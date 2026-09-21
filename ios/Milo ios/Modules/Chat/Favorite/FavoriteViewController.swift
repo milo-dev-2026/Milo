@@ -385,7 +385,7 @@ extension FavoriteViewController: UITableViewDataSource, UITableViewDelegate {
 // MARK: - 收藏Cell基类
 class FavoriteBaseCell: UITableViewCell {
     
-    private let cardView = UIView()
+    let cardView = UIView()
     let typeIconView = UIImageView()
     let timeLabel = UILabel()
     let senderLabel = UILabel()

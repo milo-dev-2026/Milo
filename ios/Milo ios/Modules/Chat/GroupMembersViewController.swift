@@ -660,7 +660,7 @@ class ForbiddenMembersViewController: UIViewController, UITableViewDataSource, U
 
     @objc private func addMutedMember() {
         let vc = ChooseContactsViewController()
-        vc.onContactsSelected = { [weak self] uids in
+        vc.onContactsSelected = { [weak self] (uids: [String]) in
             guard let self = self, let uid = uids.first else { return }
             self.muteMember(uid: uid)
         }

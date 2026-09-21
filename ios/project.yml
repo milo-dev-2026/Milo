@@ -16,6 +16,7 @@ settings:
     ENABLE_BITCODE: NO
     INFOPLIST_FILE: Milo ios/App/Info.plist
     PRODUCT_BUNDLE_IDENTIFIER: com.milo.im
+    GCC_WARN_UNDECLARED_SELECTOR: NO
 
 targets:
   Milo:

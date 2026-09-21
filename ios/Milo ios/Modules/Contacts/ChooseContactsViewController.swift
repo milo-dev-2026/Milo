@@ -11,6 +11,7 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
     private var selectedUids: Set<String> = []
     private var maxSelection: Int
     private var onSelected: (([(uid: String, name: String)]) -> Void)?
+    var onContactsSelected: (([String]) -> Void)?
 
     init(maxSelection: Int = 9, onSelected: (([(uid: String, name: String)]) -> Void)? = nil) {
         self.maxSelection = maxSelection
@@ -135,6 +136,7 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
     @objc private func done() {
         let selected = allContacts.filter { selectedUids.contains($0.uid) }.map { (uid: $0.uid, name: $0.name) }
         onSelected?(selected)
+        onContactsSelected?(selected.map { $0.uid })
         navigationController?.popViewController(animated: true)
     }
 }

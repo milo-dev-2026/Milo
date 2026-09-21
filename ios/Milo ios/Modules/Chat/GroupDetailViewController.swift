@@ -673,7 +673,7 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             switch indexPath.row {
             case 0:
                 // 查找聊天内容
-                let vc = SearchAllViewController(channelId: groupId)
+                let vc = SearchAllViewController()
                 navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 清空聊天记录
@@ -903,7 +903,7 @@ class GroupAdminsViewController: UIViewController, UITableViewDataSource, UITabl
 
     @objc private func addAdmin() {
         let vc = ChooseContactsViewController()
-        vc.onContactsSelected = { [weak self] uids in
+        vc.onContactsSelected = { [weak self] (uids: [String]) in
             guard let self = self, let uid = uids.first else { return }
             self.addAdminAction(uid: uid)
         }

@@ -26,7 +26,9 @@ class MainTabBarController: UITabBarController {
 
         // 应用外观
         tabBar.standardAppearance = appearance
-        tabBar.scrollEdgeAppearance = appearance
+        if #available(iOS 15.0, *) {
+            tabBar.scrollEdgeAppearance = appearance
+        }
 
         // iPad上TabBar字体调大
         if ScreenAdapter.isPad {

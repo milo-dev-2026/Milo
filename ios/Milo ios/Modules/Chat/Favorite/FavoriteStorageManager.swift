@@ -117,8 +117,8 @@ class FavoriteStorageManager {
             return FavoriteItem(
                 type: .video,
                 content: message.content,
-                videoURL: url,
                 imageURL: parts.first,
+                videoURL: url,
                 fromUser: from
             )
             
