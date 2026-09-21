@@ -91,6 +91,11 @@ extension IMManager: WebSocketDelegate {
             isConnected = false
             onConnectionChanged?(false)
             scheduleReconnect()
+        case .peerClosed:
+            print("IM连接被对端关闭")
+            isConnected = false
+            onConnectionChanged?(false)
+            scheduleReconnect()
         case .error(let error):
             print("IM错误: \(error?.localizedDescription ?? "")")
             isConnected = false
