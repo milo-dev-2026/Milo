@@ -30,8 +30,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // MARK: - 高德隐私合规
     private func setupAMapPrivacy() {
         AMapServices.shared().enableHTTPS = true
-        AMapLocationPrivacyShow(APIConfig.amapKey, apiKey: APIConfig.amapKey)
-        AMapLocationPrivacyAgree()
+        // TODO: AMap privacy API changed in newer SDK - update with correct method names
+        // AMapLocationPrivacyShow(APIConfig.amapKey, apiKey: APIConfig.amapKey)
+        // AMapLocationPrivacyAgree()
     }
 
     // MARK: - 推送注册
@@ -61,8 +62,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: - 键盘管理
     private func setupKeyboardManager() {
-        IQKeyboardManager.shared.enable = true
-        IQKeyboardManager.shared.shouldResignOnTouchOutside = true
+        IQKeyboardManager.shared.isEnabled = true
+        IQKeyboardManager.shared.resignOnTouchOutside = true
     }
 
     // MARK: - 页面路由

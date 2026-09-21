@@ -184,7 +184,7 @@ class NoteFolderManagerViewController: UIViewController, UITableViewDataSource, 
         return UISwipeActionsConfiguration(actions: [delete])
     }
     @objc private func addFolder() {
-        let alert = UIAlertController(title: "新建文件夹", preferredStyle: .alert)
+        let alert = UIAlertController(title: "新建文件夹", message: nil, preferredStyle: .alert)
         alert.addTextField { $0.placeholder = "文件夹名称" }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in

@@ -58,7 +58,7 @@ class EmojiPanelView: UIView {
         collectionView.backgroundColor = .systemBackground
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(EmojiCell.self, forCellWithReuseIdentifier: "EmojiCell")
+        collectionView.register(EmojiPanelCell.self, forCellWithReuseIdentifier: "EmojiCell")
         collectionView.alwaysBounceVertical = true
 
         let deleteBtn = UIButton(type: .system)
@@ -104,7 +104,7 @@ class EmojiPanelView: UIView {
 }
 
 // MARK: - Emoji Cell
-private class EmojiCell: UICollectionViewCell {
+private class EmojiPanelCell: UICollectionViewCell {
     let label = UILabel()
 
     override init(frame: CGRect) {
@@ -133,7 +133,7 @@ extension EmojiPanelView: UICollectionViewDataSource, UICollectionViewDelegate {
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "EmojiCell", for: indexPath) as! EmojiCell
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "EmojiCell", for: indexPath) as! EmojiPanelCell
         if indexPath.section == 0 && !recentEmojis.isEmpty {
             cell.label.text = recentEmojis[indexPath.item]
         } else {

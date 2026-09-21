@@ -82,8 +82,8 @@ class AccountBindingViewController: UIViewController, UITableViewDataSource, UIT
         )
 
         alert.addTextField { tf in
-            tf.placeholder = bindType == .phone ? "请输入手机号" : "请输入邮箱"
-            tf.keyboardType = bindType == .phone ? .numberPad : .emailAddress
+            tf.placeholder = self.bindType == .phone ? "请输入手机号" : "请输入邮箱"
+            tf.keyboardType = self.bindType == .phone ? .numberPad : .emailAddress
             if self.isBound { tf.text = self.boundAccount }
         }
         alert.addTextField { tf in

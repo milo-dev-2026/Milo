@@ -18,6 +18,8 @@ class ChatViewController: UIViewController {
     private let inputBar = ChatInputBar()
     private var messages: [Message] = []
     private var imagePicker: UIImagePickerController?
+    private var typingTimer: Timer?
+    private var isTyping = false
 
     init(channelId: String, title: String) {
         self.channelId = channelId
@@ -248,9 +250,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     // MARK: - 正在输入提示
-    private var typingTimer: Timer?
-    private var isTyping = false
-
     private func updateTypingStatus(isTyping: Bool) {
         if isTyping {
             guard !self.isTyping else { return }
@@ -270,29 +269,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         isTyping = false
         title = titleText
         typingTimer?.invalidate()
-    }
-
-    // MARK: - 键盘处理
-    @objc private func keyboardWillShow(_ notification: Notification) {
-        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-        let height = frame.height
-        view.layoutIfNeeded()
-        UIView.animate(withDuration: 0.3) {
-            self.inputBar.snp.updateConstraints { make in
-                make.bottom.equalToSuperview().offset(-height)
-            }
-            self.view.layoutIfNeeded()
-        }
-        scrollToBottom()
-    }
-
-    @objc private func keyboardWillHide(_ notification: Notification) {
-        UIView.animate(withDuration: 0.3) {
-            self.inputBar.snp.updateConstraints { make in
-                make.bottom.equalToSuperview()
-            }
-            self.view.layoutIfNeeded()
-        }
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -478,6 +454,9 @@ extension ChatViewController: ChatInputBarDelegate {
         updateTypingStatus(isTyping: false)
     }
 
+    func didInsertEmoji(_ emoji: String) {
+    }
+
     func didTapPhotoButton() {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .authorized || status == .limited {
@@ -533,7 +512,7 @@ extension ChatViewController: ChatInputBarDelegate {
     private func presentPhotoPicker() {
         let picker = UIImagePickerController()
         picker.sourceType = .photoLibrary
-        picker.mediaTypes = [.image]
+        picker.mediaTypes = [UTType.image.identifier]
         picker.delegate = self
         imagePicker = picker
         present(picker, animated: true)
@@ -542,7 +521,7 @@ extension ChatViewController: ChatInputBarDelegate {
     private func presentCamera() {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.mediaTypes = [.image, .movie]
+        picker.mediaTypes = [UTType.image.identifier, UTType.movie.identifier]
         picker.videoQuality = .typeMedium
         picker.videoMaximumDuration = 60
         picker.delegate = self
@@ -589,7 +568,7 @@ extension ChatViewController: ChatInputBarDelegate {
                 let fileName = "video_\(Int(Date().timeIntervalSince1970)).mp4"
                 let path = try await APIClient.shared.upload(data: data, fileName: fileName)
                 let thumbName = "thumb_\(Int(Date().timeIntervalSince1970)).jpg"
-                let thumbPath = try await APIClient.shared.upload(data: UIImage(systemName: "video")!.jpegData()!, fileName: thumbName)
+                let thumbPath = try await APIClient.shared.upload(data: UIImage(systemName: "video")!.jpegData(compressionQuality: 0.6)!, fileName: thumbName)
                 let content = "\(thumbPath)|\(path)"
                 let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 4))
                 if response["status"] as? Int == 200 {

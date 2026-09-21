@@ -126,7 +126,7 @@ class MultiImagePickerController: UIViewController {
         }
         let urls = selectedAssets.compactMap { assets[$0] }
         if let firstAsset = urls.first {
-            let img = imageManager.requestImageDataAndOrientation(for: firstAsset) { _, _, _, _ in }
+            let img = imageManager.requestImageDataAndOrientation(for: firstAsset, options: nil) { _, _, _, _ in }
             let previewVC = ImagePreviewViewController(url: nil)
             present(previewVC, animated: true)
         }

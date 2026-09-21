@@ -4,9 +4,9 @@ use_frameworks!
 target 'XianLeiHuHu' do
 
   # 高德地图 SDK
-  pod 'AMap3DMap', '~> 9.0'
-  pod 'AMapLocation', '~> 2.10'
-  pod 'AMapSearch', '~> 9.0'
+  pod 'AMap3DMap'
+  pod 'AMapLocation'
+  pod 'AMapSearch'
 
   # 腾讯实时音视频 TRTC
   pod 'TXLiteAVSDK_TRTC'
@@ -30,7 +30,7 @@ target 'XianLeiHuHu' do
   pod 'FDFullscreenPopGesture'
 
   # 键盘管理
-  pod 'IQKeyboardManagerSwift', '~> 6.5'
+  pod 'IQKeyboardManagerSwift'
 
 end
 

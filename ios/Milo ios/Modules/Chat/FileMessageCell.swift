@@ -81,7 +81,7 @@ class FileMessageCell: UITableViewCell {
         isFromMe = message.isFromMe
         timeLabel.text = message.timeString
 
-        let parts = message.content.split(separator: "|", maxParts: 2)
+        let parts = message.content.split(separator: "|")
         let fileName: String
         let fileSize: String
 

@@ -127,7 +127,7 @@ extension LocationPickerViewController: MAMapViewDelegate {
 
     func mapView(_ mapView: MAMapView!, didChange userTrackingMode: MAUserTrackingMode, byUser wasUserAction: Bool) {
         if wasUserAction {
-            mapView.setCenterCoordinate(mapView.userLocation.coordinate, animated: true)
+            mapView.setCenter(mapView.userLocation.coordinate, animated: true)
         }
     }
 
@@ -143,8 +143,8 @@ extension LocationPickerViewController: MAMapViewDelegate {
 // MARK: - AMapLocationManagerDelegate
 extension LocationPickerViewController: AMapLocationManagerDelegate {
 
-    func amapLocationManager(_ manager: AMapLocationManager!, didUpdateLocation location: CLLocation!) {
-        mapView.setCenterCoordinate(location.coordinate, animated: true)
+    func amapLocationManager(_ manager: AMapLocationManager!, didUpdate location: CLLocation!) {
+        mapView.setCenter(location.coordinate, animated: true)
         mapView.setZoomLevel(16, animated: true)
         searchPOI(keyword: "", location: location.coordinate)
         manager.stopUpdatingLocation()
@@ -183,7 +183,7 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
         selectedPOI = pois[indexPath.row]
         tableView.reloadData()
         if let coord = selectedPOI?.location {
-            mapView.setCenterCoordinate(CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude), animated: true)
+            mapView.setCenter(CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude), animated: true)
         }
     }
 }

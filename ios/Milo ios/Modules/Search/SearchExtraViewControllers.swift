@@ -38,7 +38,7 @@ class SearchUserViewController: UIViewController, UITableViewDataSource, UITable
                 let resp = try await APIClient.shared.requestRaw(.globalSearch(keyword: keyword, page: 1))
                 if let data = resp["data"] as? [String: Any], let friends = data["friends"] as? [[String: Any]] {
                     results = friends.map { ($0["channel_id"] as? String ?? "", $0["name"] as? String ?? "") }
-                    DispatchQueue.main.async { tableView.reloadData() }
+                    DispatchQueue.main.async { self.tableView.reloadData() }
                 }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("搜索失败") }
@@ -67,7 +67,7 @@ extension SearchUserViewController: UITextFieldDelegate {
                 let resp = try await APIClient.shared.requestRaw(.searchMessages(keyword: keyword))
                 if let data = resp["data"] as? [String: Any], let users = data["users"] as? [[String: Any]] {
                     results = users.map { ($0["uid"] as? String ?? "", $0["name"] as? String ?? "") }
-                    DispatchQueue.main.async { tableView.reloadData() }
+                    DispatchQueue.main.async { self.tableView.reloadData() }
                 }
             } catch { }
         }
@@ -126,7 +126,7 @@ class SearchMsgResultViewController: UIViewController, UITableViewDataSource, UI
                 let resp = try await APIClient.shared.requestRaw(.searchMessages(keyword: keyword))
                 if let data = resp["data"] as? [String: Any], let msgs = data["messages"] as? [[String: Any]] {
                     results = msgs.map { ($0["message_id"] as? String ?? "", $0["content"] as? String ?? "", $0["sender_name"] as? String ?? "", $0["created_at"] as? String ?? "") }
-                    DispatchQueue.main.async { tableView.reloadData() }
+                    DispatchQueue.main.async { self.tableView.reloadData() }
                 }
             } catch { }
         }
@@ -385,7 +385,7 @@ extension SearchAllMembersViewController: UITextFieldDelegate {
                 let resp = try await APIClient.shared.requestRaw(.searchMessages(keyword: keyword))
                 if let data = resp["data"] as? [String: Any], let users = data["users"] as? [[String: Any]] {
                     members = users.map { ($0["uid"] as? String ?? "", $0["name"] as? String ?? "") }
-                    DispatchQueue.main.async { tableView.reloadData() }
+                    DispatchQueue.main.async { self.tableView.reloadData() }
                 }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("搜索失败") }

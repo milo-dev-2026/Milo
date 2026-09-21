@@ -237,14 +237,14 @@ class ScanResultViewController: UIViewController {
         let contentLabel = UILabel()
         contentLabel.text = result; contentLabel.font = ScreenAdapter.font(16); contentLabel.numberOfLines = 0; contentLabel.textAlignment = .center
         let copyButton = UIButton(type: .system); copyButton.setTitle("复制内容", for: .normal); copyButton.titleLabel?.font = ScreenAdapter.font(16)
-        copyButton.addTarget(self, action: #selector(copy), for: .touchUpInside)
+        copyButton.addTarget(self, action: #selector(copyContent), for: .touchUpInside)
         let openButton = UIButton(type: .system); openButton.setTitle("打开链接", for: .normal); openButton.titleLabel?.font = ScreenAdapter.font(16)
         openButton.addTarget(self, action: #selector(open), for: .touchUpInside)
         let stack = UIStackView(arrangedSubviews: [icon, contentLabel, copyButton, openButton]); stack.axis = .vertical; stack.spacing = 16; stack.alignment = .center
         view.addSubview(stack); stack.snp.makeConstraints { make in make.center.equalToSuperview(); make.leading.equalToSuperview().offset(24); make.trailing.equalToSuperview().offset(-24) }
         icon.snp.makeConstraints { make in make.width.height.equalTo(ScreenAdapter.scaleW(80)) }
     }
-    @objc private func copy() { UIPasteboard.general.string = result; AppUtility.showToast("已复制") }
+    @objc private func copyContent() { UIPasteboard.general.string = result; AppUtility.showToast("已复制") }
     @objc private func open() {
         if let url = URL(string: result), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)

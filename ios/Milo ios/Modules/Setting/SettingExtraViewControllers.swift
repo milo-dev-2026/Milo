@@ -131,7 +131,7 @@ class VertifyPhoneViewController: UIViewController {
                 let resp = try await APIClient.shared.requestRaw(.bindPhone(zone: "+86", phone: account, code: code))
                 let status = resp["status"] as? Int ?? 0
                 DispatchQueue.main.async {
-                    if status == 200 { UserDefaults.standard.set(account, forKey: "bind_phone"); AppUtility.showToast("绑定成功"); self.navigationController?.popViewController(animated: true) }
+                    if status == 200 { UserDefaults.standard.set(self.account, forKey: "bind_phone"); AppUtility.showToast("绑定成功"); self.navigationController?.popViewController(animated: true) }
                     else { AppUtility.showToast(resp["msg"] as? String ?? "绑定失败") }
                 }
             } catch { DispatchQueue.main.async { AppUtility.showToast("操作失败") } }
@@ -189,7 +189,7 @@ class VertifyEmailViewController: UIViewController {
                 let resp = try await APIClient.shared.requestRaw(.bindEmail(email: account, code: code))
                 let status = resp["status"] as? Int ?? 0
                 DispatchQueue.main.async {
-                    if status == 200 { UserDefaults.standard.set(account, forKey: "bind_email"); AppUtility.showToast("绑定成功"); self.navigationController?.popViewController(animated: true) }
+                    if status == 200 { UserDefaults.standard.set(self.account, forKey: "bind_email"); AppUtility.showToast("绑定成功"); self.navigationController?.popViewController(animated: true) }
                     else { AppUtility.showToast(resp["msg"] as? String ?? "绑定失败") }
                 }
             } catch { DispatchQueue.main.async { AppUtility.showToast("操作失败") } }

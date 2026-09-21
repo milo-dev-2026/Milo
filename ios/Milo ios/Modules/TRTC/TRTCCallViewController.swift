@@ -140,7 +140,7 @@ class TRTCCallViewController: UIViewController {
     }
 
     private func setupTRTC() async {
-        trtcCloud = TRTCCloud.shareInstance()
+        trtcCloud = TRTCCloud.sharedInstance()
         trtcCloud?.delegate = self
         trtcCloud?.setVideoEncoderMirror(true)
 
@@ -203,7 +203,7 @@ class TRTCCallViewController: UIViewController {
 
     @objc private func toggleSpeaker() {
         isSpeakerOn.toggle()
-        trtcCloud?.setAudioRoute(isSpeakerOn ? .speakerMode : .receiverMode)
+        trtcCloud?.setAudioRoute(isSpeakerOn ? .speaker : .receiver)
         let imageName = isSpeakerOn ? "speaker.wave.3.fill" : "speaker.wave.1.fill"
         speakerButton.setImage(UIImage(systemName: imageName), for: .normal)
     }

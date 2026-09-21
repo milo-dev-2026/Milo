@@ -118,6 +118,9 @@ extension IMManager: WebSocketDelegate {
             isConnected = false
             onConnectionChanged?(false)
             scheduleReconnect()
+
+        default:
+            break
         }
     }
 

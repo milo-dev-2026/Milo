@@ -29,15 +29,14 @@ class DeviceManageViewController: UIViewController, UITableViewDataSource, UITab
     private func loadDevices() {
         Task {
             do {
-                struct DeviceResp: Decodable { let device_id: String?; let name: String?; let info: String?; let is_current: Bool? }
-                struct DeviceListResp: Decodable { let data: [DeviceResp]? }
-                let resp: DeviceListResp = try await APIClient.shared.requestRaw(.getDeviceList)
-                let items = (resp.data ?? []).map {
+                let resp = try await APIClient.shared.requestRaw(.getDeviceList)
+                let dataArray = resp["data"] as? [[String: Any]] ?? []
+                let items = dataArray.map {
                     DeviceItem(
-                        deviceId: $0.device_id ?? UUID().uuidString,
-                        name: $0.name ?? "未知设备",
-                        info: $0.info ?? "",
-                        isCurrent: $0.is_current ?? false
+                        deviceId: $0["device_id"] as? String ?? UUID().uuidString,
+                        name: $0["name"] as? String ?? "未知设备",
+                        info: $0["info"] as? String ?? "",
+                        isCurrent: $0["is_current"] as? Bool ?? false
                     )
                 }
                 DispatchQueue.main.async {

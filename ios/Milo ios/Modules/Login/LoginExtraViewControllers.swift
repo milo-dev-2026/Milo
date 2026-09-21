@@ -295,7 +295,7 @@ class ResetLoginPwdViewController: UIViewController {
         submitButton.isEnabled = false
         Task {
             do {
-                let resp = try await APIClient.shared.requestRaw(.pwdForget(zone: "+86", phone: phone, code: code, pwd: pwd))
+                let resp = try await APIClient.shared.requestRaw(.changePwdByPhone(zone: "+86", phone: phone, code: code, pwd: pwd))
                 let status = resp["status"] as? Int ?? 0
                 DispatchQueue.main.async {
                     self.submitButton.isEnabled = true

@@ -65,10 +65,19 @@ class RecordingViewController: UIViewController {
         try? session.setCategory(.playAndRecord, mode: .default)
         try? session.setActive(true)
 
-        AVAudioApplication.requestRecordPermission { [weak self] granted in
-            DispatchQueue.main.async {
-                guard granted else { AppUtility.showToast("需要麦克风权限"); return }
-                self?.startRecording()
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { [weak self] granted in
+                DispatchQueue.main.async {
+                    guard granted else { AppUtility.showToast("需要麦克风权限"); return }
+                    self?.startRecording()
+                }
+            }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                DispatchQueue.main.async {
+                    guard granted else { AppUtility.showToast("需要麦克风权限"); return }
+                    self?.startRecording()
+                }
             }
         }
     }

@@ -42,7 +42,7 @@ class FavoriteViewController: UIViewController {
                               let typeRaw = dict["type"] as? Int,
                               let type = FavoriteItem.FavType(rawValue: typeRaw),
                               let content = dict["content"] as? String,
-                              let ts = (dict["created_at"] as? Int64).map(Int64.init) ?? (dict["created_at"] as? Int).map(Int64.init)
+                              let ts = (dict["created_at"] as? Int64) ?? (dict["created_at"] as? Int).map { Int64($0) }
                         else { return nil }
                         return FavoriteItem(id: id, type: type, content: content, timestamp: ts)
                     }
@@ -60,7 +60,7 @@ class FavoriteViewController: UIViewController {
 }
 
 struct FavoriteItem: Codable {
-    enum FavType: Int { case text = 1, image = 2, link = 3 }
+    enum FavType: Int, Codable { case text = 1, image = 2, link = 3 }
     let id: Int
     let type: FavType
     let content: String
