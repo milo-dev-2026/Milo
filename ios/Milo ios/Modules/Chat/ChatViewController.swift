@@ -13,6 +13,7 @@ class ChatViewController: UIViewController {
 
     let channelId: String
     private let titleText: String
+    private let channelType: Int // 1: 单聊, 2: 群聊
 
     private let tableView = UITableView()
     private let inputBar = ChatInputBar()
@@ -21,9 +22,10 @@ class ChatViewController: UIViewController {
     private var typingTimer: Timer?
     private var isTyping = false
 
-    init(channelId: String, title: String) {
+    init(channelId: String, title: String, channelType: Int = 1) {
         self.channelId = channelId
         self.titleText = title
+        self.channelType = channelType
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -60,6 +62,8 @@ class ChatViewController: UIViewController {
         tableView.register(VideoMessageCell.self, forCellReuseIdentifier: "VideoMessageCell")
         tableView.register(FileMessageCell.self, forCellReuseIdentifier: "FileMessageCell")
         tableView.register(LocationMessageCell.self, forCellReuseIdentifier: "LocationMessageCell")
+        tableView.register(CardMessageCell.self, forCellReuseIdentifier: "CardMessageCell")
+        tableView.register(NoteMessageCell.self, forCellReuseIdentifier: "NoteMessageCell")
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
 
@@ -85,32 +89,55 @@ class ChatViewController: UIViewController {
     }
 
     private func setupNavBar() {
-        let audioCallBtn = UIBarButtonItem(
-            image: UIImage(systemName: "phone"),
-            style: .plain,
-            target: self,
-            action: #selector(startAudioCall)
-        )
-
-        let videoCallBtn = UIBarButtonItem(
-            image: UIImage(systemName: "video"),
-            style: .plain,
-            target: self,
-            action: #selector(startVideoCall)
-        )
-
-        navigationItem.rightBarButtonItems = [videoCallBtn, audioCallBtn]
-        navigationItem.rightBarButtonItems?.forEach { $0.tintColor = .themePrimary }
+        // 群聊时显示 "+" 按钮，单聊时不显示通话入口
+        if channelType == 2 {
+            let moreBtn = UIBarButtonItem(
+                image: UIImage(systemName: "plus.circle"),
+                style: .plain,
+                target: self,
+                action: #selector(showGroupMoreOptions)
+            )
+            moreBtn.tintColor = .themePrimary
+            navigationItem.rightBarButtonItem = moreBtn
+        }
     }
 
-    @objc private func startAudioCall() {
-        let vc = TRTCCallViewController(channelId: channelId, isVideoCall: false)
-        present(vc, animated: true)
+    @objc private func showGroupMoreOptions() {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
+            self?.startGroupVoiceCall()
+        })
+
+        alert.addAction(UIAlertAction(title: "群聊详情", style: .default) { [weak self] _ in
+            self?.openGroupDetail()
+        })
+
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+
+        // iPad 适配
+        if let popover = alert.popoverPresentationController {
+            popover.barButtonItem = navigationItem.rightBarButtonItem
+        }
+
+        present(alert, animated: true)
     }
 
-    @objc private func startVideoCall() {
-        let vc = TRTCCallViewController(channelId: channelId, isVideoCall: true)
-        present(vc, animated: true)
+    private func startGroupVoiceCall() {
+        let vc = ChooseVideoCallMembersViewController(groupId: channelId, groupType: channelType)
+        vc.onSelected = { [weak self] uids in
+            guard let self = self else { return }
+            // 发起语音通话
+            let callVC = TRTCCallViewController(channelId: self.channelId)
+            callVC.modalPresentationStyle = .fullScreen
+            self.present(callVC, animated: true)
+        }
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func openGroupDetail() {
+        let vc = GroupDetailViewController(groupId: channelId)
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     private func loadMessages() {
@@ -197,6 +224,14 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             let cell = tableView.dequeueReusableCell(withIdentifier: "LocationMessageCell", for: indexPath) as! LocationMessageCell
             cell.configure(with: message)
             return cell
+        case .card:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "CardMessageCell", for: indexPath) as! CardMessageCell
+            cell.configure(with: message)
+            return cell
+        case .note:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "NoteMessageCell", for: indexPath) as! NoteMessageCell
+            cell.configure(with: message)
+            return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell
             cell.configure(with: message)
@@ -232,6 +267,17 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         case .location:
             if let cell = tableView.cellForRow(at: indexPath) as? LocationMessageCell {
                 cell.openLocationMap(from: self)
+            }
+        case .card:
+            if let cardInfo = CardMessageInfo.parse(from: message.content) {
+                let detailVC = ContactDetailViewController(uid: cardInfo.uid)
+                navigationController?.pushViewController(detailVC, animated: true)
+            }
+        case .note:
+            // 解析笔记消息内容并展示详情
+            if let note = parseNoteMessage(message.content) {
+                let detailVC = NoteDetailViewController(note: note)
+                navigationController?.pushViewController(detailVC, animated: true)
             }
         default:
             break
@@ -371,22 +417,29 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     private func favoriteMessage(_ message: Message) {
+        // 使用本地存储收藏
+        let favItem = FavoriteStorageManager.shared.createFavorite(from: message, senderName: titleText)
+        FavoriteStorageManager.shared.addFavorite(favItem)
+        AppUtility.showToast("已收藏")
+        
+        // 同时尝试同步到服务器（失败不影响本地）
         Task {
             do {
                 let typeVal: Int
                 switch message.type {
                 case .text: typeVal = 1
                 case .image: typeVal = 2
+                case .voice: typeVal = 3
+                case .video: typeVal = 4
+                case .file: typeVal = 5
+                case .location: typeVal = 6
+                case .card: typeVal = 7
+                case .note: typeVal = 100
                 default: typeVal = 1
                 }
                 _ = try await APIClient.shared.requestRaw(.addFavorite(type: typeVal, content: message.content, extra: nil))
-                DispatchQueue.main.async {
-                    AppUtility.showToast("已收藏")
-                }
             } catch {
-                DispatchQueue.main.async {
-                    AppUtility.showToast("收藏失败")
-                }
+                // 静默失败，本地已保存
             }
         }
     }
@@ -508,6 +561,24 @@ extension ChatViewController: ChatInputBarDelegate {
         picker.delegate = self
         present(picker, animated: true)
     }
+    
+    func didTapNoteButton() {
+        let noteSelectVC = NoteSelectViewController()
+        noteSelectVC.onNoteSelected = { [weak self] note in
+            self?.sendNoteMessage(note)
+        }
+        let nav = UINavigationController(rootViewController: noteSelectVC)
+        nav.modalPresentationStyle = .pageSheet
+        present(nav, animated: true)
+    }
+    
+    func didTapCardButton() {
+        let chooseVC = ChooseContactsViewController(maxSelection: 1) { [weak self] selected in
+            guard let contact = selected.first else { return }
+            self?.sendCardMessage(uid: contact.uid, name: contact.name, avatar: "", vercode: contact.uid)
+        }
+        navigationController?.pushViewController(chooseVC, animated: true)
+    }
 
     private func presentPhotoPicker() {
         let picker = UIImagePickerController()
@@ -530,103 +601,168 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     private func sendImageMessage(data: Data) {
-        Task {
-            do {
-                let fileName = "img_\(Int(Date().timeIntervalSince1970)).jpg"
-                let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: path, type: 2))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: 1,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: path,
-                        type: .image,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                }
-            } catch {
-                AppUtility.showToast("发送图片失败")
-            }
+        guard let image = UIImage(data: data) else {
+            AppUtility.showToast("图片数据无效")
+            return
         }
+        COSUploadManager.shared.uploadImage(image,
+            progress: { progressValue in
+                print("图片上传进度: \(String(format: "%.1f%%", progressValue * 100))")
+            },
+            completion: { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .success(let cdnURL):
+                    Task {
+                        do {
+                            let response = try await APIClient.shared.requestRaw(
+                                .sendMessage(channelId: self.channelId, content: cdnURL, type: 2)
+                            )
+                            if response["status"] as? Int == 200 {
+                                let msg = Message(
+                                    messageID: UUID().uuidString,
+                                    channelID: self.channelId,
+                                    channelType: 1,
+                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                                    content: cdnURL,
+                                    type: .image,
+                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                                    status: 1
+                                )
+                                self.messages.append(msg)
+                                DispatchQueue.main.async {
+                                    self.tableView.reloadData()
+                                    self.scrollToBottom()
+                                }
+                            }
+                        } catch {
+                            AppUtility.showToast("发送图片失败")
+                        }
+                    }
+                case .failure(let error):
+                    print("图片上传失败: \(error.localizedDescription)")
+                    AppUtility.showToast("图片上传失败")
+                }
+            }
+        )
     }
 
     private func sendVideoMessage(url: URL) {
-        Task {
-            do {
-                guard let data = try? Data(contentsOf: url) else {
-                    AppUtility.showToast("视频读取失败")
-                    return
-                }
-                let fileName = "video_\(Int(Date().timeIntervalSince1970)).mp4"
-                let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                let thumbName = "thumb_\(Int(Date().timeIntervalSince1970)).jpg"
-                let thumbPath = try await APIClient.shared.upload(data: UIImage(systemName: "video")!.jpegData(compressionQuality: 0.6)!, fileName: thumbName)
-                let content = "\(thumbPath)|\(path)"
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 4))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: 1,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: content,
-                        type: .video,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
+        // 先上传视频
+        COSUploadManager.shared.uploadVideo(url,
+            progress: { progressValue in
+                print("视频上传进度: \(String(format: "%.1f%%", progressValue * 100))")
+            },
+            completion: { [weak self] videoResult in
+                guard let self = self else { return }
+                switch videoResult {
+                case .success(let videoCDNURL):
+                    // 再上传缩略图（使用系统图标作为占位）
+                    let thumbImage = UIImage(systemName: "video")!
+                    COSUploadManager.shared.uploadImage(thumbImage,
+                        progress: { progressValue in
+                            print("视频缩略图上传进度: \(String(format: "%.1f%%", progressValue * 100))")
+                        },
+                        completion: { [weak self] thumbResult in
+                            guard let self = self else { return }
+                            switch thumbResult {
+                            case .success(let thumbCDNURL):
+                                let content = "\(thumbCDNURL)|\(videoCDNURL)"
+                                Task {
+                                    do {
+                                        let response = try await APIClient.shared.requestRaw(
+                                            .sendMessage(channelId: self.channelId, content: content, type: 4)
+                                        )
+                                        if response["status"] as? Int == 200 {
+                                            let msg = Message(
+                                                messageID: UUID().uuidString,
+                                                channelID: self.channelId,
+                                                channelType: 1,
+                                                fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                                                content: content,
+                                                type: .video,
+                                                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                                                status: 1
+                                            )
+                                            self.messages.append(msg)
+                                            DispatchQueue.main.async {
+                                                self.tableView.reloadData()
+                                                self.scrollToBottom()
+                                            }
+                                        }
+                                    } catch {
+                                        AppUtility.showToast("发送视频失败")
+                                    }
+                                }
+                            case .failure(let error):
+                                print("缩略图上传失败: \(error.localizedDescription)")
+                                AppUtility.showToast("缩略图上传失败")
+                            }
+                        }
                     )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
+                case .failure(let error):
+                    print("视频上传失败: \(error.localizedDescription)")
+                    AppUtility.showToast("视频上传失败")
                 }
-            } catch {
-                AppUtility.showToast("发送视频失败")
             }
-        }
+        )
     }
 
     private func sendFileMessage(url: URL) {
-        Task {
-            do {
-                guard let data = try? Data(contentsOf: url) else {
-                    AppUtility.showToast("文件读取失败")
-                    return
-                }
-                let fileName = url.lastPathComponent
-                let fileSize = data.count
-                let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                let content = "\(fileName)|\(fileSize)"
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 5))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: 1,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: content,
-                        type: .file,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
+        let fileName = url.lastPathComponent
+
+        COSUploadManager.shared.uploadFile(fileURL: url,
+            fileName: fileName,
+            contentType: "application/octet-stream",
+            progress: { progressValue in
+                print("文件上传进度: \(String(format: "%.1f%%", progressValue * 100))")
+            },
+            completion: { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .success(let cdnURL):
+                    // 读取文件大小
+                    let fileSize: Int
+                    do {
+                        let resources = try url.resourceValues(forKeys: [.fileSizeKey])
+                        fileSize = resources.fileSize ?? 0
+                    } catch {
+                        fileSize = 0
                     }
+                    // content 格式: fileName|fileSize|cdnURL
+                    let content = "\(fileName)|\(fileSize)|\(cdnURL)"
+                    Task {
+                        do {
+                            let response = try await APIClient.shared.requestRaw(
+                                .sendMessage(channelId: self.channelId, content: content, type: 5)
+                            )
+                            if response["status"] as? Int == 200 {
+                                let msg = Message(
+                                    messageID: UUID().uuidString,
+                                    channelID: self.channelId,
+                                    channelType: 1,
+                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                                    content: content,
+                                    type: .file,
+                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                                    status: 1
+                                )
+                                self.messages.append(msg)
+                                DispatchQueue.main.async {
+                                    self.tableView.reloadData()
+                                    self.scrollToBottom()
+                                }
+                            }
+                        } catch {
+                            AppUtility.showToast("发送文件失败")
+                        }
+                    }
+                case .failure(let error):
+                    print("文件上传失败: \(error.localizedDescription)")
+                    AppUtility.showToast("文件上传失败")
                 }
-            } catch {
-                AppUtility.showToast("发送文件失败")
             }
-        }
+        )
     }
 
     private func sendLocationMessage(_ location: PickedLocation) {
@@ -655,6 +791,79 @@ extension ChatViewController: ChatInputBarDelegate {
                 AppUtility.showToast("发送位置失败")
             }
         }
+    }
+    
+    // MARK: - 发送名片消息
+    private func sendCardMessage(uid: String, name: String, avatar: String, vercode: String) {
+        let cardInfo = CardMessageInfo(uid: uid, name: name, avatar: avatar, vercode: vercode)
+        let content = cardInfo.toString()
+        Task {
+            do {
+                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 7))
+                if response["status"] as? Int == 200 {
+                    let msg = Message(
+                        messageID: UUID().uuidString,
+                        channelID: channelId,
+                        channelType: 1,
+                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                        content: content,
+                        type: .card,
+                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                        status: 1
+                    )
+                    messages.append(msg)
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
+                        self.scrollToBottom()
+                    }
+                }
+            } catch {
+                AppUtility.showToast("发送名片失败")
+            }
+        }
+    }
+    
+    // MARK: - 发送笔记消息
+    private func sendNoteMessage(_ note: NoteEntity) {
+        // 将笔记内容序列化为JSON字符串
+        guard let noteData = try? JSONEncoder().encode(note),
+              let noteString = String(data: noteData, encoding: .utf8) else {
+            AppUtility.showToast("笔记格式错误")
+            return
+        }
+        Task {
+            do {
+                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: noteString, type: 100))
+                if response["status"] as? Int == 200 {
+                    let msg = Message(
+                        messageID: UUID().uuidString,
+                        channelID: channelId,
+                        channelType: 1,
+                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                        content: noteString,
+                        type: .note,
+                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                        status: 1
+                    )
+                    messages.append(msg)
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
+                        self.scrollToBottom()
+                    }
+                }
+            } catch {
+                AppUtility.showToast("发送笔记失败")
+            }
+        }
+    }
+    
+    // MARK: - 解析笔记消息
+    private func parseNoteMessage(_ content: String) -> NoteEntity? {
+        guard let data = content.data(using: .utf8),
+              let note = try? JSONDecoder().decode(NoteEntity.self, from: data) else {
+            return nil
+        }
+        return note
     }
 }
 
@@ -773,7 +982,7 @@ class TextMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
-            bubbleView.backgroundColor = UIColor(red: 0.0, green: 0.51, blue: 1.0, alpha: 0.1)
+            bubbleView.backgroundColor = .themeBubbleOutgoing
             messageLabel.textColor = .label
             bubbleView.snp.remakeConstraints { make in
                 make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
@@ -791,7 +1000,7 @@ class TextMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
-            bubbleView.backgroundColor = .white
+            bubbleView.backgroundColor = .themeBubbleIncoming
             messageLabel.textColor = .label
             bubbleView.snp.remakeConstraints { make in
                 make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)

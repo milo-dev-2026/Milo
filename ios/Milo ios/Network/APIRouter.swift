@@ -34,6 +34,34 @@ enum APIRouter: URLRequestConvertible {
     case reactMessage(messageId: String, channelId: String, channelType: Int, emoji: String)
     case getGroupAnnouncement(groupId: String)
     case updateGroupAnnouncement(groupId: String, notice: String)
+    // Group management
+    case getGroupMembers(groupId: String, page: Int, size: Int, keyword: String?)
+    case addGroupMembers(groupId: String, uids: [String])
+    case removeGroupMembers(groupId: String, uids: [String])
+    case updateGroupInfo(groupId: String, name: String?, avatar: String?)
+    case getGroupAdmins(groupId: String)
+    case addGroupAdmin(groupId: String, uid: String)
+    case removeGroupAdmin(groupId: String, uid: String)
+    case transferGroupOwner(groupId: String, uid: String)
+    case muteGroupMember(groupId: String, uid: String, muted: Bool)
+    case getMutedMembers(groupId: String)
+    case getGroupBlackList(groupId: String)
+    case addToBlackList(groupId: String, uid: String)
+    case removeFromBlackList(groupId: String, uid: String)
+    case setJoinApproval(groupId: String, enabled: Bool)
+    case setGroupMuteAll(groupId: String, muted: Bool)
+    case setForbidAddFriend(groupId: String, forbidden: Bool)
+    case setForbidTempChat(groupId: String, forbidden: Bool)
+    case setForbidNewMemberViewHistory(groupId: String, forbidden: Bool)
+    case leaveGroup(groupId: String)
+    case dismissGroup(groupId: String)
+    case updateMyNicknameInGroup(groupId: String, nickname: String)
+    case setMessageDisturb(groupId: String, disturbed: Bool)
+    case setChatTop(groupId: String, topped: Bool)
+    case saveToContacts(groupId: String, saved: Bool)
+    case setShowGroupNickname(groupId: String, show: Bool)
+    case clearChatHistory(groupId: String)
+    case getLeftGroupMembers(groupId: String)
     // Security module
     case verifyLoginPwd(pwd: String)
     case setLockScreenPwd(pwd: String)
@@ -149,6 +177,65 @@ enum APIRouter: URLRequestConvertible {
             ])
         case let .updateGroupAnnouncement(groupId, notice):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["notice": notice])
+        case let .getGroupMembers(groupId, page, size, keyword):
+            var params: [String: Any] = ["group_id": groupId, "page": page, "size": size]
+            if let kw = keyword { params["keyword"] = kw }
+            request = try URLEncoding.default.encode(request, with: params)
+        case let .addGroupMembers(groupId, uids):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uids": uids])
+        case let .removeGroupMembers(groupId, uids):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uids": uids])
+        case let .updateGroupInfo(groupId, name, avatar):
+            var body: [String: Any] = ["group_id": groupId]
+            if let n = name { body["name"] = n }
+            if let a = avatar { body["avatar"] = a }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        case let .getGroupAdmins(groupId):
+            request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
+        case let .addGroupAdmin(groupId, uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
+        case let .removeGroupAdmin(groupId, uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
+        case let .transferGroupOwner(groupId, uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
+        case let .muteGroupMember(groupId, uid, muted):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid, "muted": muted])
+        case let .getMutedMembers(groupId):
+            request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
+        case let .getGroupBlackList(groupId):
+            request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
+        case let .addToBlackList(groupId, uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
+        case let .removeFromBlackList(groupId, uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
+        case let .setJoinApproval(groupId, enabled):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "enabled": enabled])
+        case let .setGroupMuteAll(groupId, muted):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "muted": muted])
+        case let .setForbidAddFriend(groupId, forbidden):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
+        case let .setForbidTempChat(groupId, forbidden):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
+        case let .setForbidNewMemberViewHistory(groupId, forbidden):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
+        case let .leaveGroup(groupId):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
+        case let .dismissGroup(groupId):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
+        case let .updateMyNicknameInGroup(groupId, nickname):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "nickname": nickname])
+        case let .setMessageDisturb(groupId, disturbed):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "disturbed": disturbed])
+        case let .setChatTop(groupId, topped):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "topped": topped])
+        case let .saveToContacts(groupId, saved):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "saved": saved])
+        case let .setShowGroupNickname(groupId, show):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "show": show])
+        case let .clearChatHistory(groupId):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
+        case let .getLeftGroupMembers(groupId):
+            request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
         case let .verifyLoginPwd(pwd):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["pwd": pwd])
         case let .setLockScreenPwd(pwd):
@@ -220,6 +307,33 @@ enum APIRouter: URLRequestConvertible {
         case .reactMessage: return "/v1/messages/react"
         case .getGroupAnnouncement(let groupId): return "/v1/groups/\(groupId)/announcement"
         case .updateGroupAnnouncement(let groupId, _): return "/v1/groups/\(groupId)/announcement"
+        case .getGroupMembers: return "/v1/groups/members"
+        case .addGroupMembers: return "/v1/groups/members/add"
+        case .removeGroupMembers: return "/v1/groups/members/remove"
+        case .updateGroupInfo: return "/v1/groups/info/update"
+        case .getGroupAdmins: return "/v1/groups/admins"
+        case .addGroupAdmin: return "/v1/groups/admins/add"
+        case .removeGroupAdmin: return "/v1/groups/admins/remove"
+        case .transferGroupOwner: return "/v1/groups/transfer"
+        case .muteGroupMember: return "/v1/groups/mute/member"
+        case .getMutedMembers: return "/v1/groups/mute/members"
+        case .getGroupBlackList: return "/v1/groups/blacklist"
+        case .addToBlackList: return "/v1/groups/blacklist/add"
+        case .removeFromBlackList: return "/v1/groups/blacklist/remove"
+        case .setJoinApproval: return "/v1/groups/settings/join_approval"
+        case .setGroupMuteAll: return "/v1/groups/settings/mute_all"
+        case .setForbidAddFriend: return "/v1/groups/settings/forbid_add_friend"
+        case .setForbidTempChat: return "/v1/groups/settings/forbid_temp_chat"
+        case .setForbidNewMemberViewHistory: return "/v1/groups/settings/forbid_new_view_history"
+        case .leaveGroup: return "/v1/groups/leave"
+        case .dismissGroup: return "/v1/groups/dismiss"
+        case .updateMyNicknameInGroup: return "/v1/groups/my_nickname"
+        case .setMessageDisturb: return "/v1/groups/settings/message_disturb"
+        case .setChatTop: return "/v1/groups/settings/chat_top"
+        case .saveToContacts: return "/v1/groups/settings/save_contacts"
+        case .setShowGroupNickname: return "/v1/groups/settings/show_nickname"
+        case .clearChatHistory: return "/v1/groups/clear_history"
+        case .getLeftGroupMembers: return "/v1/groups/left_members"
         case .verifyLoginPwd: return "/v1/user/verify_login_pwd"
         case .setLockScreenPwd: return "/v1/user/lockscreenpwd"
         case .deleteLockScreenPwd: return "/v1/user/lockscreenpwd"
@@ -244,11 +358,18 @@ enum APIRouter: URLRequestConvertible {
         switch self {
         case .getConversationList, .getMessages, .getContacts,
              .getUserInfo, .getGroupInfo, .getFriendsApply, .getTRTCUserSig,
-             .getFavorites, .getGroupAnnouncement, .getDeviceList:
+             .getFavorites, .getGroupAnnouncement, .getDeviceList,
+             .getGroupMembers, .getGroupAdmins, .getMutedMembers,
+             .getGroupBlackList, .getLeftGroupMembers:
             return .get
-        case .updateGroupAnnouncement, .updateLockAfterMinute:
+        case .updateGroupAnnouncement, .updateLockAfterMinute,
+             .updateGroupInfo, .setJoinApproval, .setGroupMuteAll,
+             .setForbidAddFriend, .setForbidTempChat, .setForbidNewMemberViewHistory,
+             .updateMyNicknameInGroup, .setMessageDisturb, .setChatTop,
+             .saveToContacts, .setShowGroupNickname:
             return .put
-        case .deleteFavorite, .deleteLockScreenPwd, .kickDevice:
+        case .deleteFavorite, .deleteLockScreenPwd, .kickDevice,
+             .dismissGroup:
             return .delete
         default:
             return .post

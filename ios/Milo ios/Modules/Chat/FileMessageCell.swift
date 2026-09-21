@@ -35,7 +35,7 @@ class FileMessageCell: UITableViewCell {
         bubbleView.backgroundColor = .white
 
         fileIcon.image = UIImage(systemName: "doc.fill")
-        fileIcon.tintColor = .systemBlue
+        fileIcon.tintColor = .themePrimary
         fileIcon.contentMode = .scaleAspectFit
 
         nameLabel.font = ScreenAdapter.font(15)
@@ -108,7 +108,7 @@ class FileMessageCell: UITableViewCell {
             fileIcon.tintColor = .systemRed
             fileIcon.image = UIImage(systemName: "doc.richtext.fill")
         case "doc", "docx":
-            fileIcon.tintColor = .systemBlue
+            fileIcon.tintColor = .themePrimary
             fileIcon.image = UIImage(systemName: "doc.text.fill")
         case "xls", "xlsx":
             fileIcon.tintColor = .systemGreen
@@ -120,7 +120,7 @@ class FileMessageCell: UITableViewCell {
             fileIcon.tintColor = .systemPurple
             fileIcon.image = UIImage(systemName: "doc.zipper")
         default:
-            fileIcon.tintColor = .systemBlue
+            fileIcon.tintColor = .themePrimary
             fileIcon.image = UIImage(systemName: "doc.fill")
         }
 
@@ -138,6 +138,7 @@ class FileMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
+            bubbleView.backgroundColor = .themeBubbleOutgoing
             bubbleView.snp.remakeConstraints { make in
                 make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
                 make.top.equalTo(avatarView)
@@ -155,6 +156,7 @@ class FileMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
+            bubbleView.backgroundColor = .themeBubbleIncoming
             bubbleView.snp.remakeConstraints { make in
                 make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
                 make.top.equalTo(avatarView)

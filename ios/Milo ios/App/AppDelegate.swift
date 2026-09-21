@@ -10,16 +10,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
+        // 0. 全局主题配置
+        setupGlobalTheme()
+
         // 1. 先创建并显示 window（确保不会黑屏）
         let mainWindow = UIWindow(frame: UIScreen.main.bounds)
-        mainWindow.backgroundColor = UIColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 1.0)
+        mainWindow.backgroundColor = .themeBackground
         self.window = mainWindow
 
         // 2. 设置根控制器并立即显示
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         if uid.isEmpty {
             let vc = LoginViewController()
-            mainWindow.rootViewController = UINavigationController(rootViewController: vc)
+            mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
         } else {
             let vc = MainTabBarController()
             mainWindow.rootViewController = vc
@@ -29,6 +32,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // 3. 后台初始化 SDK（避免阻塞启动）
         DispatchQueue.global(qos: .userInitiated).async {
             self.setupAMapPrivacy()
+            COSUploadManager.shared.setup()
         }
         DispatchQueue.main.async {
             self.setupKeyboardManager()
@@ -37,6 +41,41 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         return true
+    }
+
+    // MARK: - 全局主题配置
+    private func setupGlobalTheme() {
+        // 导航栏全局外观
+        let navBarAppearance = UINavigationBarAppearance()
+        navBarAppearance.configureWithDefaultBackground()
+        navBarAppearance.titleTextAttributes = [
+            .foregroundColor: UIColor.label,
+            .font: ScreenAdapter.mediumFont(17)
+        ]
+        navBarAppearance.largeTitleTextAttributes = [
+            .foregroundColor: UIColor.label,
+            .font: ScreenAdapter.boldFont(34)
+        ]
+
+        UINavigationBar.appearance().tintColor = .themePrimary
+        UINavigationBar.appearance().standardAppearance = navBarAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
+        UINavigationBar.appearance().compactAppearance = navBarAppearance
+        UINavigationBar.appearance().prefersLargeTitles = true
+
+        // TabBar 全局外观
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithDefaultBackground()
+        UITabBar.appearance().tintColor = .themePrimary
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        UITabBar.appearance().unselectedItemTintColor = .systemGray
+
+        // UISwitch 全局颜色
+        UISwitch.appearance().onTintColor = .themePrimary
+
+        // UIButton 全局 tint
+        // （保持系统默认，使用扩展方法自定义主题按钮）
     }
 
     // MARK: - 高德隐私合规

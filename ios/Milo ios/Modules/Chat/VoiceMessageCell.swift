@@ -108,6 +108,7 @@ class VoiceMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
+            bubbleView.backgroundColor = .themeBubbleOutgoing
             bubbleView.snp.remakeConstraints { make in
                 make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
                 make.top.equalTo(avatarView)
@@ -125,6 +126,7 @@ class VoiceMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
+            bubbleView.backgroundColor = .themeBubbleIncoming
             bubbleView.snp.remakeConstraints { make in
                 make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
                 make.top.equalTo(avatarView)

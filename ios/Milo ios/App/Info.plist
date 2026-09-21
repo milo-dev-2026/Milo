@@ -40,7 +40,7 @@
         <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>需要使用相机进行拍照和视频通话</string>
+    <string>需要使用相机进行拍照和扫描二维码</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>需要访问相册选择图片和视频</string>
     <key>NSMicrophoneUsageDescription</key>

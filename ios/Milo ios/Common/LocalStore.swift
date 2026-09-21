@@ -50,10 +50,15 @@ class LocalStore {
         set { defaults.set(newValue, forKey: "lastBackgroundTime") }
     }
 
-    // MARK: - 消息设置
+    // MARK: - 消息通知设置
     var isMessageNotificationEnabled: Bool {
         get { defaults.object(forKey: "msg_notification_enabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "msg_notification_enabled") }
+    }
+
+    var isNotificationDetailEnabled: Bool {
+        get { defaults.object(forKey: "msg_notification_detail_enabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "msg_notification_detail_enabled") }
     }
 
     var isSoundEnabled: Bool {
@@ -66,10 +71,39 @@ class LocalStore {
         set { defaults.set(newValue, forKey: "msg_vibration_enabled") }
     }
 
+    var isGroupMuteEnabled: Bool {
+        get { defaults.object(forKey: "msg_group_mute_enabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "msg_group_mute_enabled") }
+    }
+
     // MARK: - 通用设置
     var fontSize: Int {
         get { defaults.object(forKey: "font_size") as? Int ?? 15 }
         set { defaults.set(newValue, forKey: "font_size") }
+    }
+
+    /// 深色模式：0=跟随系统，1=浅色，2=深色
+    var appearanceMode: Int {
+        get { defaults.object(forKey: "appearance_mode") as? Int ?? 0 }
+        set { defaults.set(newValue, forKey: "appearance_mode") }
+    }
+
+    /// 字体大小级别：0=小，1=标准，2=大，3=超大
+    var fontSizeLevel: Int {
+        get { defaults.object(forKey: "font_size_level") as? Int ?? 1 }
+        set { defaults.set(newValue, forKey: "font_size_level") }
+    }
+
+    /// 语言设置：0=简体中文，1=繁体中文，2=English
+    var languageSetting: Int {
+        get { defaults.object(forKey: "language_setting") as? Int ?? 0 }
+        set { defaults.set(newValue, forKey: "language_setting") }
+    }
+
+    /// 聊天背景
+    var chatBackground: String? {
+        get { defaults.string(forKey: "chat_background") }
+        set { defaults.set(newValue, forKey: "chat_background") }
     }
 
     // MARK: - 清除

@@ -7,7 +7,7 @@ class PermissionGuideViewController: UIViewController, UITableViewDataSource, UI
     private let continueButton = UIButton(type: .system)
 
     private let permissions: [(icon: String, title: String, desc: String)] = [
-        ("camera.fill", "相机权限", "用于拍照、视频通话、扫描二维码"),
+        ("camera.fill", "相机权限", "用于拍照、扫描二维码"),
         ("mic.fill", "麦克风权限", "用于语音消息、语音通话"),
         ("photo.onrectangle", "相册权限", "用于发送图片、视频、文件"),
         ("location.fill", "位置权限", "用于发送位置信息"),

@@ -32,6 +32,9 @@ target 'Milo' do
   # 键盘管理
   pod 'IQKeyboardManagerSwift'
 
+  # 腾讯云 COS 对象存储
+  pod 'QCloudCOSXML'
+
 end
 
 post_install do |installer|

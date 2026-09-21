@@ -6,7 +6,6 @@ class WaitingAnswerViewController: UIViewController {
 
     private let channelId: String
     private let callerName: String
-    private let isVideoCall: Bool
     private var onAccept: (() -> Void)?
     private var onReject: (() -> Void)?
 
@@ -17,10 +16,9 @@ class WaitingAnswerViewController: UIViewController {
     private let rejectButton = UIButton(type: .system)
     private var ringTimer: Timer?
 
-    init(channelId: String, callerName: String, isVideoCall: Bool, onAccept: @escaping () -> Void, onReject: @escaping () -> Void) {
+    init(channelId: String, callerName: String, onAccept: @escaping () -> Void, onReject: @escaping () -> Void) {
         self.channelId = channelId
         self.callerName = callerName
-        self.isVideoCall = isVideoCall
         self.onAccept = onAccept
         self.onReject = onReject
         super.init(nibName: nil, bundle: nil)
@@ -43,7 +41,14 @@ class WaitingAnswerViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .black
+        // 毛玻璃 + 蓝色主题背景
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 0.1, green: 0.2, blue: 0.4, alpha: 1.0).cgColor,
+            UIColor(red: 0.05, green: 0.1, blue: 0.25, alpha: 1.0).cgColor
+        ]
+        gradientLayer.frame = view.bounds
+        view.layer.addSublayer(gradientLayer)
 
         let blurEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         let blurView = UIVisualEffectView(effect: blurEffect)
@@ -65,13 +70,13 @@ class WaitingAnswerViewController: UIViewController {
         nameLabel.textColor = .white
         nameLabel.textAlignment = .center
 
-        statusLabel.text = isVideoCall ? "邀请你视频通话..." : "邀请你语音通话..."
+        statusLabel.text = "邀请你语音通话..."
         statusLabel.font = ScreenAdapter.font(15)
-        statusLabel.textColor = .systemGray
+        statusLabel.textColor = .systemGray4
         statusLabel.textAlignment = .center
 
         let btnSize = ScreenAdapter.scaleW(68)
-        acceptButton.setImage(UIImage(systemName: isVideoCall ? "video.fill" : "phone.fill"), for: .normal)
+        acceptButton.setImage(UIImage(systemName: "phone.fill"), for: .normal)
         acceptButton.tintColor = .white
         acceptButton.backgroundColor = .systemGreen
         acceptButton.layer.cornerRadius = btnSize / 2
@@ -91,13 +96,13 @@ class WaitingAnswerViewController: UIViewController {
         let rejectLabel = UILabel()
         rejectLabel.text = "拒绝"
         rejectLabel.font = ScreenAdapter.font(13)
-        rejectLabel.textColor = .systemGray
+        rejectLabel.textColor = .systemGray4
         rejectLabel.textAlignment = .center
 
         let acceptLabel = UILabel()
         acceptLabel.text = "接听"
         acceptLabel.font = ScreenAdapter.font(13)
-        acceptLabel.textColor = .systemGray
+        acceptLabel.textColor = .systemGray4
         acceptLabel.textAlignment = .center
 
         let labelStack = UIStackView(arrangedSubviews: [rejectLabel, acceptLabel])

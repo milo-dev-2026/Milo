@@ -12,7 +12,7 @@ class FloatingLabelTextField: UIView {
         didSet { floatingLabel.text = placeholder }
     }
 
-    var borderColor: UIColor = UIColor(white: 0.9, alpha: 1.0) {
+    var borderColor: UIColor = .themeSeparator {
         didSet { borderView.layer.borderColor = borderColor.cgColor }
     }
 
@@ -76,8 +76,12 @@ class FloatingLabelTextField: UIView {
     }
 
     @objc private func editingDidEnd() {
-        borderView.layer.borderColor = borderColor.cgColor
-        floatingLabel.textColor = labelColor
+        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
+        floatingLabel.textColor = .secondaryLabel
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(66))
     }
 }
 
@@ -109,7 +113,7 @@ class PhoneFloatingLabelField: UIView {
 
     private func setupUI() {
         borderView.layer.borderWidth = 1
-        borderView.layer.borderColor = UIColor(white: 0.9, alpha: 1.0).cgColor
+        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
         borderView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         borderView.backgroundColor = .white
         addSubview(borderView)
@@ -119,7 +123,7 @@ class PhoneFloatingLabelField: UIView {
         countryCodeButton.titleLabel?.font = ScreenAdapter.font(17)
         addSubview(countryCodeButton)
 
-        dividerView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+        dividerView.backgroundColor = .themeSeparator
         addSubview(dividerView)
 
         textField.borderStyle = .none
@@ -175,8 +179,12 @@ class PhoneFloatingLabelField: UIView {
     }
 
     @objc private func editingDidEnd() {
-        borderView.layer.borderColor = UIColor(white: 0.9, alpha: 1.0).cgColor
+        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
         floatingLabel.textColor = .secondaryLabel
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(66))
     }
 }
 
@@ -203,7 +211,7 @@ class CodeFloatingLabelField: UIView {
 
     private func setupUI() {
         borderView.layer.borderWidth = 1
-        borderView.layer.borderColor = UIColor(white: 0.9, alpha: 1.0).cgColor
+        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
         borderView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         borderView.backgroundColor = .white
         addSubview(borderView)
@@ -259,8 +267,12 @@ class CodeFloatingLabelField: UIView {
     }
 
     @objc private func editingDidEnd() {
-        borderView.layer.borderColor = UIColor(white: 0.9, alpha: 1.0).cgColor
+        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
         floatingLabel.textColor = .secondaryLabel
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(66))
     }
 }
 
@@ -273,8 +285,8 @@ class LoginViewController: UIViewController {
 
     private let cardView = UIView()
     private let tabContainer = UIView()
-    private let phoneTabButton = UIButton(type: .system)
-    private let emailTabButton = UIButton(type: .system)
+    private let phoneTabButton = UIButton(type: .custom)
+    private let emailTabButton = UIButton(type: .custom)
 
     private let phoneField = PhoneFloatingLabelField()
     private let emailField = FloatingLabelTextField()
@@ -305,10 +317,8 @@ class LoginViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: false)
 
         // Logo
-        logoView.image = UIImage(named: "LaunchLogo")
-        logoView.contentMode = .scaleAspectFill
-        logoView.layer.cornerRadius = ScreenAdapter.scaleW(34)
-        logoView.layer.masksToBounds = true
+        logoView.image = UIImage(named: "LoginLogo")
+        logoView.contentMode = .scaleAspectFit
 
         // 标题
         titleLabel.text = "登录"
@@ -336,7 +346,7 @@ class LoginViewController: UIViewController {
         cardView.layer.masksToBounds = false
 
         // Tab 容器
-        tabContainer.backgroundColor = UIColor(white: 0.95, alpha: 1.0)
+        tabContainer.backgroundColor = .themeBackground
         tabContainer.layer.cornerRadius = ScreenAdapter.scaleW(8)
 
         phoneTabButton.setTitle("手机号登录", for: .normal)

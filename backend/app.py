@@ -2981,13 +2981,13 @@ def disband_group(group_no):
             owner_row = cursor.fetchone()
             owner_name = owner_row["name"] if owner_row else "群主"
 
-            # 获取所有群成员uid（排除群主自己）
+            # 获取所有群成员uid（包括群主）
             cursor.execute(
                 "SELECT uid FROM group_member WHERE group_no=%s AND is_deleted=0",
                 (group_no,)
             )
             members = cursor.fetchall()
-            member_uids = [m["uid"] for m in members if m["uid"] != current_uid]
+            all_member_uids = [m["uid"] for m in members]
 
             # 更新群状态为已解散(status=2)
             cursor.execute(
@@ -3004,65 +3004,42 @@ def disband_group(group_no):
         conn.commit()
         conn.close()
 
-        # 通过系统账号(u_10000)给每个成员发送个人通知消息（直接插入数据库）
+        # 通过后台管理系统API发送通知消息给所有群成员（包括群主）
         notify_content = f"群主（{owner_name}）已解散{group_name}"
-        import json as _json
-        import time as _time
-        import pymysql as _pymysql
+
+        # 登录后台管理系统获取admin token
+        try:
+            login_resp = requests.post(
+                "http://127.0.0.1:83/api/v1/user/login",
+                json={"username": "superAdmin", "password": "admin1234567"},
+                timeout=5
+            )
+            admin_token = login_resp.json().get("token", "")
+        except Exception as e:
+            logger.error(f"登录后台管理系统失败: {e}")
+            admin_token = ""
 
         success_count = 0
-        for uid in member_uids:
+        if admin_token and all_member_uids:
+            # 使用sendall API发送消息给所有群成员
             try:
-                msg_conn = _pymysql.connect(
-                    host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
-                    user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
-                    database=Config.MYSQL_DATABASE, charset='utf8mb4',
-                    cursorclass=_pymysql.cursors.DictCursor
+                send_resp = requests.post(
+                    "http://127.0.0.1:8091/v1/manager/message/sendall",
+                    json={"to_uids": all_member_uids, "content": notify_content},
+                    headers={"token": admin_token, "Content-Type": "application/json"},
+                    timeout=10
                 )
-                with msg_conn.cursor() as m_cursor:
-                    # 获取该用户个人频道的最大message_seq
-                    m_cursor.execute(
-                        "SELECT MAX(message_seq) as max_seq FROM message WHERE channel_id=%s AND channel_type=1",
-                        (uid,)
-                    )
-                    m_row = m_cursor.fetchone()
-                    m_max_seq = m_row['max_seq'] if m_row and m_row['max_seq'] else 0
-                    m_new_seq = m_max_seq + 1
-
-                    m_timestamp = int(_time.time())
-                    m_message_id = f"{int(_time.time() * 1000)}{m_new_seq:03d}"
-
-                    # 消息内容：type=1000 系统消息
-                    msg_payload = _json.dumps({
-                        "type": 1000,
-                        "content": notify_content,
-                        "from_uid": "u_10000",
-                        "from_name": "系统消息"
-                    }, ensure_ascii=False)
-
-                    # 插入消息
-                    m_cursor.execute(
-                        "INSERT INTO message (message_id, message_seq, client_msg_no, header, `setting`, `signal`, "
-                        "from_uid, channel_id, channel_type, `timestamp`, payload, is_deleted, voice_status) "
-                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0)",
-                        (m_message_id, m_new_seq, '', '', 0, 0,
-                         'u_10000', uid, 1, m_timestamp, msg_payload)
-                    )
-                    msg_conn.commit()
-
-                    # 更新channel_offset
-                    m_cursor.execute(
-                        "INSERT INTO channel_offset (channel_id, channel_type, message_seq) "
-                        "VALUES (%s, 1, %s) ON DUPLICATE KEY UPDATE message_seq = GREATEST(message_seq, %s)",
-                        (uid, m_new_seq, m_new_seq)
-                    )
-                    msg_conn.commit()
-                    success_count += 1
-                msg_conn.close()
+                if send_resp.status_code == 200 and send_resp.json().get("status") == 200:
+                    success_count = len(all_member_uids)
+                    logger.info(f"群解散通知发送成功: {success_count} members notified")
+                else:
+                    logger.error(f"群解散通知发送失败: {send_resp.text[:200]}")
             except Exception as e:
-                logger.error(f"发送群解散通知给成员 {uid} 失败: {e}")
+                logger.error(f"发送群解散通知失败: {e}")
+        else:
+            logger.warning("无法获取admin token或成员列表为空，跳过通知发送")
 
-        logger.info(f"群解散成功: group={group_no}, operator={current_uid}, notified {success_count}/{len(member_uids)} members")
+        logger.info(f"群解散成功: group={group_no}, operator={current_uid}, notified {success_count}/{len(all_member_uids)} members")
         return jsonify({"status": 200, "msg": "群聊已解散"})
     except Exception as e:
         logger.error(f"解散群聊异常: {e}")

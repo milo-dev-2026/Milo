@@ -122,7 +122,7 @@ class ScanOverlayView: UIView {
         layer.borderColor = UIColor.white.cgColor
         layer.borderWidth = 1
 
-        scanLine.backgroundColor = UIColor(red: 0.0, green: 0.51, blue: 1.0, alpha: 0.8)
+        scanLine.backgroundColor = UIColor.themePrimary.withAlphaComponent(0.8)
         addSubview(scanLine)
 
         displayLink = CADisplayLink(target: self, selector: #selector(updateScanLine))

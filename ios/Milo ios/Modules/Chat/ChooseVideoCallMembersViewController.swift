@@ -2,7 +2,7 @@ import UIKit
 import SnapKit
 import Kingfisher
 
-// MARK: - 选择视频通话成员
+// MARK: - 选择语音通话成员
 class ChooseVideoCallMembersViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
 
     private let groupId: String
@@ -25,7 +25,7 @@ class ChooseVideoCallMembersViewController: UIViewController, UITableViewDataSou
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "选择成员"
+        title = "语音通话"
         view.backgroundColor = .themeBackground
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "确定", style: .done, target: self, action: #selector(confirm))
         tableView.dataSource = self

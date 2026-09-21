@@ -2,29 +2,28 @@ import UIKit
 import SnapKit
 import TXLiteAVSDK_TRTC
 
-// MARK: - TRTC通话页
+// MARK: - TRTC语音通话页
 class TRTCCallViewController: UIViewController {
 
     private let channelId: String
-    private let isVideoCall: Bool
     private var trtcCloud: TRTCCloud?
     private var remoteUserID: String?
 
-    private let localView = UIView()
-    private let remoteView = UIView()
+    private let avatarView = UIImageView()
+    private let nameLabel = UILabel()
+    private let statusLabel = UILabel()
+    private let durationLabel = UILabel()
     private let hangupButton = UIButton(type: .system)
     private let muteButton = UIButton(type: .system)
-    private let switchCameraButton = UIButton(type: .system)
     private let speakerButton = UIButton(type: .system)
-    private let durationLabel = UILabel()
+
     private var isMuted = false
     private var isSpeakerOn = true
     private var callDurationTimer: Timer?
     private var callDuration: Int = 0
 
-    init(channelId: String, isVideoCall: Bool) {
+    init(channelId: String) {
         self.channelId = channelId
-        self.isVideoCall = isVideoCall
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -41,67 +40,106 @@ class TRTCCallViewController: UIViewController {
     deinit {
         stopCallDurationTimer()
         trtcCloud?.stopLocalAudio()
-        trtcCloud?.stopLocalPreview()
         trtcCloud?.exitRoom()
         TRTCCloud.destroySharedInstance()
     }
 
     private func setupUI() {
-        view.backgroundColor = .black
+        // 毛玻璃 + 蓝色主题背景
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 0.1, green: 0.2, blue: 0.4, alpha: 1.0).cgColor,
+            UIColor(red: 0.05, green: 0.1, blue: 0.25, alpha: 1.0).cgColor
+        ]
+        gradientLayer.frame = view.bounds
+        view.layer.addSublayer(gradientLayer)
 
-        let buttonSize = ScreenAdapter.scaleW(60)
-        let buttonGap = ScreenAdapter.scaleW(40)
-        let sideMargin = ScreenAdapter.scaleW(20)
-        let localViewW = ScreenAdapter.scaleW(100)
-        let localViewH = ScreenAdapter.scaleH(140)
-        let bottomOffset = ScreenAdapter.safeAreaBottom + ScreenAdapter.scaleH(40)
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        let blurView = UIVisualEffectView(effect: blurEffect)
+        view.addSubview(blurView)
+        blurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
 
-        remoteView.backgroundColor = .systemGray6
-        localView.backgroundColor = .systemGray4
-        localView.layer.cornerRadius = ScreenAdapter.scaleW(8)
-        localView.clipsToBounds = true
+        let buttonSize = ScreenAdapter.scaleW(64)
+        let buttonGap = ScreenAdapter.scaleW(48)
+        let bottomOffset = ScreenAdapter.safeAreaBottom + ScreenAdapter.scaleH(50)
 
+        // 头像/语音图标
+        let avatarSize = ScreenAdapter.scaleW(120)
+        avatarView.layer.cornerRadius = avatarSize / 2
+        avatarView.clipsToBounds = true
+        avatarView.contentMode = .scaleAspectFill
+        avatarView.image = UIImage(systemName: "phone.fill")
+        avatarView.tintColor = .white
+        avatarView.backgroundColor = UIColor.themePrimary.withAlphaComponent(0.8)
+        avatarView.layer.borderWidth = 3
+        avatarView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+
+        // 名称标签
+        nameLabel.text = "语音通话"
+        nameLabel.font = ScreenAdapter.mediumFont(22)
+        nameLabel.textColor = .white
+        nameLabel.textAlignment = .center
+
+        // 状态标签
+        statusLabel.text = "连接中..."
+        statusLabel.font = ScreenAdapter.font(15)
+        statusLabel.textColor = .systemGray4
+        statusLabel.textAlignment = .center
+
+        // 通话时长
+        durationLabel.text = "00:00"
+        durationLabel.font = ScreenAdapter.font(16)
+        durationLabel.textColor = .systemGray4
+        durationLabel.textAlignment = .center
+        durationLabel.isHidden = true
+
+        // 挂断按钮
         hangupButton.setImage(UIImage(systemName: "phone.down.fill"), for: .normal)
         hangupButton.tintColor = .white
         hangupButton.backgroundColor = .systemRed
         hangupButton.layer.cornerRadius = buttonSize / 2
 
+        // 静音按钮
         muteButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
         muteButton.tintColor = .white
-        muteButton.backgroundColor = UIColor(white: 1, alpha: 0.3)
+        muteButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
         muteButton.layer.cornerRadius = buttonSize / 2
 
-        switchCameraButton.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
-        switchCameraButton.tintColor = .white
-        switchCameraButton.backgroundColor = UIColor(white: 1, alpha: 0.3)
-        switchCameraButton.layer.cornerRadius = buttonSize / 2
-
+        // 免提按钮
         speakerButton.setImage(UIImage(systemName: "speaker.wave.3.fill"), for: .normal)
         speakerButton.tintColor = .white
-        speakerButton.backgroundColor = UIColor(white: 1, alpha: 0.3)
+        speakerButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
         speakerButton.layer.cornerRadius = buttonSize / 2
-
-        durationLabel.text = "00:00"
-        durationLabel.font = ScreenAdapter.font(16)
-        durationLabel.textColor = .white
-        durationLabel.textAlignment = .center
 
         hangupButton.addTarget(self, action: #selector(hangup), for: .touchUpInside)
         muteButton.addTarget(self, action: #selector(toggleMute), for: .touchUpInside)
-        switchCameraButton.addTarget(self, action: #selector(switchCamera), for: .touchUpInside)
         speakerButton.addTarget(self, action: #selector(toggleSpeaker), for: .touchUpInside)
 
-        view.addSubviews(remoteView, localView, hangupButton, muteButton, switchCameraButton, speakerButton, durationLabel)
+        blurView.contentView.addSubviews(avatarView, nameLabel, statusLabel, durationLabel,
+                                         muteButton, hangupButton, speakerButton)
 
-        remoteView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+        avatarView.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalToSuperview().offset(ScreenAdapter.safeAreaTop + ScreenAdapter.scaleH(80))
+            make.width.height.equalTo(avatarSize)
         }
 
-        localView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.safeAreaTop + ScreenAdapter.scaleH(20))
-            make.trailing.equalToSuperview().offset(-sideMargin)
-            make.width.equalTo(localViewW)
-            make.height.equalTo(localViewH)
+        nameLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(avatarView.snp.bottom).offset(ScreenAdapter.scaleH(24))
+            make.leading.trailing.equalToSuperview().inset(ScreenAdapter.scaleW(20))
+        }
+
+        statusLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(nameLabel.snp.bottom).offset(ScreenAdapter.scaleH(8))
+        }
+
+        durationLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(statusLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
         }
 
         hangupButton.snp.makeConstraints { make in
@@ -116,33 +154,16 @@ class TRTCCallViewController: UIViewController {
             make.width.height.equalTo(buttonSize)
         }
 
-        switchCameraButton.snp.makeConstraints { make in
+        speakerButton.snp.makeConstraints { make in
             make.leading.equalTo(hangupButton.snp.trailing).offset(buttonGap)
             make.centerY.equalTo(hangupButton)
             make.width.height.equalTo(buttonSize)
-        }
-
-        speakerButton.snp.makeConstraints { make in
-            make.leading.equalTo(switchCameraButton.snp.trailing).offset(buttonGap)
-            make.centerY.equalTo(hangupButton)
-            make.width.height.equalTo(buttonSize)
-        }
-
-        durationLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.safeAreaTop + ScreenAdapter.scaleH(40))
-            make.centerX.equalToSuperview()
-        }
-
-        if !isVideoCall {
-            localView.isHidden = true
-            switchCameraButton.isHidden = true
         }
     }
 
     private func setupTRTC() async {
         trtcCloud = TRTCCloud.sharedInstance()
         trtcCloud?.delegate = self
-        trtcCloud?.setVideoEncoderMirror(true)
 
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
 
@@ -178,11 +199,7 @@ class TRTCCallViewController: UIViewController {
         params.role = .anchor
         params.userSig = userSig
 
-        trtcCloud?.enterRoom(params, appScene: isVideoCall ? .videoCall : .audioCall)
-
-        if isVideoCall {
-            trtcCloud?.startLocalPreview(true, view: localView)
-        }
+        trtcCloud?.enterRoom(params, appScene: .audioCall)
         trtcCloud?.startLocalAudio(.default)
     }
 
@@ -195,10 +212,7 @@ class TRTCCallViewController: UIViewController {
         trtcCloud?.muteLocalAudio(isMuted)
         let imageName = isMuted ? "mic.slash.fill" : "mic.fill"
         muteButton.setImage(UIImage(systemName: imageName), for: .normal)
-    }
-
-    @objc private func switchCamera() {
-        trtcCloud?.switchCamera()
+        muteButton.backgroundColor = isMuted ? UIColor.systemRed.withAlphaComponent(0.8) : UIColor.white.withAlphaComponent(0.2)
     }
 
     @objc private func toggleSpeaker() {
@@ -230,6 +244,8 @@ extension TRTCCallViewController: TRTCCloudDelegate {
     func onEnterRoom(_ result: Int) {
         DispatchQueue.main.async {
             if result > 0 {
+                self.statusLabel.text = "通话中"
+                self.durationLabel.isHidden = false
                 self.startCallDurationTimer()
             } else {
                 AppUtility.showToast("进入房间失败")
@@ -244,17 +260,6 @@ extension TRTCCallViewController: TRTCCloudDelegate {
     func onUserAudioAvailable(_ userId: String, available: Bool) {
         if available {
             remoteUserID = userId
-        }
-    }
-
-    func onUserVideoAvailable(_ userId: String, available: Bool) {
-        DispatchQueue.main.async {
-            if available {
-                self.remoteUserID = userId
-                self.trtcCloud?.startRemoteView(userId, streamType: .big, view: self.remoteView)
-            } else {
-                self.trtcCloud?.stopRemoteView(userId, streamType: .big)
-            }
         }
     }
 

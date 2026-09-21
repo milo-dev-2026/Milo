@@ -34,9 +34,9 @@ struct APIConfig {
     // MARK: - 5. 腾讯云COS对象存储
     static let cosSecretID = "__PLACEHOLDER_COS_SID__"
     static let cosSecretKey = "__PLACEHOLDER_COS_KEY__"
-    static let cosRegion = "__PLACEHOLDER_COS_REGION__"
-    static let cosBucket = "__PLACEHOLDER_COS_BUCKET__"
-    static let cosCDNDomain = "__PLACEHOLDER_COS_CDN__"
+    static let cosRegion = "ap-guangzhou"
+    static let cosBucket = "milo-img-1364784323"
+    static let cosCDNDomain = "https://milo-img-1364784323.cos.ap-guangzhou.myqcloud.com"
 
     // MARK: - 6. 腾讯实时音视频 TRTC
     // SDKAppID 和 SecretKey 仅配置在后端 config.py，客户端通过 /v1/trtc/usersig 接口动态获取

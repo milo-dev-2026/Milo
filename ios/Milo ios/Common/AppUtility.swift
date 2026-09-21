@@ -84,10 +84,50 @@ class AppUtility {
 
 // MARK: - 颜色扩展
 extension UIColor {
-    static let themePrimary = UIColor(red: 0.0, green: 0.51, blue: 1.0, alpha: 1.0)
-    static let themeBackground = UIColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 1.0)
-    static let themeCellSeparator = UIColor(white: 0.9, alpha: 1.0)
-    static let themeChatBackground = UIColor(red: 0.94, green: 0.94, blue: 0.96, alpha: 1.0)
+    // MARK: - 主题色
+    /// 主色调：现代蓝 #5B7BFF，清新干净
+    static let themePrimary = UIColor(red: 0.357, green: 0.482, blue: 1.0, alpha: 1.0)
+    /// 主色调深色（按压态）
+    static let themePrimaryDark = UIColor(red: 0.298, green: 0.420, blue: 0.933, alpha: 1.0)
+    /// 主色调浅色（背景点缀）
+    static let themePrimaryLight = UIColor(red: 0.357, green: 0.482, blue: 1.0, alpha: 0.12)
+
+    // MARK: - 背景色
+    /// 全局背景色：浅灰 #F6F7F9
+    static let themeBackground = UIColor(red: 0.965, green: 0.969, blue: 0.976, alpha: 1.0)
+    /// 聊天背景色
+    static let themeChatBackground = UIColor(red: 0.965, green: 0.969, blue: 0.976, alpha: 1.0)
+    /// 卡片/单元格背景
+    static let themeCardBackground = UIColor.systemBackground
+
+    // MARK: - 文字色
+    /// 主要文字色
+    static let themeTextPrimary = UIColor.label
+    /// 次要文字色
+    static let themeTextSecondary = UIColor.secondaryLabel
+    /// 三级文字色
+    static let themeTextTertiary = UIColor.tertiaryLabel
+
+    // MARK: - 分割线
+    /// 分割线颜色
+    static let themeSeparator = UIColor(red: 0.90, green: 0.90, blue: 0.92, alpha: 1.0)
+    /// 兼容旧命名
+    static let themeCellSeparator = UIColor.themeSeparator
+
+    // MARK: - 聊天气泡
+    /// 自己发送的气泡背景（蓝色主题淡色）
+    static let themeBubbleOutgoing = UIColor(red: 0.357, green: 0.482, blue: 1.0, alpha: 0.12)
+    /// 接收的气泡背景（白色）
+    static let themeBubbleIncoming = UIColor.systemBackground
+
+    // MARK: - 毛玻璃样式
+    /// 导航栏/工具栏毛玻璃效果样式
+    static var themeBlurStyle: UIBlurEffect.Style {
+        if UITraitCollection.current.userInterfaceStyle == .dark {
+            return .systemMaterialDark
+        }
+        return .systemMaterial
+    }
 
     static func hex(_ hex: String) -> UIColor {
         var cString = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -132,6 +172,86 @@ extension UIView {
     /// 根据屏幕适配圆角
     func adaptiveRoundCorners(_ baseRadius: CGFloat) {
         layer.cornerRadius = ScreenAdapter.scaleW(baseRadius)
+        layer.masksToBounds = true
+    }
+
+    // MARK: - 毛玻璃效果
+    /// 添加毛玻璃背景效果
+    @discardableResult
+    func addBlurEffect(style: UIBlurEffect.Style = .systemMaterial, at index: Int = 0) -> UIVisualEffectView {
+        let blurEffect = UIBlurEffect(style: style)
+        let blurView = UIVisualEffectView(effect: blurEffect)
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        insertSubview(blurView, at: index)
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: topAnchor),
+            blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        return blurView
+    }
+
+    // MARK: - 阴影效果
+    /// 添加 iOS 风格的轻阴影
+    func addShadow(
+        color: UIColor = .black,
+        opacity: Float = 0.08,
+        offset: CGSize = CGSize(width: 0, height: 2),
+        radius: CGFloat = 8
+    ) {
+        layer.shadowColor = color.cgColor
+        layer.shadowOpacity = opacity
+        layer.shadowOffset = offset
+        layer.shadowRadius = radius
+        layer.masksToBounds = false
+    }
+
+    /// 移除阴影
+    func removeShadow() {
+        layer.shadowColor = nil
+        layer.shadowOpacity = 0
+        layer.shadowOffset = .zero
+        layer.shadowRadius = 0
+    }
+}
+
+// MARK: - UIButton 主题扩展
+extension UIButton {
+
+    /// 配置为主题填充按钮（蓝色背景、白色文字、圆角）
+    func configureAsThemeButton(title: String? = nil, fontSize: CGFloat = 17) {
+        if let title = title {
+            setTitle(title, for: .normal)
+        }
+        backgroundColor = .themePrimary
+        setTitleColor(.white, for: .normal)
+        titleLabel?.font = ScreenAdapter.mediumFont(fontSize)
+        layer.cornerRadius = ScreenAdapter.scaleW(12)
+        layer.masksToBounds = true
+    }
+
+    /// 配置为文字按钮（蓝色文字、透明背景）
+    func configureAsTextButton(title: String? = nil, fontSize: CGFloat = 16) {
+        if let title = title {
+            setTitle(title, for: .normal)
+        }
+        backgroundColor = .clear
+        setTitleColor(.themePrimary, for: .normal)
+        titleLabel?.font = ScreenAdapter.font(fontSize)
+    }
+
+    /// 配置为边框按钮（蓝色边框、蓝色文字）
+    func configureAsBorderButton(title: String? = nil, fontSize: CGFloat = 16) {
+        if let title = title {
+            setTitle(title, for: .normal)
+        }
+        backgroundColor = .clear
+        setTitleColor(.themePrimary, for: .normal)
+        titleLabel?.font = ScreenAdapter.mediumFont(fontSize)
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.themePrimary.cgColor
+        layer.cornerRadius = ScreenAdapter.scaleW(12)
         layer.masksToBounds = true
     }
 }

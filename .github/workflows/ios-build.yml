@@ -72,6 +72,8 @@ jobs:
       - name: Inject APIConfig.swift from secret
         env:
           API_CONFIG_BASE64: ${{ secrets.IOS_API_CONFIG_SWIFT }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
         run: |
           if [ -n "$API_CONFIG_BASE64" ]; then
             echo "$API_CONFIG_BASE64" | base64 --decode > ios/APIConfig.swift
@@ -81,6 +83,15 @@ jobs:
           else
             echo "::warning::No APIConfig.swift found, using template"
             cp ios/APIConfig.template.swift ios/APIConfig.swift
+            # 注入 COS 密钥（如果配置了 secrets）
+            if [ -n "$COS_SECRET_ID" ]; then
+              sed -i '' "s/__PLACEHOLDER_COS_SID__/$COS_SECRET_ID/g" ios/APIConfig.swift
+              echo "::notice::COS Secret ID injected"
+            fi
+            if [ -n "$COS_SECRET_KEY" ]; then
+              sed -i '' "s/__PLACEHOLDER_COS_KEY__/$COS_SECRET_KEY/g" ios/APIConfig.swift
+              echo "::notice::COS Secret Key injected"
+            fi
           fi
 
       - name: Generate Xcode project

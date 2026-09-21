@@ -35,13 +35,7 @@ targets:
         CFBundleDisplayName: Milo
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
-        UILaunchScreen:
-          UIColor:
-            red: 0.95
-            green: 0.95
-            blue: 0.97
-          UIImageName: LaunchLogo
-          UIImageRespectsSafeAreaInsets: true
+        UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIBackgroundModes:
@@ -50,7 +44,7 @@ targets:
           - voip
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-        NSCameraUsageDescription: 需要使用相机进行拍照和视频通话
+        NSCameraUsageDescription: 需要使用相机进行拍照和扫描二维码
         NSPhotoLibraryUsageDescription: 需要访问相册选择图片和视频
         NSMicrophoneUsageDescription: 需要使用麦克风进行语音通话
         NSLocationWhenInUseUsageDescription: 需要获取位置信息发送位置消息

@@ -9,6 +9,8 @@ protocol ChatInputBarDelegate: AnyObject {
     func didTapCameraButton()
     func didTapLocationButton()
     func didTapFileButton()
+    func didTapNoteButton()
+    func didTapCardButton()
     func didStartTyping()
     func didStopTyping()
     func didInsertEmoji(_ emoji: String)
@@ -38,7 +40,19 @@ class ChatInputBar: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = .systemBackground
+        backgroundColor = .clear
+
+        // 毛玻璃背景
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurView = UIVisualEffectView(effect: blurEffect)
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        insertSubview(blurView, at: 0)
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: topAnchor),
+            blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         let minH = ScreenAdapter.scaleH(36)
         let maxH = ScreenAdapter.scaleH(100)
@@ -46,7 +60,7 @@ class ChatInputBar: UIView {
         let vPad = ScreenAdapter.scaleH(6)
 
         let topBorder = UIView()
-        topBorder.backgroundColor = .themeCellSeparator
+        topBorder.backgroundColor = .themeSeparator
         addSubview(topBorder)
         topBorder.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
@@ -54,22 +68,24 @@ class ChatInputBar: UIView {
         }
 
         textView.font = ScreenAdapter.font(15)
-        textView.layer.cornerRadius = ScreenAdapter.scaleW(6)
+        textView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         textView.layer.borderWidth = 0.5
-        textView.layer.borderColor = UIColor.systemGray4.cgColor
+        textView.layer.borderColor = UIColor.themeSeparator.cgColor
+        textView.backgroundColor = .systemBackground
         textView.delegate = self
         textView.isScrollEnabled = false
 
         sendButton.setTitle("发送", for: .normal)
+        sendButton.setTitleColor(.themePrimary, for: .normal)
         sendButton.titleLabel?.font = ScreenAdapter.mediumFont(15)
         sendButton.addTarget(self, action: #selector(send), for: .touchUpInside)
 
-        moreButton.setImage(UIImage(systemName: "plus.circle"), for: .normal)
-        moreButton.tintColor = .darkGray
+        moreButton.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
+        moreButton.tintColor = .themePrimary
         moreButton.addTarget(self, action: #selector(toggleMorePanel), for: .touchUpInside)
 
         emojiButton.setImage(UIImage(systemName: "face.smiling"), for: .normal)
-        emojiButton.tintColor = .darkGray
+        emojiButton.tintColor = .themePrimary
         emojiButton.addTarget(self, action: #selector(toggleEmojiPanel), for: .touchUpInside)
 
         addSubviews(emojiButton, textView, sendButton, moreButton)
@@ -163,15 +179,17 @@ class ChatInputBar: UIView {
 
     private func showMorePanel() {
         let panel = UIView()
-        panel.backgroundColor = .systemBackground
+        panel.backgroundColor = .clear
         addSubview(panel)
 
-        let panelHeight = ScreenAdapter.scaleH(120)
+        let panelHeight = ScreenAdapter.scaleH(180)
         let columns: [(icon: String, title: String, action: Selector)] = [
             ("photo.on.rectangle", "相册", #selector(didTapPhoto)),
             ("camera", "拍摄", #selector(didTapCamera)),
             ("location", "位置", #selector(didTapLocation)),
-            ("folder", "文件", #selector(didTapFile))
+            ("folder", "文件", #selector(didTapFile)),
+            ("note.text", "笔记", #selector(didTapNote)),
+            ("person.text.rectangle", "名片", #selector(didTapCard))
         ]
 
         var prevButton: UIButton?
@@ -179,8 +197,9 @@ class ChatInputBar: UIView {
             let btn = UIButton(type: .system)
             let iconSize = ScreenAdapter.scaleW(32)
             btn.setImage(UIImage(systemName: item.icon), for: .normal)
-            btn.tintColor = .darkGray
+            btn.tintColor = .themePrimary
             btn.setTitle(item.title, for: .normal)
+            btn.setTitleColor(.label, for: .normal)
             btn.titleLabel?.font = ScreenAdapter.font(11)
             btn.titleEdgeInsets = UIEdgeInsets(top: iconSize + 4, left: 0, bottom: 0, right: 0)
             btn.imageEdgeInsets = UIEdgeInsets(top: -14, left: 0, bottom: 0, right: 0)
@@ -245,6 +264,16 @@ class ChatInputBar: UIView {
     @objc private func didTapFile() {
         hideMorePanel()
         delegate?.didTapFileButton()
+    }
+    
+    @objc private func didTapNote() {
+        hideMorePanel()
+        delegate?.didTapNoteButton()
+    }
+    
+    @objc private func didTapCard() {
+        hideMorePanel()
+        delegate?.didTapCardButton()
     }
 
     private var vPad: CGFloat {

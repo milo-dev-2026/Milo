@@ -64,7 +64,7 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
 class GroupBlackListViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var groupId: String
-    private var members: [(uid: String, name: String)] = []
+    private var members: [GroupMember] = []
 
     init(groupId: String) { self.groupId = groupId; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError() }
@@ -75,20 +75,107 @@ class GroupBlackListViewController: UIViewController, UITableViewDataSource, UIT
         view.backgroundColor = .themeBackground
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "GBLCell")
+        tableView.register(GroupMemberCell.self, forCellReuseIdentifier: "GBLCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: "添加",
+            style: .plain,
+            target: self,
+            action: #selector(addToBlackList)
+        )
+        navigationItem.rightBarButtonItem?.tintColor = .themePrimary
+
+        loadBlackList()
     }
+
+    private func loadBlackList() {
+        Task {
+            do {
+                let response = try await APIClient.shared.requestRaw(.getGroupBlackList(groupId: groupId))
+                if let data = response["data"] as? [[String: Any]] {
+                    let list = data.compactMap { dict -> GroupMember? in
+                        let uid = dict["uid"] as? String ?? ""
+                        let name = dict["name"] as? String ?? ""
+                        let avatar = dict["avatar"] as? String
+                        return GroupMember(uid: uid, name: name, avatar: avatar, role: 0, nickname: nil, joinTime: nil, isMuted: nil)
+                    }
+                    DispatchQueue.main.async {
+                        self.members = list
+                        self.tableView.reloadData()
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("加载失败")
+                }
+            }
+        }
+    }
+
+    @objc private func addToBlackList() {
+        let vc = ChooseContactsViewController()
+        vc.onContactsSelected = { [weak self] uids in
+            guard let self = self, let uid = uids.first else { return }
+            self.addMemberToBlackList(uid: uid)
+        }
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func addMemberToBlackList(uid: String) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.addToBlackList(groupId: groupId, uid: uid))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("已加入黑名单")
+                    self.loadBlackList()
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("添加失败")
+                }
+            }
+        }
+    }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(members.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "GBLCell", for: indexPath)
-        if members.isEmpty { cell.textLabel?.text = "暂无黑名单用户"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let m = members[indexPath.row]; cell.textLabel?.text = m.name; cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "GBLCell", for: indexPath) as! GroupMemberCell
+        if members.isEmpty {
+            cell.textLabel?.text = "暂无黑名单用户"
+            cell.textLabel?.textColor = .secondaryLabel
+            cell.textLabel?.textAlignment = .center
+            cell.imageView?.image = nil
+            cell.selectionStyle = .none
+        } else {
+            let m = members[indexPath.row]
+            cell.configure(with: m)
+        }
         return cell
     }
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         guard !members.isEmpty else { return nil }
-        let remove = UIContextualAction(style: .destructive, title: "移出黑名单") { _, _, c in self.members.remove(at: indexPath.row); tableView.reloadData(); c(true) }
+        let remove = UIContextualAction(style: .destructive, title: "移出") { [weak self] (_, _, completionHandler) in
+            guard let self = self else { return }
+            let m = self.members[indexPath.row]
+            Task {
+                do {
+                    _ = try await APIClient.shared.requestRaw(.removeFromBlackList(groupId: self.groupId, uid: m.uid))
+                    DispatchQueue.main.async {
+                        self.members.remove(at: indexPath.row)
+                        tableView.reloadData()
+                        AppUtility.showToast("已移出黑名单")
+                        completionHandler(true)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        AppUtility.showToast("操作失败")
+                        completionHandler(false)
+                    }
+                }
+            }
+        }
         return UISwipeActionsConfiguration(actions: [remove])
     }
 }
