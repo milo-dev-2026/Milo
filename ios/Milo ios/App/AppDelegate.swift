@@ -1,6 +1,7 @@
 import UIKit
 import UserNotifications
 import IQKeyboardManagerSwift
+import MAMapKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
