@@ -25,7 +25,7 @@ class LoginViewController: UIViewController {
         view.backgroundColor = .themeBackground
 
         let logoLabel = UILabel()
-        logoLabel.text = "闲雷虎虎"
+        logoLabel.text = "Milo"
         logoLabel.font = ScreenAdapter.boldFont(32)
         logoLabel.textColor = .themePrimary
         logoLabel.textAlignment = .center

@@ -1,8 +1,5 @@
 import UIKit
 import UserNotifications
-import MAMapKit
-import AMapLocationKit
-import AMapSearchKit
 import IQKeyboardManagerSwift
 
 @main
@@ -12,19 +9,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-        setupAMapPrivacy()
-        registerPushNotification(application)
-        setupAppLockCheck()
-        setupKeyboardManager()
+        // 1. 先创建并显示 window（确保不会黑屏）
+        let mainWindow = UIWindow(frame: UIScreen.main.bounds)
+        mainWindow.backgroundColor = UIColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 1.0)
+        self.window = mainWindow
 
-        window = UIWindow(frame: UIScreen.main.bounds)
-        window?.backgroundColor = .themeBackground
-
+        // 2. 设置根控制器并立即显示
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         if uid.isEmpty {
-            showLoginScreen()
+            let vc = LoginViewController()
+            mainWindow.rootViewController = UINavigationController(rootViewController: vc)
         } else {
-            showMainScreen()
+            let vc = MainTabBarController()
+            mainWindow.rootViewController = vc
+        }
+        mainWindow.makeKeyAndVisible()
+
+        // 3. 后台初始化 SDK（避免阻塞启动）
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.setupAMapPrivacy()
+        }
+        DispatchQueue.main.async {
+            self.setupKeyboardManager()
+            self.registerPushNotification(application)
+            self.setupAppLockCheck()
         }
 
         return true
@@ -32,10 +40,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: - 高德隐私合规
     private func setupAMapPrivacy() {
-        AMapServices.shared().enableHTTPS = true
-        // TODO: AMap privacy API changed in newer SDK - update with correct method names
-        // AMapLocationPrivacyShow(APIConfig.amapKey, apiKey: APIConfig.amapKey)
-        // AMapLocationPrivacyAgree()
+        // 高德 SDK 初始化（已在 Podfile 中配置）
+        // 注意：高德地图 SDK 需要在主线程初始化
+        DispatchQueue.main.async {
+            _ = MAMapView() // 触发 SDK 加载
+            AMapServices.shared().enableHTTPS = true
+            AMapServices.shared().apiKey = APIConfig.amapKey
+        }
     }
 
     // MARK: - 推送注册
@@ -69,19 +80,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         IQKeyboardManager.shared.resignOnTouchOutside = true
     }
 
-    // MARK: - 页面路由
-    private func showLoginScreen() {
-        let vc = LoginViewController()
-        window?.rootViewController = UINavigationController(rootViewController: vc)
-        window?.makeKeyAndVisible()
-    }
-
-    private func showMainScreen() {
-        let vc = MainTabBarController()
-        window?.rootViewController = vc
-        window?.makeKeyAndVisible()
-    }
-
     // MARK: - APNs Token
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
@@ -96,9 +94,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private func uploadPushTokenToServer(token: String) {
         let url = APIConfig.apiBaseURL + "/v1/devices/apns"
-        var request = URLRequest(url: URL(string: url)!)
+        guard let urlObj = URL(string: url) else { return }
+        var request = URLRequest(url: urlObj)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeader: "Content-Type")
 
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         let body: [String: Any] = [
@@ -130,11 +129,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if let channelId = userInfo["channel_id"] as? String {
             let title = (userInfo["channel_name"] as? String) ?? "聊天"
             let chatVC = ChatViewController(channelId: channelId, title: title)
-            let keyWindow = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first { $0.isKeyWindow }
-            keyWindow?.rootViewController?.show(chatVC, sender: nil)
+            if let nav = window?.rootViewController as? UINavigationController {
+                nav.pushViewController(chatVC, animated: true)
+            } else if let tab = window?.rootViewController as? UITabBarController,
+                      let nav = tab.selectedViewController as? UINavigationController {
+                nav.pushViewController(chatVC, animated: true)
+            }
         }
         completionHandler()
     }

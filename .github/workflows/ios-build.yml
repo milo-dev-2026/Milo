@@ -1,4 +1,4 @@
-name: iOS Build IPA
+﻿name: iOS Build IPA
 
 on:
   push:
@@ -33,10 +33,10 @@ on:
         type: boolean
 
 env:
-  SCHEME: XianLeiHuHu
-  WORKSPACE: ios/XianLeiHuHu.xcworkspace
+  SCHEME: Milo
+  WORKSPACE: ios/Milo.xcworkspace
   CONFIGURATION: Release
-  BUNDLE_ID: com.xian.leihuhu
+  BUNDLE_ID: com.milo.im
 
 jobs:
   build:
@@ -219,7 +219,7 @@ jobs:
               <string>manual</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>com.xian.leihuhu</key>
+                  <key>com.milo.im</key>
                   <string>PP_NAME_PLACEHOLDER</string>
               </dict>
               <key>stripSwiftSymbols</key>
@@ -251,7 +251,7 @@ jobs:
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration "$CONFIGURATION" \
-            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Milo.xcarchive" \
             -sdk iphoneos \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE="Manual" \
@@ -261,7 +261,7 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/build-signed.log"
 
           # 验证归档
-          if [ ! -d "$RUNNER_TEMP/XianLeiHuHu.xcarchive" ]; then
+          if [ ! -d "$RUNNER_TEMP/Milo.xcarchive" ]; then
             echo "::error::归档构建失败，未生成 .xcarchive"
             exit 1
           fi
@@ -275,7 +275,7 @@ jobs:
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration "$CONFIGURATION" \
-            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Milo.xcarchive" \
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -286,7 +286,7 @@ jobs:
             SWIFT_STRICT_CONCURRENCY=minimal \
             2>&1 | tee "$RUNNER_TEMP/build-unsigned.log"
 
-          if [ ! -d "$RUNNER_TEMP/XianLeiHuHu.xcarchive" ]; then
+          if [ ! -d "$RUNNER_TEMP/Milo.xcarchive" ]; then
             echo "::error::归档构建失败"
             exit 1
           fi
@@ -301,7 +301,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ipa-output"
 
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Milo.xcarchive" \
             -exportPath "$RUNNER_TEMP/ipa-output" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             2>&1 | tee "$RUNNER_TEMP/export.log"
@@ -322,15 +322,15 @@ jobs:
           unzip -l "$IPA_FILE" | grep "_CodeSignature" || echo "警告: 未找到 _CodeSignature"
 
           echo "ipa_path=$IPA_FILE" >> $GITHUB_OUTPUT
-          echo "ipa_name=XianLeiHuHu-signed.ipa" >> $GITHUB_OUTPUT
+          echo "ipa_name=Milo-signed.ipa" >> $GITHUB_OUTPUT
 
       - name: Package unsigned IPA
         if: steps.build_type.outputs.type == 'unsigned'
         id: package
         run: |
-          APP_PATH="$RUNNER_TEMP/XianLeiHuHu.xcarchive/Products/Applications/XianLeiHuHu.app"
+          APP_PATH="$RUNNER_TEMP/Milo.xcarchive/Products/Applications/Milo.app"
           if [ ! -d "$APP_PATH" ]; then
-            APP_PATH=$(find "$RUNNER_TEMP/XianLeiHuHu.xcarchive" -name "*.app" -type d | head -1)
+            APP_PATH=$(find "$RUNNER_TEMP/Milo.xcarchive" -name "*.app" -type d | head -1)
           fi
 
           PAYLOAD_DIR="$RUNNER_TEMP/Payload"
@@ -338,12 +338,12 @@ jobs:
           cp -R "$APP_PATH" "$PAYLOAD_DIR/"
 
           cd "$RUNNER_TEMP"
-          zip -r "XianLeiHuHu-unsigned.ipa" Payload \
+          zip -r "Milo-unsigned.ipa" Payload \
             -x "*.DS_Store" \
             -x "*._*"
 
-          echo "ipa_path=$RUNNER_TEMP/XianLeiHuHu-unsigned.ipa" >> $GITHUB_OUTPUT
-          echo "ipa_name=XianLeiHuHu-unsigned.ipa" >> $GITHUB_OUTPUT
+          echo "ipa_path=$RUNNER_TEMP/Milo-unsigned.ipa" >> $GITHUB_OUTPUT
+          echo "ipa_name=Milo-unsigned.ipa" >> $GITHUB_OUTPUT
 
       # ============================================================
       # 上传产物
@@ -413,12 +413,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
-          name: "闲雷虎虎 ${{ steps.tag.outputs.name }}"
+          name: "Milo ${{ steps.tag.outputs.name }}"
           body: |
             ## iOS IPA Build
 
             **Build type:** ${{ needs.build.outputs.build_type == 'signed' && 'Signed (ad-hoc)' || 'Unsigned' }}
-            **Bundle ID:** com.xian.leihuhu
+            **Bundle ID:** com.milo.im
 
             ${{ needs.build.outputs.build_type == 'signed' && '### 签名构建 (Ad-Hoc)' || '### 未签名构建' }}
 
@@ -427,7 +427,7 @@ jobs:
             ${{ needs.build.outputs.build_type == 'signed' && '### 安装方式\n1. 通过 Sideloadly / 3uTools / Apple Configurator 安装\n2. 或上传至 TestFlight 分发\n3. 确保设备 UDID 已在 Provisioning Profile 中注册' || '> 注意：使用免费 Apple ID 签名后，App 有效期为 7 天，最多 3 个设备。\n> 购买 $99/年 Apple Developer 账户可获得无限期签名。' }}
 
             ### 构建信息
-            - Scheme: XianLeiHuHu
+            - SCHEME: Milo
             - Configuration: Release
             - Runner: macos-latest
             - Commit: ${{ github.sha }}

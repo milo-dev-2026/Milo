@@ -1,6 +1,6 @@
-name: XianLeiHuHu
+name: Milo
 options:
-  bundleIdPrefix: com.xian.leihuhu
+  bundleIdPrefix: com.milo
   deploymentTarget:
     iOS: "14.0"
   createIntermediateGroups: true
@@ -15,10 +15,10 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "14.0"
     ENABLE_BITCODE: NO
     INFOPLIST_FILE: Milo ios/App/Info.plist
-    PRODUCT_BUNDLE_IDENTIFIER: com.xian.leihuhu
+    PRODUCT_BUNDLE_IDENTIFIER: com.milo.im
 
 targets:
-  XianLeiHuHu:
+  Milo:
     type: application
     platform: iOS
     sources:
@@ -32,10 +32,16 @@ targets:
     info:
       path: Milo ios/App/Info.plist
       properties:
-        CFBundleDisplayName: 闲雷虎虎
+        CFBundleDisplayName: Milo
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColor:
+            red: 0.95
+            green: 0.95
+            blue: 0.97
+          UIImageName: LaunchLogo
+          UIImageRespectsSafeAreaInsets: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIBackgroundModes:

@@ -1,7 +1,7 @@
 platform :ios, '14.0'
 use_frameworks!
 
-target 'XianLeiHuHu' do
+target 'Milo' do
 
   # 高德地图 SDK
   pod 'AMap3DMap'
