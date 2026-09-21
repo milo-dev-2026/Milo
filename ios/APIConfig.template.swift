@@ -1,7 +1,7 @@
 import Foundation
 
 ///
-/// 闲雷虎虎 iOS API 配置文件（模板）
+/// Milo iOS API 配置文件（模板）
 ///
 /// 此文件为模板，实际配置通过 GitHub Secrets 注入
 /// 本地使用时请替换所有占位符为真实值
@@ -22,7 +22,7 @@ struct APIConfig {
     static let apnsKeyID = "__PLACEHOLDER_APNS_KEY_ID__"
     static let apnsTeamID = "__PLACEHOLDER_APNS_TEAM_ID__"
     static let apnsKeyPath = "__PLACEHOLDER_APNS_KEY_PATH__"
-    static let apnsBundleID = "com.xian.leihuhu"
+    static let apnsBundleID = "com.milo.im"
     static let apnsProduction = false
 
     // MARK: - 4. 阿里云号码认证服务
@@ -41,7 +41,7 @@ struct APIConfig {
     // MARK: - 7. Resend 邮箱服务
     static let resendAPIKey = "__PLACEHOLDER_RESEND_KEY__"
     static let resendFromEmail = "__PLACEHOLDER_RESEND_EMAIL__"
-    static let resendFromName = "雷虎虎"
+    static let resendFromName = "Milo"
 
     // MARK: - 8. 数据库配置 (后端使用)
     static let mysqlHost = "__PLACEHOLDER_MYSQL_HOST__"
@@ -56,8 +56,8 @@ struct APIConfig {
     static let redisPassword = ""
 
     // MARK: - 10. 应用基础信息
-    static let appName = "闲雷虎虎"
-    static let bundleID = "com.xian.leihuhu"
+    static let appName = "Milo"
+    static let bundleID = "com.milo.im"
     static let appVersion = "1.0"
     static let appBuild = "1"
 

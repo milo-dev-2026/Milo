@@ -97,7 +97,7 @@ jobs:
 
       - name: Install CocoaPods
         working-directory: ios
-        run: pod install
+        run: pod install --repo-update
 
       # ============================================================
       # 签名构建：导入证书和描述文件
