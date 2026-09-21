@@ -4,15 +4,15 @@ use_frameworks!
 target 'XianLeiHuHu' do
 
   # 高德地图 SDK
-  pod 'AMap3DMap'
-  pod 'AMapLocation'
-  pod 'AMapSearch'
+  pod 'AMap3DMap', '~> 9.0'
+  pod 'AMapLocation', '~> 2.10'
+  pod 'AMapSearch', '~> 9.0'
 
   # 腾讯实时音视频 TRTC
   pod 'TXLiteAVSDK_TRTC'
 
   # WebSocket (IM连接)
-  pod 'Starscream'
+  pod 'Starscream', '~> 4.0'
 
   # 刷新控件
   pod 'MJRefresh'
@@ -30,7 +30,7 @@ target 'XianLeiHuHu' do
   pod 'FDFullscreenPopGesture'
 
   # 键盘管理
-  pod 'IQKeyboardManagerSwift'
+  pod 'IQKeyboardManagerSwift', '~> 6.5'
 
 end
 
@@ -38,6 +38,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['SWIFT_VERSION'] = '5.0'
     end
   end
 end
