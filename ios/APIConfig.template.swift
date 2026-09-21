@@ -1,7 +1,7 @@
 import Foundation
 
 ///
-/// Milo iOS API 配置文件（模板）
+/// Milo iOS API 配置文件
 ///
 /// 此文件为模板，实际配置通过 GitHub Secrets 注入
 /// 本地使用时请替换所有占位符为真实值
@@ -37,6 +37,9 @@ struct APIConfig {
     static let cosRegion = "__PLACEHOLDER_COS_REGION__"
     static let cosBucket = "__PLACEHOLDER_COS_BUCKET__"
     static let cosCDNDomain = "__PLACEHOLDER_COS_CDN__"
+
+    // MARK: - 6. 腾讯实时音视频 TRTC
+    // SDKAppID 和 SecretKey 仅配置在后端 config.py，客户端通过 /v1/trtc/usersig 接口动态获取
 
     // MARK: - 7. Resend 邮箱服务
     static let resendAPIKey = "__PLACEHOLDER_RESEND_KEY__"
@@ -80,7 +83,7 @@ struct APIConfig {
     static let vivoPushAppKey = "__PLACEHOLDER_VIVO_APP_KEY__"
     static let vivoPushAppSecret = "__PLACEHOLDER_VIVO_APP_SECRET__"
 
-    // MARK: - 12. 小米推送模板配置
+    // MARK: - 12. 小米推送模板配置 (后端使用)
     static let xiaomiTplFriend = "__PLACEHOLDER_XM_TPL_FRIEND__"
     static let xiaomiTplGroup = "__PLACEHOLDER_XM_TPL_GROUP__"
     static let xiaomiTplMention = "__PLACEHOLDER_XM_TPL_MENTION__"
