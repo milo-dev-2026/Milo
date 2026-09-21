@@ -98,7 +98,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard let urlObj = URL(string: url) else { return }
         var request = URLRequest(url: urlObj)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeader: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         let body: [String: Any] = [
