@@ -73,7 +73,7 @@ class IMManager: NSObject {
 // MARK: - WebSocketDelegate
 extension IMManager: WebSocketDelegate {
 
-    func didReceive(event: WebSocketEvent, client: WebSocket) {
+    func didReceive(event: WebSocketEvent, client: WebSocketClient) {
         switch event {
         case .connected:
             print("IM连接成功")
