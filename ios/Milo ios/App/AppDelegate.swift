@@ -17,6 +17,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         setupAppLockCheck()
         setupKeyboardManager()
 
+        window = UIWindow(frame: UIScreen.main.bounds)
+        window?.backgroundColor = .themeBackground
+
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         if uid.isEmpty {
             showLoginScreen()
