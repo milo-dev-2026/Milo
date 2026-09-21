@@ -197,7 +197,7 @@ class DeleteGroupMemberViewController: UIViewController, UITableViewDataSource, 
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "DGMCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "删除", style: .destructive, target: self, action: #selector(deleteMembers))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "删除", style: .plain, target: self, action: #selector(deleteMembers))
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { members.count }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -240,7 +240,7 @@ class ReadMsgMembersViewController: UIViewController, UITableViewDataSource, UIT
         tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
     }
     func numberOfSections(in tableView: UITableView) -> Int { 2 }
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) { section == 0 ? max(readMembers.count, 1) : max(unreadMembers.count, 1) }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { section == 0 ? max(readMembers.count, 1) : max(unreadMembers.count, 1) }
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { section == 0 ? "已读\(readMembers.count)人" : "未读\(unreadMembers.count)人" }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "RMCell", for: indexPath)
