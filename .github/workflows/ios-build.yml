@@ -43,7 +43,7 @@ jobs:
     name: Build iOS IPA
     runs-on: macos-latest
     outputs:
-      ipa_name: ${{ steps.package.outputs.ipa_name }}
+      ipa_name: ${{ steps.package.outputs.ipa_name || steps.package_signed.outputs.ipa_name }}
       build_type: ${{ steps.build_type.outputs.type }}
 
     steps:
@@ -294,7 +294,7 @@ jobs:
       # ============================================================
       - name: Export signed IPA
         if: steps.build_type.outputs.type == 'signed'
-        id: package
+        id: package_signed
         run: |
           mkdir -p "$RUNNER_TEMP/ipa-output"
 
@@ -349,8 +349,8 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.package.outputs.ipa_name }}
-          path: ${{ steps.package.outputs.ipa_path }}
+          name: ${{ steps.package.outputs.ipa_name || steps.package_signed.outputs.ipa_name }}
+          path: ${{ steps.package.outputs.ipa_path || steps.package_signed.outputs.ipa_path }}
           retention-days: 30
           if-no-files-found: error
 
