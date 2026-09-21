@@ -1,6 +1,7 @@
 import UIKit
 import SnapKit
 import Kingfisher
+import UniformTypeIdentifiers
 
 // MARK: - 我的设置页
 class MySettingViewController: UIViewController {
@@ -246,7 +247,7 @@ class ProfileEditViewController: UIViewController {
     @objc private func changeAvatar() {
         let picker = UIImagePickerController()
         picker.sourceType = .photoLibrary
-        picker.mediaTypes = [.image]
+        picker.mediaTypes = [UTType.image.identifier]
         picker.delegate = self
         present(picker, animated: true)
     }

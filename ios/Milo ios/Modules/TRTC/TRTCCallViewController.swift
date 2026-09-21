@@ -203,7 +203,7 @@ class TRTCCallViewController: UIViewController {
 
     @objc private func toggleSpeaker() {
         isSpeakerOn.toggle()
-        trtcCloud?.setAudioRoute(isSpeakerOn ? .speaker : .receiver)
+        trtcCloud?.setAudioRoute(isSpeakerOn ? TRTCAudioRoute(rawValue: 1)! : TRTCAudioRoute(rawValue: 2)!)
         let imageName = isSpeakerOn ? "speaker.wave.3.fill" : "speaker.wave.1.fill"
         speakerButton.setImage(UIImage(systemName: imageName), for: .normal)
     }

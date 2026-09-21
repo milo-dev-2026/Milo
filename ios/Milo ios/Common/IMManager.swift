@@ -73,54 +73,28 @@ class IMManager: NSObject {
 // MARK: - WebSocketDelegate
 extension IMManager: WebSocketDelegate {
 
-    func didReceive(event: WebSocketEvent, client: WebSocket) {
-        switch event {
-        case .connected(let handler):
-            print("IM连接成功")
-            isConnected = true
-            reconnectCount = 0
-            onConnectionChanged?(true)
-            sendAuthPacket()
+    func websocketDidConnect(socket: WebSocketClient) {
+        print("IM连接成功")
+        isConnected = true
+        reconnectCount = 0
+        onConnectionChanged?(true)
+        sendAuthPacket()
+    }
 
-        case .disconnected(let reason, let code):
-            print("IM断开: \(reason) (code: \(code))")
-            isConnected = false
-            onConnectionChanged?(false)
-            scheduleReconnect()
+    func websocketDidDisconnect(socket: WebSocketClient, error: Error?) {
+        print("IM断开: \(error?.localizedDescription ?? "")")
+        isConnected = false
+        onConnectionChanged?(false)
+        scheduleReconnect()
+    }
 
-        case .text(let text):
+    func websocketDidReceiveMessage(socket: WebSocketClient, text: String) {
+        handleMessage(text)
+    }
+
+    func websocketDidReceiveData(socket: WebSocketClient, data: Data) {
+        if let text = String(data: data, encoding: .utf8) {
             handleMessage(text)
-
-        case .binary(let data):
-            if let text = String(data: data, encoding: .utf8) {
-                handleMessage(text)
-            }
-
-        case .ping:
-            break
-
-        case .pong:
-            break
-
-        case .error(let error):
-            print("IM连接错误: \(error?.localizedDescription ?? "")")
-            isConnected = false
-            onConnectionChanged?(false)
-            scheduleReconnect()
-
-        case .viabilityChanged:
-            break
-
-        case .reconnectSuggested:
-            break
-
-        case .cancelled:
-            isConnected = false
-            onConnectionChanged?(false)
-            scheduleReconnect()
-
-        default:
-            break
         }
     }
 

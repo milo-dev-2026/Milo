@@ -188,7 +188,7 @@ class NoteFolderManagerViewController: UIViewController, UITableViewDataSource, 
         alert.addTextField { $0.placeholder = "文件夹名称" }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
-            if let name = alert.textFields?[0].text, !name.isEmpty { self.folders.append(name); UserDefaults.standard.set(self.folders, forKey: "note_folders"); tableView.reloadData() }
+            if let name = alert.textFields?[0].text, !name.isEmpty { self.folders.append(name); UserDefaults.standard.set(self.folders, forKey: "note_folders"); self.tableView.reloadData() }
         })
         present(alert, animated: true)
     }
