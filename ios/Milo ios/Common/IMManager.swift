@@ -98,7 +98,7 @@ extension IMManager: WebSocketDelegate {
             scheduleReconnect()
         case .text(let text):
             handleMessage(text)
-        case .data(let data):
+        case .binary(let data):
             if let text = String(data: data, encoding: .utf8) {
                 handleMessage(text)
             }
