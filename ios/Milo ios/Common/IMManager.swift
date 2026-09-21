@@ -73,28 +73,43 @@ class IMManager: NSObject {
 // MARK: - WebSocketDelegate
 extension IMManager: WebSocketDelegate {
 
-    func websocketDidConnect(socket: WebSocketClient) {
-        print("IM连接成功")
-        isConnected = true
-        reconnectCount = 0
-        onConnectionChanged?(true)
-        sendAuthPacket()
-    }
-
-    func websocketDidDisconnect(socket: WebSocketClient, error: Error?) {
-        print("IM断开: \(error?.localizedDescription ?? "")")
-        isConnected = false
-        onConnectionChanged?(false)
-        scheduleReconnect()
-    }
-
-    func websocketDidReceiveMessage(socket: WebSocketClient, text: String) {
-        handleMessage(text)
-    }
-
-    func websocketDidReceiveData(socket: WebSocketClient, data: Data) {
-        if let text = String(data: data, encoding: .utf8) {
+    func didReceive(event: WebSocketEvent, client: WebSocket) {
+        switch event {
+        case .connected:
+            print("IM连接成功")
+            isConnected = true
+            reconnectCount = 0
+            onConnectionChanged?(true)
+            sendAuthPacket()
+        case .disconnected(let reason, let code):
+            print("IM断开: \(reason) (code: \(code))")
+            isConnected = false
+            onConnectionChanged?(false)
+            scheduleReconnect()
+        case .cancelled:
+            print("IM连接取消")
+            isConnected = false
+            onConnectionChanged?(false)
+            scheduleReconnect()
+        case .error(let error):
+            print("IM错误: \(error?.localizedDescription ?? "")")
+            isConnected = false
+            onConnectionChanged?(false)
+            scheduleReconnect()
+        case .text(let text):
             handleMessage(text)
+        case .data(let data):
+            if let text = String(data: data, encoding: .utf8) {
+                handleMessage(text)
+            }
+        case .ping:
+            break
+        case .pong:
+            break
+        case .viabilityChanged:
+            break
+        case .reconnectSuggested:
+            break
         }
     }
 
