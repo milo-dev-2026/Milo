@@ -1,0 +1,71 @@
+definitions:
+  workflows:
+    - name: iOS Build IPA
+      instance_type: mac_mini
+      max_build_duration: 60
+      environment:
+        env_vars:
+          - group: api_config
+      scripts:
+        - name: Install XcodeGen
+          script: |
+            brew install xcodegen
+
+        - name: Inject APIConfig.swift
+          script: |
+            if [ -n "$IOS_API_CONFIG_B64" ]; then
+              echo "$IOS_API_CONFIG_B64" | base64 --decode > ios/APIConfig.swift
+              echo "APIConfig.swift injected from environment variable"
+            elif [ -f ios/APIConfig.swift ]; then
+              echo "Using existing APIConfig.swift"
+            else
+              echo "WARNING: Using template APIConfig.swift"
+              cp ios/APIConfig.template.swift ios/APIConfig.swift
+            fi
+
+        - name: Generate Xcode project
+          script: |
+            cd ios
+            xcodegen generate
+
+        - name: Install CocoaPods
+          script: |
+            cd ios
+            pod install
+
+        - name: Build archive (unsigned)
+          script: |
+            xcodebuild archive \
+              -workspace ios/XianLeiHuHu.xcworkspace \
+              -scheme XianLeiHuHu \
+              -configuration Release \
+              -archivePath build/XianLeiHuHu.xcarchive \
+              -sdk iphoneos \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              CODE_SIGN_STYLE=""
+
+        - name: Package unsigned IPA
+          script: |
+            APP_PATH="build/XianLeiHuHu.xcarchive/Products/Applications/XianLeiHuHu.app"
+            if [ ! -d "$APP_PATH" ]; then
+              APP_PATH=$(find build/XianLeiHuHu.xcarchive -name "*.app" -type d | head -1)
+            fi
+
+            mkdir -p build/Payload
+            cp -R "$APP_PATH" build/Payload/
+
+            cd build
+            zip -r XianLeiHuHu-unsigned.ipa Payload \
+              -x "*.DS_Store" \
+              -x "*._*"
+
+      artifacts:
+        - build/XianLeiHuHu-unsigned.ipa
+        - ios/build/XianLeiHuHu.xcarchive
+      publishing:
+        email:
+          recipients:
+            - dev@milo.local
