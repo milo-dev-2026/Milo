@@ -67,6 +67,3 @@ targets:
           - $(SRCROOT)/Pods/AMapLocation
           - $(SRCROOT)/Pods/AMapSearch
           - $(SRCROOT)/Pods/TXLiteAVSDK_TRTC/TXLiteAVSDK_TRTC
-    configFiles:
-      Debug: "Pods/Target Support Files/Pods-XianLeiHuHu/Pods-XianLeiHuHu.debug.xcconfig"
-      Release: "Pods/Target Support Files/Pods-XianLeiHuHu/Pods-XianLeiHuHu.release.xcconfig"
