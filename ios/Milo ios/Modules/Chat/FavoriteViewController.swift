@@ -38,11 +38,19 @@ class FavoriteViewController: UIViewController {
                 if let data = response["data"] as? [String: Any],
                    let items = data["items"] as? [[String: Any]] {
                     favorites = items.compactMap { dict in
+                        let ts: Int64?
+                        if let t = dict["created_at"] as? Int64 {
+                            ts = t
+                        } else if let t = dict["created_at"] as? Int {
+                            ts = Int64(t)
+                        } else {
+                            ts = nil
+                        }
                         guard let id = dict["id"] as? Int,
                               let typeRaw = dict["type"] as? Int,
                               let type = FavoriteItem.FavType(rawValue: typeRaw),
                               let content = dict["content"] as? String,
-                              let ts = (dict["created_at"] as? Int64) ?? (dict["created_at"] as? Int).map { Int64($0) }
+                              let ts = ts
                         else { return nil }
                         return FavoriteItem(id: id, type: type, content: content, timestamp: ts)
                     }
