@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <com.chat.base.views.ChatItemView android:id="@+id/viewGroupLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="2dp" android:paddingBottom="2dp">
+    
+      <com.chat.base.ui.components.CheckBox
+        android:id="@+id/checkBox"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center|bottom|end"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="-24dp"
+        android:visibility="gone" />
+    
+      <FrameLayout
+        android:id="@+id/viewContentLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+    
+        <com.chat.base.ui.components.AvatarView
+          android:id="@+id/avatarView"
+          android:layout_width="54dp"
+          android:layout_height="54dp"
+          android:layout_gravity="end"
+          android:layout_marginStart="10dp"
+          android:layout_marginEnd="10dp" />
+    
+        <ImageView
+          android:id="@+id/bannedimg"
+          android:layout_width="54dp"
+          android:layout_height="54dp"
+          android:layout_gravity="end"
+          android:layout_marginStart="10dp"
+          android:layout_marginEnd="10dp"
+          android:padding="6dp"
+          android:src="@mipmap/icon_banned"
+          android:visibility="gone" />
+    
+        <LinearLayout
+          android:id="@+id/fullContentLayout"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:orientation="vertical">
+    
+          <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/wkBaseContentLayout2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|start">
+    
+            <TextView
+              android:id="@+id/receivedNameTv"
+              android:layout_width="0dp"
+              android:layout_height="wrap_content"
+              android:ellipsize="end"
+              android:fontFamily="sans-serif-medium"
+              android:lines="1"
+              android:singleLine="true"
+              android:text="Name"
+              android:textColor="@color/c888A95"
+              android:textSize="12sp"
+              android:visibility="gone"
+              app:layout_constrainedWidth="true"
+              app:layout_constraintBottom_toBottomOf="parent"
+              app:layout_constraintEnd_toStartOf="@id/llSvgLayout"
+              app:layout_constraintHorizontal_bias="0"
+              app:layout_constraintHorizontal_chainStyle="packed"
+              app:layout_constraintStart_toStartOf="parent"
+              app:layout_constraintTop_toTopOf="parent"
+              app:layout_constraintVertical_bias="0.5"
+              app:layout_constraintWidth="wrap_content_constrained" />
+    
+            <LinearLayout
+              android:id="@+id/llSvgLayout"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginLeft="2dp"
+              android:layout_marginEnd="16dp"
+              android:layout_marginBottom="1dp"
+              android:gravity="start"
+              android:orientation="horizontal"
+              app:layout_constrainedWidth="true"
+              app:layout_constraintBottom_toBottomOf="@id/receivedNameTv"
+              app:layout_constraintEnd_toEndOf="parent"
+              app:layout_constraintHorizontal_bias="0"
+              app:layout_constraintHorizontal_chainStyle="packed"
+              app:layout_constraintStart_toEndOf="@id/receivedNameTv"
+              app:layout_constraintWidth="wrap_content_constrained" />
+          </androidx.constraintlayout.widget.ConstraintLayout>
+    
+          <LinearLayout
+            android:id="@+id/baseLinearLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+    
+            <LinearLayout
+              android:id="@+id/wkBaseContentLayout"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal" />
+          </LinearLayout>
+    
+          <FrameLayout
+            android:id="@+id/reactionsView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|bottom|end"
+            android:visibility="gone" />
+        </LinearLayout>
+      </FrameLayout>
+    </com.chat.base.views.ChatItemView>
+</layout>

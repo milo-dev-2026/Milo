@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:padding="15dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <com.chat.base.ui.components.AvatarView
+        android:id="@+id/avatarView"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="1dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <TextView
+        android:textSize="16sp"
+        android:textColor="@color/textcode"
+        android:ellipsize="end"
+        android:id="@+id/tvTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/mutua_friends"
+        android:maxLines="1"
+        android:layout_marginStart="12dp"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintBottom_toBottomOf="@+id/avatarView"
+        app:layout_constraintEnd_toStartOf="@+id/img_group_senior"
+        app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toEndOf="@+id/avatarView"
+        app:layout_constraintTop_toTopOf="@+id/avatarView"
+        app:layout_constraintWidth="wrap_content_constrained"/>
+    <ImageView
+        android:id="@+id/img_group_senior"
+        android:visibility="gone"
+        android:layout_width="30dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="4dp"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintStart_toEndOf="@+id/tvTitle"
+        app:layout_constraintTop_toTopOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="340dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/bg_permission_dialog"
+        android:paddingHorizontal="28dp"
+        android:paddingTop="40dp"
+        android:paddingBottom="28dp">
+
+        <!-- 标题 -->
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="欢迎使用Milo"
+            android:textColor="#ff2b313d"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <!-- 副标题 -->
+        <TextView
+            android:id="@+id/tv_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="请您开启权限通知不然接受不到消息且进入不了app"
+            android:textColor="#ff999999"
+            android:textSize="15sp" />
+
+        <!-- 权限列表 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:orientation="vertical">
+
+            <!-- 自启动权限 -->
+            <LinearLayout
+                android:id="@+id/item_auto_start"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/icon_auto_start"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_permission_unchecked"
+                    android:contentDescription="" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:text="开启自启动权限"
+                    android:textColor="#ff2b313d"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/btn_auto_start"
+                    android:layout_width="72dp"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:text="开启"
+                    android:textColor="#ffffff"
+                    android:textSize="14sp"
+                    android:background="@drawable/bg_permission_btn_blue" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:background="#1A000000" />
+
+            <!-- 电池优化 -->
+            <LinearLayout
+                android:id="@+id/item_battery"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/icon_battery"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_permission_unchecked"
+                    android:contentDescription="" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:text="关闭电池优化(选择无限制)"
+                    android:textColor="#ff2b313d"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/btn_battery"
+                    android:layout_width="72dp"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:text="开启"
+                    android:textColor="#ffffff"
+                    android:textSize="14sp"
+                    android:background="@drawable/bg_permission_btn_blue" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:background="#1A000000" />
+
+            <!-- 消息通知权限 -->
+            <LinearLayout
+                android:id="@+id/item_notification"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/icon_notification"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_permission_unchecked"
+                    android:contentDescription="" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:text="开启消息通知权限"
+                    android:textColor="#ff2b313d"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/btn_notification"
+                    android:layout_width="72dp"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:text="开启"
+                    android:textColor="#ffffff"
+                    android:textSize="14sp"
+                    android:background="@drawable/bg_permission_btn_blue" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:background="#1A000000" />
+
+            <!-- 语音通知权限 -->
+            <LinearLayout
+                android:id="@+id/item_voice"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/icon_voice"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_permission_unchecked"
+                    android:contentDescription="" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:text="开启语音通知"
+                    android:textColor="#ff2b313d"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/btn_voice"
+                    android:layout_width="72dp"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:text="开启"
+                    android:textColor="#ffffff"
+                    android:textSize="14sp"
+                    android:background="@drawable/bg_permission_btn_blue" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- 全选状态提示 -->
+        <TextView
+            android:id="@+id/tv_select_all_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="请开启以上全部权限"
+            android:textColor="#ffb4b6bd"
+            android:textSize="14sp"
+            android:visibility="visible" />
+
+        <!-- 底部进入按钮 -->
+        <TextView
+            android:id="@+id/btn_enter"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="22dp"
+            android:gravity="center"
+            android:text="进入Milo"
+            android:textColor="#ffffff"
+            android:textSize="18sp"
+            android:background="@drawable/bg_permission_btn_disabled" />
+
+    </LinearLayout>
+</FrameLayout>

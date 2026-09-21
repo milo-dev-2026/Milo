@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.AppCompatImageView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_gravity="bottom"
+    android:id="@+id/avatarView"
+    android:paddingTop="12dp"
+    android:layout_width="32dp"
+    android:layout_height="32dp"
+    android:paddingEnd="12dp"
+    app:srcCompat="@mipmap/ic_note_edit_top"/>

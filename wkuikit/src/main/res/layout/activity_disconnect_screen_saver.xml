@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/homeColor"
+        android:orientation="vertical">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="8dp"
+                android:text="@string/disconnect_protection"
+                android:textColor="@color/color999"
+                android:textSize="@dimen/font_size_13" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/white"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/disconnectProtectionLayout"
+                    style="@style/layoutBgPaddingSmall">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:text="@string/disconnect_saver" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/disconnect_saver_desc"
+                            android:textColor="@color/color999"
+                            android:textSize="@dimen/font_size_12" />
+                    </LinearLayout>
+
+                    <com.chat.base.ui.components.SwitchView
+                        android:id="@+id/disconnectProtectionSwitch"
+                        android:layout_width="50dp"
+                        android:layout_height="30dp"
+                        android:layout_gravity="center_vertical" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/disconnectScreenshotLayout"
+                    style="@style/layoutBgPaddingSmall">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:text="@string/disconnect_screenshot" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/disconnect_screenshot_desc"
+                            android:textColor="@color/color999"
+                            android:textSize="@dimen/font_size_12" />
+                    </LinearLayout>
+
+                    <com.chat.base.ui.components.SwitchView
+                        android:id="@+id/disconnectScreenshotSwitch"
+                        android:layout_width="50dp"
+                        android:layout_height="30dp"
+                        android:layout_gravity="center_vertical" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</layout>

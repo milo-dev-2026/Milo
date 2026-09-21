@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:id="@+id/record_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:orientation="vertical"
+        android:id="@+id/layout_record_audio"
+        android:background="@color/homeColor"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true">
+
+        <!-- 倒计时显示 -->
+        <LinearLayout
+            android:id="@+id/countdownLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:visibility="invisible"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:id="@+id/countdownDotsLeft"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="•••••••••"
+                android:textColor="@color/colorAccent"
+                android:textSize="16sp"
+                android:layout_marginEnd="10dp"/>
+
+            <TextView
+                android:id="@+id/countdownTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="倒计时 01:00"
+                android:textColor="@color/colorAccent"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/countdownDotsRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="•••••••••"
+                android:textColor="@color/colorAccent"
+                android:textSize="16sp"
+                android:layout_marginStart="10dp"/>
+        </LinearLayout>
+
+        <com.chat.uikit.view.voice.LineWaveVoiceView
+            android:id="@+id/waveVoiceView"
+            android:visibility="invisible"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            app:voiceLineColor="@color/color999"
+            app:voiceLineWidth="3dp"
+            app:voiceTextColor="@color/color999"
+            app:voiceTextSize="14dp"/>
+        <com.chat.uikit.view.voice.RecordAudioView
+            android:layout_gravity="center"
+            android:id="@+id/ivRecording"
+            android:background="@drawable/ar_record_audio_btn_selector"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_marginBottom="10dp"/>
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/color999"
+            android:layout_gravity="center"
+            android:id="@+id/record_tips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="@string/press_talk"/>
+        <LinearLayout
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:id="@+id/pp_layout_cancel"
+            android:background="@drawable/ar_cancel_layout_background"
+            android:visibility="invisible"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp">
+            <TextView
+                android:textSize="14sp"
+                android:textColor="#ffffff"
+                android:layout_gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ar_feed_sound_cancel"/>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

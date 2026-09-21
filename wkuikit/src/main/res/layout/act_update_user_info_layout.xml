@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/homeColor">
+
+        <include
+            android:id="@+id/ll_title"
+            layout="@layout/wk_title_bar_layout" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/labelTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:text="@string/remark"
+            android:textColor="@color/color999"
+            android:textSize="14sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/ll_title" />
+
+        <androidx.appcompat.widget.AppCompatEditText
+            android:id="@+id/contentEt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@color/layoutColor"
+            android:hint="@string/input"
+            android:inputType="textMultiLine"
+            android:maxLength="100"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="45dp"
+            android:textColor="@color/colorDark"
+            android:textColorHint="@color/color999"
+            android:textSize="16sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/labelTv" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/closeImg"
+            android:layout_width="20dp"
+            android:layout_height="0dp"
+            android:layout_marginEnd="16dp"
+            android:src="@mipmap/ic_search_close"
+            app:layout_constraintBottom_toBottomOf="@+id/contentEt"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/contentEt" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/fixedTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="16dp"
+            android:text="0/100"
+            android:textColor="@color/color999"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/contentEt" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/descTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"
+            android:textColor="@color/color999"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/fixedTv" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

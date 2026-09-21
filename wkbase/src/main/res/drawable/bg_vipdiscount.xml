@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:height="16dp"
+    android:width="58dp"
+    android:viewportWidth="58"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="@drawable/res_0x7f080006_bg_vipdiscount__0"
+        android:pathData="M0,12C0,5.373 5.373,0 12,0H58V4C58,10.627 52.627,16 46,16H0V12Z"/>
+</vector>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UTalk merged arrays -->
+    <array name="exo_controls_playback_speeds">
+        <item>0.25x</item>
+        <item>0.5x</item>
+        <item>0.75x</item>
+        <item>Normal</item>
+        <item>1.25x</item>
+        <item>1.5x</item>
+        <item>2x</item>
+    </array>
+    <array name="note_tools">
+        <item>标题</item>
+        <item>文字</item>
+        <item>图片</item>
+        <item>视频</item>
+        <item>展示视频</item>
+        <item>位置</item>
+        <item>笔记分组</item>
+        <item>备注</item>
+    </array>
+</resources>

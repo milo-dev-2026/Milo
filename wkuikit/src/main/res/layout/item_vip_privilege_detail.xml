@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/banner_image"
+        android:layout_width="230dp"
+        android:layout_height="230dp"
+        android:scaleType="fitCenter"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <TextView
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/ff3c4047"
+        android:id="@+id/tv_privilege_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="148dp"
+        app:layout_constraintLeft_toLeftOf="@+id/banner_image"
+        app:layout_constraintRight_toRightOf="@+id/banner_image"
+        app:layout_constraintTop_toTopOf="@+id/banner_image"/>
+    <TextView
+        android:textSize="15sp"
+        android:textColor="@color/ff888a95"
+        android:id="@+id/tv_privilege_desc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_privilege_title"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

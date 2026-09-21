@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/llFile"
+    android:layout_width="match_parent"
+    android:layout_height="53dp">
+    <com.chat.base.ui.components.CheckBox
+        android:id="@+id/cbSelect"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        app:color_checked="#fff"
+        app:color_checked_bg="@color/color_main"
+        app:color_unchecked_bg="@color/transparent"
+        app:color_unchecked_stroke="@color/color_grey"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:size="15dp"
+        app:stroke_width="1dp"/>
+    <TextView
+        android:textSize="15sp"
+        android:textColor="@color/black_3C4047"
+        android:id="@+id/tvFileName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/cbSelect"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <View
+        android:layout_gravity="bottom"
+        android:id="@+id/divider"
+        android:background="@color/divider_08"
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

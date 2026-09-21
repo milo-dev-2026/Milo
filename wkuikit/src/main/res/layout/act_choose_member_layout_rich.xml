@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/homeColor"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <include layout="@layout/wk_title_bar_layout"/>
+    <LinearLayout
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/searchIv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@mipmap/ic_ab_search"/>
+        <androidx.appcompat.widget.AppCompatEditText
+            android:textSize="@dimen/font_size_16"
+            android:textColor="@color/colorDark"
+            android:textColorHint="@color/color999"
+            android:gravity="start|center_vertical"
+            android:layout_gravity="center_vertical"
+            android:id="@+id/searchET"
+            android:background="@color/transparent"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="45dp"
+            android:hint="@string/str_search"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:imeOptions="actionSearch"
+            android:layout_marginStart="5dp"/>
+    </LinearLayout>
+    <com.scwang.smart.refresh.layout.SmartRefreshLayout
+        android:id="@+id/refreshLayout"
+        android:background="@color/transparent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:srlEnableFooterFollowWhenLoadFinished="true"
+        app:srlEnableScrollContentWhenLoaded="true">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:background="@color/transparent"
+            android:visibility="visible"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+        <com.scwang.smart.refresh.footer.ClassicsFooter
+            android:background="@color/homeColor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:srlTextNothing="@string/refresh_footer"/>
+    </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+</LinearLayout>

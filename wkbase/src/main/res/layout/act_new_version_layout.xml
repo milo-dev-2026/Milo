@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:gravity="center" android:orientation="vertical" android:background="@color/transparent" android:layout_width="fill_parent" android:layout_height="wrap_content">
+    <LinearLayout android:orientation="vertical" android:background="@drawable/layout_bg_white_15" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <LinearLayout android:orientation="vertical" android:background="@mipmap/update_bg_title" android:layout_width="fill_parent" android:layout_height="100.0dip">
+            <TextView android:textSize="17.0sp" android:textColor="#ffffffff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20.0dip" android:text="@string/find_new_version" android:layout_marginStart="13.0dip" />
+            <TextView android:textSize="10.0sp" android:textColor="#ffffffff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" android:text="NEW VERSION" android:layout_marginStart="13.0dip" />
+        </LinearLayout>
+        <ScrollView android:layout_width="fill_parent" android:layout_height="180.0dip">
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <TextView android:textSize="12.0sp" android:textColor="#ff333333" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_10" android:text="@string/version_desc" android:layout_marginStart="13.0dip" />
+                <TextView android:textSize="12.0sp" android:textColor="#ff333333" android:id="@+id/versionTv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_10" android:layout_marginStart="13.0dip" />
+                <TextView android:textSize="12.0sp" android:textColor="@color/grey_777777" android:textColorLink="#ff0000ff" android:id="@+id/contentTv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_10" android:layout_marginStart="13.0dip" />
+            </LinearLayout>
+        </ScrollView>
+        <ProgressBar android:id="@+id/progressBar" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="5.0dip" android:layout_marginTop="20.0dip" android:max="100" android:progress="10" android:progressDrawable="@drawable/greenprogress" android:layout_marginStart="15.0dip" android:layout_marginEnd="15.0dip" style="?android:progressBarStyleHorizontal" />
+        <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="32.0dip" android:layout_marginTop="24.0dip" android:layout_marginBottom="30.0dip" android:layout_marginStart="18.0dip" android:layout_marginEnd="18.0dip">
+            <TextView android:textSize="@dimen/font_size_12" android:textColor="@color/color999" android:gravity="center" android:id="@+id/cancelTv" android:background="@drawable/update_cancel" android:layout_width="0.0dip" android:layout_height="fill_parent" android:text="@string/cancel" android:layout_weight="1.0" android:layout_marginStart="6.0dip" android:layout_marginEnd="6.0dip" />
+            <TextView android:textSize="@dimen/font_size_12" android:textColor="#ffffffff" android:gravity="center" android:id="@+id/sureBtn" android:background="@drawable/update_now" android:layout_width="0.0dip" android:layout_height="fill_parent" android:text="@string/update_now" android:layout_weight="1.0" android:layout_marginStart="6.0dip" android:layout_marginEnd="6.0dip" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
+</layout>

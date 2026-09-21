@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <RelativeLayout android:orientation="vertical" android:background="@color/homeColor" android:layout_width="fill_parent" android:layout_height="fill_parent">
+      <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerView" android:background="@color/homeColor" android:layout_width="fill_parent" android:layout_height="fill_parent" />
+      <com.chat.base.views.ShadowLayout android:id="@+id/shadowLayout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentBottom="true" android:layout_marginEnd="5.0dip" android:layout_alignParentEnd="true" app:hl_cornerRadius="5.0dip" app:hl_dx="0.0dip" app:hl_dy="0.0dip" app:hl_shadowBackColor="@color/colorDark" app:hl_shadowColor="@color/colorDark" app:hl_shadowLimit="5.0dip">
+        <RelativeLayout android:id="@+id/deleteLayout" android:background="@drawable/white_bg" android:paddingTop="10.0dip" android:paddingBottom="10.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="10.0dip" android:paddingEnd="10.0dip">
+          <androidx.appcompat.widget.AppCompatImageView android:id="@+id/deleteIv" android:layout_width="25.0dip" android:layout_height="20.0dip" android:layout_margin="5.0dip" android:src="@mipmap/passcode_delete" />
+        </RelativeLayout>
+      </com.chat.base.views.ShadowLayout>
+    </RelativeLayout>
+</layout>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@android:color/black"
+    android:layout_width="match_parent"
+    android:layout_height="200dp"
+    android:layout_margin="4dp">
+    <io.livekit.android.renderer.TextureViewRenderer
+        android:id="@+id/videoRenderer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+    <TextView
+        android:textSize="12sp"
+        android:textColor="@android:color/white"
+        android:layout_gravity="start|bottom"
+        android:id="@+id/nameTv"
+        android:background="#80000000"
+        android:padding="4dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"/>
+</FrameLayout>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/white"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        style="@style/layoutBg">
+        <FrameLayout
+            android:layout_width="50dp"
+            android:layout_height="50dp">
+            <com.chat.base.ui.components.AvatarView
+                android:layout_gravity="center"
+                android:id="@+id/avatarView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+            <com.chat.base.ui.components.CheckBox
+                android:layout_gravity="end|bottom"
+                android:id="@+id/checkBox"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                app:color_checked="#fff"
+                app:color_checked_bg="@color/color_main"
+                app:color_unchecked_bg="@color/transparent"
+                app:color_unchecked_stroke="@color/color_grey"
+                app:size="20dp"
+                app:stroke_width="2dp"/>
+        </FrameLayout>
+        <TextView
+            android:textSize="14sp"
+            android:textColor="@color/colorDark"
+            android:ellipsize="end"
+            android:layout_gravity="center_vertical"
+            android:id="@+id/nameTv"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:lines="1"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"/>
+    </LinearLayout>
+</LinearLayout>

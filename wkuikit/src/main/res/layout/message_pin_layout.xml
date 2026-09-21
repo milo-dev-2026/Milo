@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pinnedMessageLayout"
+    android:background="@color/white"
+    android:visibility="visible"
+    android:clickable="true"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:foreground="?attr/selectableItemBackground"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="16dp"
+    android:gravity="center_vertical">
+
+    <View
+        android:layout_width="3dp"
+        android:layout_height="24dp"
+        android:background="#3F74FC"
+        android:layout_marginEnd="10dp"/>
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/pinImgIv"
+        android:visibility="gone"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:scaleType="centerCrop"
+        android:layout_marginEnd="8dp"/>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+        <TextView
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="#3F74FC"
+            android:id="@+id/pinTitleTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="置顶消息"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="#999999"
+            android:ellipsize="end"
+            android:id="@+id/pinContentTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:layout_marginTop="1dp"/>
+    </LinearLayout>
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/pinCloseIv"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:padding="4dp"
+        android:src="@mipmap/ic_close"
+        android:layout_marginStart="8dp"/>
+</LinearLayout>

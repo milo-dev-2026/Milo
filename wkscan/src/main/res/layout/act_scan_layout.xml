@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/black"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.king.view.viewfinderview.ViewfinderView
+        android:id="@+id/viewfinderView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:vvFrameColor="@color/colorAccent"
+        app:vvFrameCornerColor="@color/colorAccent"
+        app:vvLabelText="@string/tips_scan_code"
+        app:vvLabelTextLocation="bottom"
+        app:vvLaserColor="@color/colorAccent"
+        app:vvLaserStyle="grid"
+        app:vvPointColor="@color/colorAccent"
+        app:vvPointStrokeColor="@color/colorAccent" />
+
+    <!-- 顶部返回按钮 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/backIv"
+        android:padding="2dp"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginStart="16dp"
+        android:src="@mipmap/ic_ab_back"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 顶部标题 -->
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/titleTv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="扫一扫"
+        android:textColor="@color/white_abs"
+        android:textSize="17sp"
+        app:layout_constraintBottom_toBottomOf="@+id/backIv"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/backIv" />
+
+    <!-- 顶部右侧更多按钮 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/rightIV"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginEnd="16dp"
+        android:src="@mipmap/ic_ab_other"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 右侧垂直工具栏 -->
+    <LinearLayout
+        android:id="@+id/rightToolbar"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:background="@drawable/shape_scan_toolbar_bg"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
+        android:layout_width="48dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="80dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- 闪光灯 -->
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivFlash"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@mipmap/icon_torch" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="开灯"
+            android:textColor="@color/white_abs"
+            android:textSize="10sp" />
+
+        <View
+            android:layout_width="1px"
+            android:layout_height="0.5dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="#33FFFFFF" />
+
+        <!-- 相册 -->
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/photoAlbumIv"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_scan_album" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="相册"
+            android:textColor="@color/white_abs"
+            android:textSize="10sp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,31 @@
+<resources>
+    <string name="login_next_step">Next</string>
+    <string name="hint_phone_number">Phone number</string>
+    <string name="hint_email_address">Email address</string>
+    <string name="login_back">Back</string>
+    <string name="login_agree_auth_tips">Please read and agree to the Privacy Policy and User Agreement first</string>
+    <string name="login_account_not_empty">Please enter phone number or email</string>
+    <string name="login_email_invalid">Invalid email format</string>
+    <string name="login_code_sent">Verification code sent</string>
+    <string name="login_code_expired">Verification code expired, please get a new one</string>
+    <string name="login_code_error">Verification code error</string>
+    <string name="login_register_success">Registration successful</string>
+    <string name="login_ip_rate_limited">Too many registration attempts, please try again later</string>
+    <string name="login_sms_rate_limited">Too frequent, please try again later</string>
+    <string name="wklogin_nickname">NickName</string>
+    <string name="must_input_name">Name (Required)</string>
+    <string name="wklogin_sure">Sure</string>
+    <string name="input_invite_code_must">Please enter the invitation code (required)</string>
+    <string name="invite_code_not_null">The invitation code cannot be empty</string>
+    <string name="login_auth_desc">You are logging in to %s on a new device, and security verification is required. After passing, verification is not required next time.</string>
+    <string name="phone_num">Mobile:</string>
+    <string name="start_auth">Start verification</string>
+    <string name="wklogin_upload_header">Click to upload profile picture</string>
+    <string name="wklogin_perfect_userinfo">Complete Profile</string>
+    <string name="wklogin_must_upload_header">Please upload a profile picture</string>
+    <string name="wklogin_compressing">Compressing image...</string>
+    <string name="wklogin_uploading">Uploading...</string>
+    <string name="wklogin_upload_failed">Upload failed, please try again</string>
+    <string name="wklogin_image_select_error">Image selection failed, please try again</string>
+    <string name="wklogin_image_not_exist">Image file does not exist</string>
+</resources>

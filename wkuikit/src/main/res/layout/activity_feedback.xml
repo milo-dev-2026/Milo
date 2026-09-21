@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/homeColor"
+        android:orientation="vertical">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/homeColor"
+                android:orientation="vertical"
+                android:padding="15dp">
+
+                <!-- 反馈类型 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="反馈类型"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_14" />
+
+                <LinearLayout
+                    android:id="@+id/typeLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/default_view_bg"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/typeTv"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="功能建议"
+                        android:textColor="@color/colorDark"
+                        android:textSize="@dimen/font_size_14" />
+
+                    <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                </LinearLayout>
+
+                <!-- 反馈内容 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="反馈内容"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_14" />
+
+                <EditText
+                    android:id="@+id/contentEt"
+                    android:layout_width="match_parent"
+                    android:layout_height="150dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/default_view_bg"
+                    android:gravity="top|start"
+                    android:hint="请详细描述您遇到的问题或建议..."
+                    android:padding="12dp"
+                    android:textColor="@color/colorDark"
+                    android:textColorHint="@color/color999"
+                    android:textSize="@dimen/font_size_14" />
+
+                <TextView
+                    android:id="@+id/countTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="end"
+                    android:text="0/500"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_12" />
+
+                <!-- 联系方式 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="联系方式（选填）"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_14" />
+
+                <EditText
+                    android:id="@+id/contactEt"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/default_view_bg"
+                    android:hint="请输入手机号或邮箱"
+                    android:inputType="text"
+                    android:padding="12dp"
+                    android:textColor="@color/colorDark"
+                    android:textColorHint="@color/color999"
+                    android:textSize="@dimen/font_size_14" />
+
+                <!-- 提交按钮 -->
+                <TextView
+                    android:id="@+id/submitBtn"
+                    style="@style/buttonNormal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="30dp"
+                    android:alpha="0.2"
+                    android:enabled="false"
+                    android:text="提交反馈" />
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="20dp" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+</layout>

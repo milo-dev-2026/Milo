@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:background="@color/homeColor"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <com.scwang.smart.refresh.layout.SmartRefreshLayout
+            android:id="@+id/refreshLayout"
+            android:background="@color/transparent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            app:srlEnableFooterFollowWhenLoadFinished="true"
+            app:srlEnableScrollContentWhenLoaded="true">
+            <LinearLayout
+                android:gravity="center"
+                android:background="@color/transparent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <com.github.ybq.android.spinkit.SpinKitView
+                    android:layout_gravity="center"
+                    android:id="@+id/spin_kit"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    app:SpinKit_Color="@color/color999"
+                    style="@style/SpinKitView.Large.DoubleBounce"/>
+            </LinearLayout>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:background="@color/transparent"
+                android:visibility="visible"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+            <com.scwang.smart.refresh.footer.ClassicsFooter
+                android:background="@color/homeColor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:srlTextNothing="@string/refresh_footer"/>
+        </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+
+        <TextView
+            android:id="@+id/managerBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:gravity="center"
+            android:paddingVertical="12dp"
+            android:text="@string/sticker_manager"
+            android:textColor="@color/color_main"
+            android:textSize="@dimen/font_size_14"
+            android:visibility="visible" />
+    </LinearLayout>
+</layout>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <TextView
+        android:textSize="15sp"
+        android:layout_gravity="center_vertical"
+        android:id="@+id/titleTv"
+        android:padding="10dp"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"/>
+    <androidx.appcompat.widget.AppCompatImageView
+        android:layout_gravity="center_vertical"
+        android:id="@+id/addIV"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@mipmap/menu_add"
+        android:layout_marginEnd="10dp"/>
+</LinearLayout>

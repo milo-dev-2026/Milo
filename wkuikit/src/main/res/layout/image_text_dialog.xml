@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <FrameLayout
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/image_color_primary"
+            android:layout_gravity="center_vertical"
+            android:id="@+id/tv_cancel"
+            android:focusable="true"
+            android:clickable="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/image_cancel"/>
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/image_color_accent"
+            android:layout_gravity="end|center_vertical"
+            android:id="@+id/tv_txt_done"
+            android:focusable="true"
+            android:clickable="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/image_done"/>
+    </FrameLayout>
+    <EditText
+        android:textSize="24sp"
+        android:textColor="@color/image_color_primary"
+        android:gravity="top"
+        android:id="@+id/et_text"
+        android:background="@null"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="22dp"
+        android:layout_weight="1"/>
+    <include layout="@layout/image_color_layout"/>
+</LinearLayout>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:background="@color/white"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <ImageView
+        android:id="@+id/stickerIv"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/nameTv"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:textColor="@color/colorDark"
+        android:textSize="@dimen/font_size_14" />
+
+    <ImageView
+        android:id="@+id/dragIv"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:src="@drawable/ic_drag_handle"
+        android:contentDescription="拖动排序" />
+</LinearLayout>

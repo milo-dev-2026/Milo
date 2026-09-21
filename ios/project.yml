@@ -1,0 +1,61 @@
+name: XianLeiHuHu
+options:
+  bundleIdPrefix: com.xian.leihuhu
+  deploymentTarget:
+    iOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    IPHONEOS_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_BITCODE: NO
+    INFOPLIST_FILE: Milo ios/App/Info.plist
+    PRODUCT_BUNDLE_IDENTIFIER: com.xian.leihuhu
+
+targets:
+  XianLeiHuHu:
+    type: application
+    platform: iOS
+    sources:
+      - path: Milo ios
+        excludes:
+          - "**/.DS_Store"
+      - path: APIConfig.swift
+    resources:
+      - path: Milo ios/Resources
+        optional: true
+    info:
+      path: Milo ios/App/Info.plist
+      properties:
+        CFBundleDisplayName: 闲雷虎虎
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
+          - remote-notification
+          - voip
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSCameraUsageDescription: 需要使用相机进行拍照和视频通话
+        NSPhotoLibraryUsageDescription: 需要访问相册选择图片和视频
+        NSMicrophoneUsageDescription: 需要使用麦克风进行语音通话
+        NSLocationWhenInUseUsageDescription: 需要获取位置信息发送位置消息
+        NSContactsUsageDescription: 需要访问通讯录添加好友
+        NSFaceIDUsageDescription: 使用Face ID进行应用锁屏验证
+        NSLocalNetworkUsageDescription: 需要本地网络权限进行设备发现
+        AMapApiKey: "18fc1fe7d76180fe7ebde0ffdb6ddac0"
+        UIStatusBarStyle: UIStatusBarStyleDefault
+    settings:
+      base:
+        HEADER_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/Pods/Headers/Public

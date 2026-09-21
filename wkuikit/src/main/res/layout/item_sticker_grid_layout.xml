@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cl"
+    android:layout_width="71dp"
+    android:layout_height="71dp">
+    <com.chat.sticker.ui.components.StickerView
+        android:id="@+id/stickerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <com.chat.base.views.blurview.ShapeBlurView
+        android:id="@+id/blurOverlay"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:blur_overlay_color="@color/blur_overlay"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,96 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_USER_PRESENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:supportsRtl="true">
+
+        <!-- ==================== 小米推送 ==================== -->
+        <receiver
+            android:name="com.chat.push.push.XiaoMiMessageReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.xiaomi.mipush.RECEIVE_MESSAGE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.xiaomi.mipush.MESSAGE_ARRIVED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.xiaomi.mipush.ERROR" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ==================== 华为厂商通道 ==================== -->
+        <meta-data
+            android:name="com.huawei.hms.client.appid"
+            android:value="appid=${HM_APPID}" />
+
+        <!-- 华为推送消息服务 -->
+        <service
+            android:name="com.chat.push.push.HuaweiHmsMessageService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.huawei.push.action.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- ==================== Vivo厂商通道 ==================== -->
+        <meta-data
+            android:name="com.vivo.push.api_key"
+            android:value="${VIVO_APPKEY}" />
+        <meta-data
+            android:name="com.vivo.push.app_id"
+            android:value="${VIVO_APPID}" />
+
+        <!-- Vivo推送消息接收器 -->
+        <receiver
+            android:name="com.chat.push.push.VivoPushMessageReceiverImpl"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vivo.pushclient.action.RECEIVE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ==================== OPPO厂商通道 ==================== -->
+        <!-- OPPO推送消息服务 -->
+        <service
+            android:name="com.chat.push.push.OPPOPushMessageService"
+            android:exported="false"
+            android:permission="com.heytap.mcs.permission.SEND_PUSH_MESSAGE">
+            <intent-filter>
+                <action android:name="com.heytap.mcs.action.RECEIVE_PROXY_PUSH_MSG" />
+                <action android:name="com.heytap.msp.push.action.RECEIVE_PUSH_MSG" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="com.chat.push.push.OPPOAppPushMessageService"
+            android:exported="false"
+            android:permission="com.heytap.mcs.permission.SEND_PUSH_MESSAGE">
+            <intent-filter>
+                <action android:name="com.heytap.mcs.action.RECEIVE_PROXY_PUSH_MSG" />
+                <action android:name="com.heytap.msp.push.action.RECEIVE_PUSH_MSG" />
+            </intent-filter>
+        </service>
+
+        <!-- OPPO推送注册回调服务 -->
+        <service
+            android:name="com.chat.push.push.OPPOIdentifyService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.heytap.mcs.action.RECEIVE_REGID" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>

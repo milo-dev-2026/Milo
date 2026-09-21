@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <View
+        android:id="@+id/topView"
+        style="@style/view_line_15"/>
+    <LinearLayout
+        android:id="@+id/forbiddenLayout"
+        style="@style/layoutBg">
+        <TextView
+            android:id="@+id/timeTv"
+            android:text="@string/forbidden_with_group_member"
+            style="@style/leftTextView"/>
+        <TextView
+            android:textSize="@dimen/font_size_14"
+            android:textColor="@color/color999"
+            android:gravity="end"
+            android:layout_gravity="center"
+            android:id="@+id/contentTv"
+            android:visibility="gone"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:layout_marginEnd="10dp"/>
+        <com.chat.base.ui.components.AvatarView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/avatarView"
+            android:visibility="gone"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"/>
+        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv"/>
+    </LinearLayout>
+    <View
+        android:id="@+id/bottomView"
+        android:visibility="gone"
+        style="@style/view_line_padding"/>
+</LinearLayout>

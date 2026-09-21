@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:id="@+id/chatBgLayout"
+        style="@style/layoutBg">
+        <TextView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/titleCenterTv"
+            android:layout_width="0dp"
+            android:text="@string/chat_bg"
+            android:layout_weight="1"
+            style="@style/leftTextView"/>
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center_vertical"
+            style="@style/arrow_right_iv"/>
+    </LinearLayout>
+</LinearLayout>

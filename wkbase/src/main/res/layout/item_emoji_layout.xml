@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="vertical" android:background="@color/homeColor" android:layout_width="wrap_content" android:layout_height="wrap_content">
+      <com.chat.base.ui.components.FilterImageView android:id="@+id/emojiIv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleType="centerCrop" />
+    </LinearLayout>
+</layout>

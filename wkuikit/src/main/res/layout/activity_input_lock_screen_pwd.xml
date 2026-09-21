@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F6F7F9"
+        android:orientation="vertical">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- 盾牌图标 -->
+            <FrameLayout
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="40dp"
+                android:background="@drawable/bg_lock_shield_container">
+
+                <ImageView
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_security_shield"
+                    android:contentDescription="@string/lock_screen_password" />
+            </FrameLayout>
+
+            <!-- 标题 -->
+            <TextView
+                android:id="@+id/titleTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+                android:text="@string/set_lock_screen_pwd"
+                android:textColor="#2B313D"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/subtitleTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="10dp"
+                android:text="@string/set_lock_screen_pwd_desc"
+                android:textColor="#787A7E"
+                android:textSize="14sp" />
+
+            <!-- 密码指示器 - 6个圆角方块 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:gravity="center">
+
+                <View
+                    android:id="@+id/dot1"
+                    style="@style/lockPwdBoxStyle" />
+
+                <View
+                    android:id="@+id/dot2"
+                    style="@style/lockPwdBoxStyle" />
+
+                <View
+                    android:id="@+id/dot3"
+                    style="@style/lockPwdBoxStyle" />
+
+                <View
+                    android:id="@+id/dot4"
+                    style="@style/lockPwdBoxStyle" />
+
+                <View
+                    android:id="@+id/dot5"
+                    style="@style/lockPwdBoxStyle" />
+
+                <View
+                    android:id="@+id/dot6"
+                    style="@style/lockPwdBoxStyle" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/errorTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:textColor="#FF3B30"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- 数字键盘 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_lock_keyboard_bg"
+                android:orientation="vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="20dp"
+                android:paddingBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btn1"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="1" />
+
+                    <TextView
+                        android:id="@+id/btn2"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="2" />
+
+                    <TextView
+                        android:id="@+id/btn3"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="3" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btn4"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="4" />
+
+                    <TextView
+                        android:id="@+id/btn5"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="5" />
+
+                    <TextView
+                        android:id="@+id/btn6"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="6" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btn7"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="7" />
+
+                    <TextView
+                        android:id="@+id/btn8"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="8" />
+
+                    <TextView
+                        android:id="@+id/btn9"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="9" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/btn0"
+                        style="@style/lockKeyBtnStyle"
+                        android:text="0" />
+
+                    <ImageView
+                        android:id="@+id/deleteBtn"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:padding="16dp"
+                        android:src="@drawable/ic_delete_num"
+                        android:scaleType="centerInside" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</layout>

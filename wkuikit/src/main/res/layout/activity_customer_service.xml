@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/homeColor"
+        android:orientation="vertical">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/homeColor"
+                android:orientation="vertical">
+
+                <!-- 在线客服入口 -->
+                <LinearLayout
+                    android:id="@+id/onlineServiceLayout"
+                    style="@style/layoutBgPaddingSmall"
+                    android:layout_marginTop="10dp"
+                    android:background="@color/layoutColor">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:text="@string/customer_service" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="在线咨询，快速解决问题"
+                            android:textColor="@color/color999"
+                            android:textSize="@dimen/font_size_12" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                </LinearLayout>
+
+                <!-- 帮助中心 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="8dp"
+                    android:text="帮助中心"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_13" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/layoutColor"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/faqLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:layout_weight="1"
+                            android:text="常见问题" />
+
+                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                    </LinearLayout>
+
+                    <View style="@style/view_line_padding" />
+
+                    <LinearLayout
+                        android:id="@+id/feedbackLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:layout_weight="1"
+                            android:text="意见反馈" />
+
+                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 关于 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/setting_section_support"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_13" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/layoutColor"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/aboutLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:layout_weight="1"
+                            android:text="@string/about" />
+
+                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+</layout>

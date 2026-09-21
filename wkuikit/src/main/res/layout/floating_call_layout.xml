@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/floating_window_bg"
+    android:padding="8dp">
+
+    <!-- 音频模式布局 -->
+    <LinearLayout
+        android:id="@+id/audioModeLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/floating_audio_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/floatingNameTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="通话中"
+            android:textColor="#1296db"
+            android:textSize="12sp"
+            android:maxEms="6"
+            android:ellipsize="end"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/floatingTimeTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="00:00"
+            android:textColor="#1296db"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</LinearLayout>

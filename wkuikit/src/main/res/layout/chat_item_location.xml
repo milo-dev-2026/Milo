@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:gravity="end"
+    android:orientation="horizontal"
+    android:id="@+id/locationView"
+    android:background="@null"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <com.chat.base.views.BubbleLayout
+        android:id="@+id/bubbleLayout"
+        android:visibility="visible"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:bubblePadding="0dp"
+        app:shadowRadius="0dp">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="270dp"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp">
+
+                <TextView
+                    android:textSize="15sp"
+                    android:textColor="#FF333333"
+                    android:textStyle="bold"
+                    android:layout_gravity="center_vertical"
+                    android:id="@+id/addressTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:textSize="12sp"
+                    android:textColor="#FF999999"
+                    android:layout_gravity="center_vertical"
+                    android:id="@+id/addressDetailTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="120dp">
+
+                <com.chat.base.ui.components.FilterImageView
+                    android:id="@+id/locationMapIv"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/default_view_bg"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_location_pin_red"
+                    android:translationY="-12dp" />
+
+                <FrameLayout
+                    android:layout_gravity="end|bottom"
+                    android:background="@drawable/bg_location_time_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="5dp"
+                    android:layout_marginEnd="5dp">
+
+                    <include layout="@layout/wk_msg_status_layout" />
+                </FrameLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </com.chat.base.views.BubbleLayout>
+</LinearLayout>

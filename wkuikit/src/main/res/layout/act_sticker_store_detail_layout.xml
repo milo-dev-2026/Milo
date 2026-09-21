@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/homeColor"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <include layout="@layout/wk_title_bar_layout"/>
+    <LinearLayout
+        android:padding="15dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+            <TextView
+                android:textSize="16sp"
+                android:textColor="@color/colorDark"
+                android:id="@+id/titleTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+            <TextView
+                android:textSize="14sp"
+                android:textColor="@color/color999"
+                android:id="@+id/descTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"/>
+        </LinearLayout>
+        <com.google.android.material.button.MaterialButton
+            android:textSize="@dimen/font_size_14"
+            android:layout_gravity="center_vertical"
+            android:id="@+id/addBtn"
+            android:layout_width="wrap_content"
+            android:minWidth="80dp"
+            android:text="@string/str_sticker_added"
+            android:paddingStart="15dp"
+            android:paddingEnd="15dp"
+            app:cornerRadius="@dimen/button_radian"
+            style="@style/buttonNormal"/>
+    </LinearLayout>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</LinearLayout>

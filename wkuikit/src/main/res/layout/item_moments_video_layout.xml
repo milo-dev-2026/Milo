@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/layoutColor"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <include layout="@layout/item_moments_title_layout"/>
+    <FrameLayout
+        android:id="@+id/videoLayout"
+        android:layout_width="100dp"
+        android:layout_height="200dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="10dp"
+        android:layout_marginStart="65dp"
+        android:layout_marginEnd="15dp">
+        <com.chat.base.ui.components.FilterImageView
+            android:id="@+id/imageView"
+            android:layout_width="100dp"
+            android:layout_height="200dp"
+            android:src="@drawable/default_view_bg"
+            android:scaleType="centerCrop"/>
+        <View
+            android:id="@+id/coverView"
+            android:background="#33cccccc"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+        <ImageView
+            android:layout_gravity="center"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@mipmap/icon_play"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/white"
+            android:layout_gravity="end|bottom"
+            android:id="@+id/durationTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:layout_marginEnd="10dp"/>
+        <com.chat.base.views.CircularProgressView
+            android:layout_gravity="center"
+            android:id="@+id/progressView"
+            android:visibility="visible"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            app:backColor="@color/white"
+            app:backWidth="2dp"
+            app:progColor="@color/color999"
+            app:progWidth="2dp"
+            app:progress="0"/>
+    </FrameLayout>
+    <include layout="@layout/item_moments_bottom_layout"/>
+</LinearLayout>

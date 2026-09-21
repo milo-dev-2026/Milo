@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:background="@color/homeColor"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/checkIv"
+        android:layout_gravity="center"
+        android:visibility="gone"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="15dp"
+        android:src="@mipmap/ic_uncheck"
+        android:scaleType="centerInside" />
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:id="@+id/contentLayout"
+        android:background="@drawable/round_bg"
+        android:padding="15dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:layout_marginStart="15dp"
+        android:layout_marginEnd="15dp">
+
+        <FrameLayout
+            android:id="@+id/mediaLayout"
+            android:visibility="gone"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@color/homeColorSelected">
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/imageView"
+                android:focusable="false"
+                android:clickable="false"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:src="@drawable/default_view_bg"
+                android:scaleType="centerCrop" />
+            <androidx.appcompat.widget.AppCompatImageView
+                android:layout_gravity="center"
+                android:id="@+id/mediaPlaceholderIv"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@mipmap/ic_note_image"
+                android:scaleType="centerInside" />
+            <androidx.appcompat.widget.AppCompatImageView
+                android:layout_gravity="center"
+                android:id="@+id/playIv"
+                android:visibility="gone"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@mipmap/ic_msg_video_play" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/locationContainer"
+            android:visibility="gone"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_map"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+            <ImageView
+                android:layout_gravity="center"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@mipmap/icon_location_mark" />
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp">
+                <TextView
+                    android:textSize="16sp"
+                    android:textColor="@color/receive_text_color"
+                    android:ellipsize="end"
+                    android:id="@+id/locationTitleTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1" />
+                <TextView
+                    android:textSize="14sp"
+                    android:textColor="@color/c787A7E"
+                    android:ellipsize="end"
+                    android:id="@+id/locationAddressTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:maxLines="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/colorDark"
+            android:ellipsize="end"
+            android:id="@+id/titleTv"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:lineSpacingExtra="3dp"
+            android:textFontWeight="500" />
+
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/colorDark"
+            android:ellipsize="end"
+            android:id="@+id/summaryTv"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:lineSpacingExtra="3dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_gravity="center_vertical"
+                android:id="@+id/avatarIcon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@mipmap/ic_note_text"
+                android:scaleType="centerInside" />
+
+            <TextView
+                android:textSize="12sp"
+                android:textColor="@color/color999"
+                android:layout_gravity="center_vertical"
+                android:id="@+id/authTv"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:ellipsize="end"
+                android:maxLines="1" />
+
+            <TextView
+                android:textSize="12sp"
+                android:textColor="@color/color999"
+                android:layout_gravity="center_vertical"
+                android:id="@+id/timeTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

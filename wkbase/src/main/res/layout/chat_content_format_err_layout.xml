@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="horizontal" android:id="@+id/contentLayout" android:layout_width="fill_parent" android:layout_height="wrap_content">
+      <com.chat.base.views.BubbleLayout android:gravity="start|center" android:orientation="vertical" android:id="@+id/bubbleLayout" android:paddingTop="5.0dip" android:paddingBottom="5.0dip" android:visibility="visible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="40.0dip" android:paddingStart="10.0dip" android:paddingEnd="10.0dip" app:shadowRadius="0.0dip">
+        <TextView android:textSize="16.0sp" android:textColor="#ff313131" android:gravity="start|center" android:id="@+id/contentTv" android:visibility="visible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/str_content_format_err" android:lineSpacingExtra="2.0dip" />
+      </com.chat.base.views.BubbleLayout>
+    </LinearLayout>
+</layout>

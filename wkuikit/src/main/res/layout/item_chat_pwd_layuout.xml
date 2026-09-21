@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout style="@style/layoutBgPaddingSmall">
+        <TextView
+            android:layout_width="0dp"
+            android:text="@string/chat_pwd"
+            android:layout_weight="1"
+            style="@style/leftTextView"/>
+        <com.chat.base.ui.components.SwitchView
+            android:id="@+id/chatPwdSwitchView"
+            android:layout_width="50dp"
+            android:layout_height="30dp"/>
+    </LinearLayout>
+</LinearLayout>

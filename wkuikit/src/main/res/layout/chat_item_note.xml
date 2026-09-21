@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:gravity="end"
+    android:id="@+id/cardView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:animateLayoutChanges="true">
+
+    <com.chat.base.views.BubbleLayout
+        android:gravity="start|center_vertical"
+        android:orientation="vertical"
+        android:id="@+id/contentLayout"
+        android:paddingTop="@dimen/chat_bubble_padding_tb"
+        android:paddingBottom="@dimen/chat_bubble_padding_tb"
+        android:visibility="visible"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="40dp"
+        android:minHeight="40dp"
+        android:animateLayoutChanges="true"
+        android:paddingStart="@dimen/chat_bubble_padding_lr"
+        android:paddingEnd="@dimen/chat_bubble_padding_lr"
+        app:shadowRadius="0dp">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:id="@+id/textContentLayout"
+            android:layout_width="270dp"
+            android:layout_height="wrap_content"
+            android:animateLayoutChanges="true">
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="60dp">
+
+                <com.chat.base.ui.components.FilterImageView
+                    android:id="@+id/note_item_headurl"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    app:civ_border_color="@color/borderColor"
+                    app:civ_border_width="@dimen/chat_border_width" />
+
+                <TextView
+                    android:textSize="@dimen/font_size_14"
+                    android:textColor="@color/receive_text_color"
+                    android:ellipsize="end"
+                    android:id="@+id/title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:maxLines="2"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <View
+                android:id="@+id/divider"
+                android:background="#80ffffff"
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:layout_marginTop="5dp" />
+
+            <LinearLayout
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp">
+
+                <TextView
+                    android:textSize="@dimen/font_size_12"
+                    android:textColor="@color/colorB6CAFF"
+                    android:ellipsize="end"
+                    android:id="@+id/tvNote"
+                    android:visibility="visible"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/note"
+                    android:layout_marginEnd="8dp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:gravity="end|bottom"
+                    android:id="@+id/msgTimeView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    layout="@layout/wk_msg_status_layout" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.chat.base.views.BubbleLayout>
+</LinearLayout>

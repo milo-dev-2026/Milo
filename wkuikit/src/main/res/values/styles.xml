@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 视频通话按钮样式 -->
+    <style name="buttonVideo" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="backgroundTint">@color/color_main</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:buttonStyle">@style/Widget.MaterialComponents.Button.UnelevatedButton</item>
+        <item name="cornerRadius">@dimen/radian_8</item>
+    </style>
+
+    <!-- 发消息按钮样式 -->
+    <style name="buttonMsg" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="backgroundTint">@color/white</item>
+        <item name="android:textColor">@color/colorDark</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:buttonStyle">@style/Widget.MaterialComponents.Button.UnelevatedButton</item>
+        <item name="cornerRadius">@dimen/radian_8</item>
+        <item name="strokeColor">@color/colorLine</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- 临时会话banner按钮背景样式 -->
+    <style name="layoutBannerBg">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:background">@color/transparent</item>
+    </style>
+
+    <style name="PreferenceSummaryTextStyle" parent="android:TextAppearance.Small">
+        <item name="android:textColor">@android:color/secondary_text_dark</item>
+    </style>
+    <style name="video_vertical_progressBar" parent="android:Widget.ProgressBar.Horizontal">
+        <item name="android:progressDrawable">@android:drawable/progress_horizontal</item>
+    </style>
+
+    <!-- 锁屏数字按钮样式 -->
+    <style name="LockNumBtn">
+        <item name="android:layout_width">60dp</item>
+        <item name="android:layout_height">60dp</item>
+        <item name="android:layout_margin">8dp</item>
+        <item name="android:background">@drawable/bg_lock_num_btn</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/textColor</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- 密码键盘数字按钮样式 -->
+    <style name="numBtnStyle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/bg_lock_num_btn</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/textColor</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- 锁屏密码方块样式 -->
+    <style name="lockPwdBoxStyle">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginHorizontal">8dp</item>
+        <item name="android:background">@drawable/selector_lock_pwd_box</item>
+    </style>
+
+    <!-- 锁屏键盘按钮样式 -->
+    <style name="lockKeyBtnStyle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/bg_lock_key_btn</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#2B313D</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+</resources>

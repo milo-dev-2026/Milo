@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:background="@color/white" android:orientation="horizontal" android:padding="12dp">
+    
+      <ImageView
+        android:id="@+id/thumbIv"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="#F0F0F0"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_gallery" />
+    
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+    
+        <TextView
+          android:id="@+id/titleTv"
+          android:layout_width="match_parent"
+          android:layout_height="0dp"
+          android:layout_weight="1"
+          android:ellipsize="end"
+          android:maxLines="2"
+          android:textColor="@color/colorDark"
+          android:textSize="14sp" />
+    
+        <TextView
+          android:id="@+id/timeTv"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:textColor="@color/color999"
+          android:textSize="12sp" />
+      </LinearLayout>
+      <ImageView android:id="@+id/moreIv" android:layout_width="32dp" android:layout_height="32dp" android:padding="6dp" android:src="@android:drawable/ic_menu_more" android:contentDescription="更多" />
+    </LinearLayout>
+</layout>

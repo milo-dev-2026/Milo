@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:id="@+id/remindLayout"
+        style="@style/layoutBg">
+        <TextView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/titleCenterTv"
+            android:layout_width="0dp"
+            android:text="@string/msg_remind_setting"
+            android:layout_weight="1"
+            style="@style/leftTextView"/>
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center_vertical"
+            style="@style/arrow_right_iv"/>
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/chatBgLayout"
+        android:visibility="gone"
+        style="@style/layoutBg">
+        <TextView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/setChannelChatBgTv"
+            android:layout_width="0dp"
+            android:text="@string/set_channel_chat_bg"
+            android:layout_weight="1"
+            style="@style/leftTextView"/>
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center_vertical"
+            style="@style/arrow_right_iv"/>
+    </LinearLayout>
+    <View style="@style/view_line_padding"/>
+</LinearLayout>

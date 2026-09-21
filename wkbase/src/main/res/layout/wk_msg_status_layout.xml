@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="horizontal" android:id="@+id/msgStatusLayout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="5.0dip" android:paddingEnd="5.0dip">
+      <androidx.appcompat.widget.AppCompatImageView android:layout_gravity="center" android:id="@+id/pimImg" android:visibility="gone" android:layout_width="12.0dip" android:layout_height="12.0dip" android:layout_marginEnd="2.0dip" app:srcCompat="@mipmap/message_pin" />
+      <androidx.appcompat.widget.AppCompatTextView android:textSize="12.0sp" android:textColor="@color/color999" android:layout_gravity="center_vertical" android:id="@+id/editedTv" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/edited" android:layout_marginEnd="2.0dip" />
+      <androidx.appcompat.widget.AppCompatTextView android:textSize="12.0sp" android:textColor="@color/colorB6CAFF" android:layout_gravity="center_vertical" android:id="@+id/msgTimeTv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="10:10AM" />
+      <ViewStub android:id="@+id/statusIVStub" android:layout="@layout/wk_msg_status_icon" android:inflatedId="@+id/statusIV" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+</layout>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="end"
+    android:orientation="horizontal"
+    android:id="@+id/contentLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <FrameLayout
+        android:layout_gravity="center"
+        android:id="@+id/stickerLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+        <com.chat.sticker.ui.components.StickerView
+            android:layout_gravity="center"
+            android:id="@+id/stickerView"
+            android:layout_width="180dp"
+            android:layout_height="180dp"/>
+        <FrameLayout
+            android:layout_gravity="end|bottom"
+            android:background="@drawable/msg_time_status_bg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:layout_marginEnd="5dp">
+            <include layout="@layout/wk_msg_status_layout"/>
+        </FrameLayout>
+    </FrameLayout>
+</LinearLayout>

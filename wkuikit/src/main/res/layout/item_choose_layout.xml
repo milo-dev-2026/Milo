@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:background="@color/screen_bg"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <!-- 头像 -->
+    <FrameLayout
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_marginEnd="12dp">
+        <com.chat.base.ui.components.AvatarView
+            android:layout_gravity="center"
+            android:id="@+id/avatarView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+    </FrameLayout>
+
+    <!-- 昵称 -->
+    <TextView
+        android:textSize="15sp"
+        android:textColor="@color/colorDark"
+        android:ellipsize="end"
+        android:layout_gravity="center_vertical"
+        android:id="@+id/nameTv"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:singleLine="true"
+        android:layout_weight="1"/>
+
+    <!-- 复选框 -->
+    <com.chat.base.ui.components.CheckBox
+        android:layout_gravity="center"
+        android:id="@+id/checkBox"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_marginStart="12dp"
+        app:color_checked="#fff"
+        app:color_checked_bg="@color/color_main"
+        app:color_unchecked_bg="@color/transparent"
+        app:color_unchecked_stroke="@color/color_grey"
+        app:size="20dp"
+        app:stroke_width="2dp"/>
+
+</LinearLayout>

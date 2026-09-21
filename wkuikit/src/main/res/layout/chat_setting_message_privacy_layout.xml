@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/layoutColor"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:id="@+id/burnMainLayout"
+        android:visibility="visible"
+        style="@style/layoutBgPaddingSmall">
+        <TextView
+            android:layout_width="0dp"
+            android:text="@string/burn_after_reading"
+            android:layout_weight="1"
+            style="@style/leftTextView"/>
+        <com.chat.base.ui.components.SwitchView
+            android:id="@+id/burnSwitchView"
+            android:layout_width="50dp"
+            android:layout_height="30dp"/>
+    </LinearLayout>
+    <com.chat.base.views.expandablelayout.ExpandableLayout
+        android:orientation="vertical"
+        android:id="@+id/burnTimeExpandLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:el_duration="200"
+        app:el_expanded="false"
+        app:el_parallax="0.5">
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <LinearLayout
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_gravity="center"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@mipmap/flame_small"
+                    android:tint="@color/color999"/>
+                <TextView
+                    android:textSize="@dimen/font_size_14"
+                    android:textColor="@color/color999"
+                    android:id="@+id/burnTimeDescTv"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/burn_time_default_desc"
+                    android:layout_weight="1"
+                    android:layout_marginStart="5dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time10Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_10" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time10CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="visible" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time20Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_20" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time20CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time30Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_30" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time30CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time60Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_60" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time60CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time120Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_120" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time120CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/time180Layout"
+                android:background="@color/screen_bg"
+                style="@style/layoutBg">
+                <TextView
+                    style="@style/leftTextView"
+                    android:layout_weight="1"
+                    android:text="@string/time_180" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/time180CheckIv"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/icon_checked"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.chat.base.views.expandablelayout.ExpandableLayout>
+    <View style="@style/view_line_padding"/>
+</LinearLayout>

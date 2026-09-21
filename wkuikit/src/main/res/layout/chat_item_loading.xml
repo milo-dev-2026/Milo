@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="center"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <FrameLayout
+        android:layout_gravity="center"
+        android:id="@+id/loading"
+        android:background="@drawable/shape_corner_rectangle"
+        android:layout_width="35dp"
+        android:layout_height="35dp">
+        <com.chat.base.ui.components.RadialProgressView
+            android:layout_gravity="center"
+            android:id="@+id/progress"
+            android:layout_width="50dp"
+            android:layout_height="50dp"/>
+    </FrameLayout>
+</FrameLayout>

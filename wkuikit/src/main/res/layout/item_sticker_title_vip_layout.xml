@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/titleLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_vertical"
+        android:id="@+id/titleTv"
+        android:padding="10dp"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="10sp"
+        android:textColor="#935d14"
+        android:gravity="center"
+        android:id="@+id/vipTv"
+        android:background="@mipmap/ic_vip_background"
+        android:layout_width="30dp"
+        android:layout_height="wrap_content"
+        android:text="VIP"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/titleTv"
+        app:layout_constraintTop_toTopOf="parent"/>
+    <androidx.appcompat.widget.AppCompatTextView
+        android:textSize="12sp"
+        android:textColor="@color/activate_immediately"
+        android:gravity="center"
+        android:id="@+id/openVipTv"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:text="@string/activate_immediately"
+        android:drawableEnd="@mipmap/ic_opne_vip"
+        android:layout_marginEnd="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/homeColor"
+        android:orientation="vertical">
+
+        <include layout="@layout/wk_title_bar_layout" />
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/homeColor"
+                android:orientation="vertical">
+
+                <!-- 消息设置 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/message_settings"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_13" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/white"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/burnAfterReadingLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                style="@style/leftTextView"
+                                android:text="@string/burn_after_reading" />
+
+                            <TextView
+                                android:id="@+id/burnTimeDescTv"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/burn_time_default_desc"
+                                android:textColor="@color/color999"
+                                android:textSize="@dimen/font_size_12" />
+                        </LinearLayout>
+
+                        <com.chat.base.ui.components.SwitchView
+                            android:id="@+id/burnSwitchView"
+                            android:layout_width="50dp"
+                            android:layout_height="30dp"
+                            android:layout_gravity="center_vertical" />
+                    </LinearLayout>
+
+                    <com.chat.base.views.expandablelayout.ExpandableLayout
+                        android:id="@+id/burnTimeExpandLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:el_duration="200"
+                        app:el_expanded="false"
+                        app:el_parallax="0.5">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@color/screen_bg"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:id="@+id/time5Layout"
+                                style="@style/layoutBg">
+
+                                <TextView
+                                    style="@style/leftTextView"
+                                    android:layout_weight="1"
+                                    android:text="5秒" />
+
+                                <androidx.appcompat.widget.AppCompatImageView
+                                    android:id="@+id/time5CheckIv"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_gravity="center_vertical"
+                                    android:src="@drawable/icon_checked"
+                                    android:visibility="gone" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/time10Layout"
+                                style="@style/layoutBg">
+
+                                <TextView
+                                    style="@style/leftTextView"
+                                    android:layout_weight="1"
+                                    android:text="10秒" />
+
+                                <androidx.appcompat.widget.AppCompatImageView
+                                    android:id="@+id/time10CheckIv"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_gravity="center_vertical"
+                                    android:src="@drawable/icon_checked"
+                                    android:visibility="visible" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/time30Layout"
+                                style="@style/layoutBg">
+
+                                <TextView
+                                    style="@style/leftTextView"
+                                    android:layout_weight="1"
+                                    android:text="30秒" />
+
+                                <androidx.appcompat.widget.AppCompatImageView
+                                    android:id="@+id/time30CheckIv"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_gravity="center_vertical"
+                                    android:src="@drawable/icon_checked"
+                                    android:visibility="gone" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/time60Layout"
+                                style="@style/layoutBg">
+
+                                <TextView
+                                    style="@style/leftTextView"
+                                    android:layout_weight="1"
+                                    android:text="1分钟" />
+
+                                <androidx.appcompat.widget.AppCompatImageView
+                                    android:id="@+id/time60CheckIv"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_gravity="center_vertical"
+                                    android:src="@drawable/icon_checked"
+                                    android:visibility="gone" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.chat.base.views.expandablelayout.ExpandableLayout>
+                </LinearLayout>
+
+                <!-- 隐私设置 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/privacy_settings"
+                    android:textColor="@color/color999"
+                    android:textSize="@dimen/font_size_13" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/white"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/readReceiptLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                style="@style/leftTextView"
+                                android:text="已读回执" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="开启后，消息会显示已读/未读状态"
+                                android:textColor="@color/color999"
+                                android:textSize="@dimen/font_size_12" />
+                        </LinearLayout>
+
+                        <com.chat.base.ui.components.SwitchView
+                            android:id="@+id/readReceiptSwitchView"
+                            android:layout_width="50dp"
+                            android:layout_height="30dp"
+                            android:layout_gravity="center_vertical" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/typingStatusLayout"
+                        style="@style/layoutBgPaddingSmall">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                style="@style/leftTextView"
+                                android:text="输入状态" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="开启后，对方可以看到你正在输入"
+                                android:textColor="@color/color999"
+                                android:textSize="@dimen/font_size_12" />
+                        </LinearLayout>
+
+                        <com.chat.base.ui.components.SwitchView
+                            android:id="@+id/typingStatusSwitchView"
+                            android:layout_width="50dp"
+                            android:layout_height="30dp"
+                            android:layout_gravity="center_vertical" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+</layout>

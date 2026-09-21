@@ -1,0 +1,43 @@
+platform :ios, '14.0'
+use_frameworks!
+
+target 'XianLeiHuHu' do
+
+  # 高德地图 SDK
+  pod 'AMap3DMap'
+  pod 'AMapLocation'
+  pod 'AMapSearch'
+
+  # 腾讯实时音视频 TRTC
+  pod 'TXLiteAVSDK_TRTC'
+
+  # WebSocket (IM连接)
+  pod 'Starscream'
+
+  # 刷新控件
+  pod 'MJRefresh'
+
+  # 网络请求
+  pod 'Alamofire', '~> 5.0'
+
+  # 图片加载
+  pod 'Kingfisher', '~> 7.0'
+
+  # 布局
+  pod 'SnapKit', '~> 5.0'
+
+  # 侧滑返回
+  pod 'FDFullscreenPopGesture'
+
+  # 键盘管理
+  pod 'IQKeyboardManagerSwift'
+
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+    end
+  end
+end

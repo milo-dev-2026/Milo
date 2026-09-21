@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="@drawable/common_bottom_view_top_bg"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:textSize="17sp"
+        android:textColor="@color/colorDark"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:id="@+id/titleTv"
+        android:text="确认删除？" />
+
+    <TextView
+        android:textSize="14sp"
+        android:textColor="@color/color999"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:text="删除后将无法恢复" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="20dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp">
+
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/colorDark"
+            android:gravity="center"
+            android:id="@+id/cancelBtn"
+            android:background="@drawable/btn_noteshare_nobg"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="取消" />
+
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@color/white_abs"
+            android:gravity="center"
+            android:id="@+id/confirmBtn"
+            android:background="@drawable/btn_red_round_bg"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="删除" />
+    </LinearLayout>
+</LinearLayout>

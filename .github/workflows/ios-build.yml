@@ -1,0 +1,437 @@
+name: iOS Build IPA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'ios/**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type: unsigned (free, no certs needed) or signed (needs GitHub Secrets)'
+        required: true
+        default: 'unsigned'
+        type: choice
+        options:
+          - unsigned
+          - signed
+      create_release:
+        description: 'Create GitHub Release with IPA'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  SCHEME: XianLeiHuHu
+  WORKSPACE: ios/XianLeiHuHu.xcworkspace
+  CONFIGURATION: Release
+  BUNDLE_ID: com.xian.leihuhu
+
+jobs:
+  build:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    outputs:
+      ipa_name: ${{ steps.package.outputs.ipa_name }}
+      build_type: ${{ steps.build_type.outputs.type }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine build type
+        id: build_type
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "type=${{ inputs.build_type }}" >> $GITHUB_OUTPUT
+          else
+            # 默认使用 unsigned 构建（无需 Apple Developer 证书）
+            echo "type=unsigned" >> $GITHUB_OUTPUT
+          fi
+          echo "::notice::Build type: unsigned (default, no signing required)"
+
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Inject APIConfig.swift from secret
+        env:
+          API_CONFIG_BASE64: ${{ secrets.IOS_API_CONFIG_SWIFT }}
+        run: |
+          if [ -n "$API_CONFIG_BASE64" ]; then
+            echo "$API_CONFIG_BASE64" | base64 --decode > ios/APIConfig.swift
+            echo "::notice::APIConfig.swift injected from secret"
+          elif [ -f ios/APIConfig.swift ]; then
+            echo "::notice::Using existing APIConfig.swift from repo"
+          else
+            echo "::warning::No APIConfig.swift found, using template"
+            cp ios/APIConfig.template.swift ios/APIConfig.swift
+          fi
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
+
+      # ============================================================
+      # 签名构建：导入证书和描述文件
+      # ============================================================
+      - name: Prepare signing certificates
+        if: steps.build_type.outputs.type == 'signed'
+        id: signing
+        env:
+          P12_BASE64: ${{ secrets.IOS_P12_CERTIFICATE }}
+          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          # 检查所有必需的 Secrets
+          MISSING=()
+          [[ -z "$P12_BASE64" ]] && MISSING+=("IOS_P12_CERTIFICATE")
+          [[ -z "$P12_PASSWORD" ]] && MISSING+=("IOS_P12_PASSWORD")
+          [[ -z "$PROVISIONING_PROFILE_BASE64" ]] && MISSING+=("IOS_PROVISIONING_PROFILE")
+          [[ -z "$KEYCHAIN_PASSWORD" ]] && MISSING+=("IOS_KEYCHAIN_PASSWORD")
+          [[ -z "$TEAM_ID" ]] && MISSING+=("IOS_TEAM_ID")
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::签名构建需要以下 GitHub Secrets，但未配置:"
+            for s in "${MISSING[@]}"; do
+              echo "  - $s"
+            done
+            echo ""
+            echo "配置路径: GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "需要的 Secrets:"
+            echo "  IOS_P12_CERTIFICATE       — .p12 证书的 base64 (必填)"
+            echo "  IOS_P12_PASSWORD           — .p12 证书密码 (必填)"
+            echo "  IOS_PROVISIONING_PROFILE   — .mobileprovision 的 base64 (必填)"
+            echo "  IOS_KEYCHAIN_PASSWORD      — 临时 keychain 密码，任意字符串 (必填)"
+            echo "  IOS_TEAM_ID                — Apple Developer Team ID (必填)"
+            echo ""
+            echo "生成 base64 (在 macOS 终端执行):"
+            echo "  base64 -i certificate.p12 | pbcopy"
+            echo "  base64 -i profile.mobileprovision | pbcopy"
+            exit 1
+          fi
+
+          echo "::notice::Team ID: $TEAM_ID"
+
+          # 创建临时 keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # 导入 .p12 证书
+          P12_PATH="$RUNNER_TEMP/cert.p12"
+          echo "$P12_BASE64" | base64 --decode -o "$P12_PATH"
+
+          security import "$P12_PATH" \
+            -P "$P12_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # 检查证书是否导入成功
+          CERT_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" 2>&1)
+          if echo "$CERT_INFO" | grep -q "iPhone Distribution"; then
+            echo "::notice::Distribution 证书导入成功"
+          elif echo "$CERT_INFO" | grep -q "Apple Development"; then
+            echo "::notice::Development 证书导入成功"
+            echo "SIGNING_IDENTITY=Apple Development" >> $GITHUB_ENV
+          else
+            echo "::warning::未找到预期的签名身份，已导入的证书:"
+            echo "$CERT_INFO"
+          fi
+
+          # 安装 Provisioning Profile
+          PP_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PP_DIR"
+
+          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+
+          # 提取 UUID 和 Name
+          PP_PLIST=$(security cms -D -i "$PP_PATH" 2>/dev/null)
+          if [ -z "$PP_PLIST" ]; then
+            echo "::error::无法读取 Provisioning Profile，文件可能损坏"
+            exit 1
+          fi
+
+          PP_UUID=$(echo "$PP_PLIST" | /usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin 2>/dev/null)
+          PP_NAME=$(echo "$PP_PLIST" | /usr/libexec/PlistBuddy -c "Print Name" /dev/stdin 2>/dev/null)
+          PP_METHOD=$(echo "$PP_PLIST" | /usr/libexec/PlistBuddy -c "Print :ProvisionsAllDevices" /dev/stdin 2>/dev/null || echo "false")
+
+          echo "::notice::Provisioning Profile: $PP_NAME (UUID: $PP_UUID)"
+
+          cp "$PP_PATH" "$PP_DIR/$PP_UUID.mobileprovision"
+
+          # 将 keychain 加入搜索列表
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # 保存路径供后续步骤使用
+          echo "PP_UUID=$PP_UUID" >> $GITHUB_OUTPUT
+          echo "PP_NAME=$PP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create ExportOptions.plist (signed)
+        if: steps.build_type.outputs.type == 'signed'
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          PP_NAME="${{ steps.signing.outputs.PP_NAME }}"
+
+          cat > "$RUNNER_TEMP/ExportOptions.plist" << 'PLIST_EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.xian.leihuhu</key>
+                  <string>PP_NAME_PLACEHOLDER</string>
+              </dict>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+              <key>teamID</key>
+              <string>TEAM_ID_PLACEHOLDER</string>
+          </dict>
+          </plist>
+          PLIST_EOF
+
+          # 替换占位符
+          sed -i '' "s/PP_NAME_PLACEHOLDER/$PP_NAME/" "$RUNNER_TEMP/ExportOptions.plist"
+          sed -i '' "s/TEAM_ID_PLACEHOLDER/$TEAM_ID/" "$RUNNER_TEMP/ExportOptions.plist"
+
+          echo "=== ExportOptions.plist ==="
+          cat "$RUNNER_TEMP/ExportOptions.plist"
+
+      # ============================================================
+      # 构建归档
+      # ============================================================
+      - name: Build archive (signed)
+        if: steps.build_type.outputs.type == 'signed'
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -sdk iphoneos \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            2>&1 | tee "$RUNNER_TEMP/build-signed.log"
+
+          # 验证归档
+          if [ ! -d "$RUNNER_TEMP/XianLeiHuHu.xcarchive" ]; then
+            echo "::error::归档构建失败，未生成 .xcarchive"
+            exit 1
+          fi
+
+          echo "::notice::归档构建成功"
+
+      - name: Build archive (unsigned)
+        if: steps.build_type.outputs.type == 'unsigned'
+        run: |
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGN_STYLE="" \
+            2>&1 | tee "$RUNNER_TEMP/build-unsigned.log"
+
+          if [ ! -d "$RUNNER_TEMP/XianLeiHuHu.xcarchive" ]; then
+            echo "::error::归档构建失败"
+            exit 1
+          fi
+
+      # ============================================================
+      # 导出 IPA
+      # ============================================================
+      - name: Export signed IPA
+        if: steps.build_type.outputs.type == 'signed'
+        id: package
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa-output"
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/XianLeiHuHu.xcarchive" \
+            -exportPath "$RUNNER_TEMP/ipa-output" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            2>&1 | tee "$RUNNER_TEMP/export.log"
+
+          IPA_FILE=$(find "$RUNNER_TEMP/ipa-output" -name "*.ipa" | head -1)
+
+          if [ -z "$IPA_FILE" ]; then
+            echo "::error::IPA 导出失败，未找到 .ipa 文件"
+            echo "=== 导出日志 ==="
+            cat "$RUNNER_TEMP/export.log"
+            exit 1
+          fi
+
+          echo "::notice::IPA 导出成功: $IPA_FILE"
+
+          # 验证签名
+          echo "=== 验证 IPA 签名 ==="
+          unzip -l "$IPA_FILE" | grep "_CodeSignature" || echo "警告: 未找到 _CodeSignature"
+
+          echo "ipa_path=$IPA_FILE" >> $GITHUB_OUTPUT
+          echo "ipa_name=XianLeiHuHu-signed.ipa" >> $GITHUB_OUTPUT
+
+      - name: Package unsigned IPA
+        if: steps.build_type.outputs.type == 'unsigned'
+        id: package
+        run: |
+          APP_PATH="$RUNNER_TEMP/XianLeiHuHu.xcarchive/Products/Applications/XianLeiHuHu.app"
+          if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$RUNNER_TEMP/XianLeiHuHu.xcarchive" -name "*.app" -type d | head -1)
+          fi
+
+          PAYLOAD_DIR="$RUNNER_TEMP/Payload"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/"
+
+          cd "$RUNNER_TEMP"
+          zip -r "XianLeiHuHu-unsigned.ipa" Payload \
+            -x "*.DS_Store" \
+            -x "*._*"
+
+          echo "ipa_path=$RUNNER_TEMP/XianLeiHuHu-unsigned.ipa" >> $GITHUB_OUTPUT
+          echo "ipa_name=XianLeiHuHu-unsigned.ipa" >> $GITHUB_OUTPUT
+
+      # ============================================================
+      # 上传产物
+      # ============================================================
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.ipa_name }}
+          path: ${{ steps.package.outputs.ipa_path }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ runner.temp }}/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # ============================================================
+      # 清理临时 keychain
+      # ============================================================
+      - name: Cleanup keychain
+        if: always() && steps.build_type.outputs.type == 'signed'
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+            echo "::notice::Keychain 已清理"
+          fi
+
+  # ============================================================
+  # Release Job
+  # ============================================================
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_release)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.ipa_name }}
+          path: artifacts
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "name=nightly-$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "闲雷虎虎 ${{ steps.tag.outputs.name }}"
+          body: |
+            ## iOS IPA Build
+
+            **Build type:** ${{ needs.build.outputs.build_type == 'signed' && 'Signed (ad-hoc)' || 'Unsigned' }}
+            **Bundle ID:** com.xian.leihuhu
+
+            ${{ needs.build.outputs.build_type == 'signed' && '### 签名构建 (Ad-Hoc)' || '### 未签名构建' }}
+
+            ${{ needs.build.outputs.build_type == 'signed' && '此 IPA 已使用 Apple Developer 证书签名，可直接安装到已注册 UDID 的设备。' || '此 IPA 未签名，需要通过以下方式安装：\n- **Sideloadly** (推荐): https://sideloadly.io/\n- **AltStore**: https://altstore.io/\n- **TrollStore** (iOS 14.0-16.6.1)\n- **Esign** / **牛蛙助手**等第三方签名工具' }}
+
+            ${{ needs.build.outputs.build_type == 'signed' && '### 安装方式\n1. 通过 Sideloadly / 3uTools / Apple Configurator 安装\n2. 或上传至 TestFlight 分发\n3. 确保设备 UDID 已在 Provisioning Profile 中注册' || '> 注意：使用免费 Apple ID 签名后，App 有效期为 7 天，最多 3 个设备。\n> 购买 $99/年 Apple Developer 账户可获得无限期签名。' }}
+
+            ### 构建信息
+            - Scheme: XianLeiHuHu
+            - Configuration: Release
+            - Runner: macos-latest
+            - Commit: ${{ github.sha }}
+            - Build Date: ${{ github.run_id }}
+
+            ---
+            Generated with GitHub Actions
+          files: artifacts/*.ipa
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}

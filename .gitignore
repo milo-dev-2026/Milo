@@ -1,0 +1,49 @@
+*.iml
+.gradle
+.idea
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/app/build
+/wkbase/build
+/wklogin/build
+/wkscan/build
+/wkpush/build
+/wkuikit/build
+/MyLibs/rlottie/build
+/wksdk_extracted
+/wksdk_classes
+/test_java_write
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Backend sensitive files
+backend/.env
+backend/.env.*
+*.pem
+*.key
+
+# iOS sensitive files (contains API keys)
+ios/APIConfig.swift
+*.jks
+app/leihuhu.jks
+app/agconnect-services.json
+
+# iOS build artifacts
+ios/XianLeiHuHu.xcodeproj
+ios/XianLeiHuHu.xcworkspace
+ios/Pods/
+ios/build/
+ios/DerivedData/
+*.xcarchive
+
+# macOS
+.DS_Store

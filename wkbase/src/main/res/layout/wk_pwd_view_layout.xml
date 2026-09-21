@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="vertical" android:id="@+id/contentLayout" android:background="@drawable/white_bg" android:layout_width="fill_parent" android:layout_height="wrap_content">
+      <androidx.appcompat.widget.AppCompatImageView android:layout_gravity="end" android:id="@+id/closeIv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_margin="10.0dip" android:src="@mipmap/ic_close_white" />
+      <LinearLayout android:orientation="vertical" android:id="@+id/bottomView" android:paddingTop="20.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="15.0dip" android:paddingEnd="15.0dip">
+        <TextView android:textSize="20.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/titleCenterTv" android:layout_width="fill_parent" android:layout_height="wrap_content" />
+        <TextView android:textSize="16.0sp" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/subtitleTv" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="15.0dip" />
+        <TextView android:textSize="14.0sp" android:textColor="@color/color999" android:gravity="center" android:id="@+id/remarkTv" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="15.0dip" />
+        <LinearLayout android:layout_gravity="bottom" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="10.0dip" android:layout_marginBottom="10.0dip" android:baselineAligned="false">
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass1" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="" android:inputType="numberPassword" />
+            <View android:id="@+id/view1" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass2" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:inputType="numberPassword" />
+            <View android:id="@+id/view2" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass3" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:inputType="numberPassword" />
+            <View android:id="@+id/view3" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass4" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:inputType="numberPassword" />
+            <View android:id="@+id/view4" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass5" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:inputType="numberPassword" />
+            <View android:id="@+id/view5" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+          <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <androidx.appcompat.widget.AppCompatEditText android:enabled="false" android:textSize="32.0sp" android:textStyle="bold" android:textColor="@color/colorDark" android:gravity="center" android:id="@+id/tv_pass6" android:background="@color/transparent" android:focusable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:inputType="numberPassword" />
+            <View android:id="@+id/view6" android:background="@color/color999" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginLeft="5.0dip" android:layout_marginRight="5.0dip" />
+          </LinearLayout>
+        </LinearLayout>
+      </LinearLayout>
+      <TextView android:textSize="@dimen/font_size_16" android:layout_gravity="bottom|center" android:id="@+id/bottomTv" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="10.0dip" />
+    </LinearLayout>
+</layout>

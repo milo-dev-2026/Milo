@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:layout_gravity="center" android:orientation="horizontal" android:id="@+id/toastLayout" android:background="@drawable/toast_bg_normal" android:layout_width="wrap_content" android:layout_height="wrap_content">
+      <androidx.appcompat.widget.AppCompatImageView android:layout_gravity="center_vertical" android:id="@+id/toastIv" android:layout_width="20.0dip" android:layout_height="20.0dip" android:src="@mipmap/icon_info" android:layout_marginStart="10.0dip" />
+      <TextView android:textSize="16.0sp" android:textColor="@color/white" android:layout_gravity="center_vertical" android:id="@+id/toastTv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dip" android:layout_marginBottom="10.0dip" android:layout_marginStart="5.0dip" android:layout_marginEnd="15.0dip" />
+    </LinearLayout>
+</layout>

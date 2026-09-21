@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@drawable/shap_bottom_sheet_bg"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="356dp">
+    <com.zhpan.bannerview.BannerViewPager
+        android:id="@+id/banner"
+        android:layout_width="match_parent"
+        android:layout_height="245dp"
+        android:layout_marginTop="12dp"
+        app:bvp_auto_play="false"
+        app:bvp_indicator_checked_color="@color/ffbc0e"
+        app:bvp_indicator_normal_color="@color/e2e5ec"/>
+    <TextView
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/ff6c4615"
+        android:gravity="center"
+        android:id="@+id/tv_open_vip"
+        android:background="@drawable/bg_vip_gradient_r12"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="10dp"
+        android:text="立即开通"/>
+</LinearLayout>

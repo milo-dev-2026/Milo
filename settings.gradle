@@ -1,0 +1,30 @@
+pluginManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url "https://jitpack.io" }
+        maven {url 'https://developer.huawei.com/repo/'}
+        maven { url 'https://mirrors.tencent.com/nexus/repository/maven-public/' }
+        maven { url 'https://maven.aliyun.com/repository/jcenter' }
+        maven { url 'https://repo1.maven.org/maven2/' }
+        maven { url file("maven-repo").toURI() }
+    }
+}
+rootProject.name = "TsddClient"
+include ':MyLibs:rlottie'
+include ':app'
+include ':wkbase'
+include ':wkuikit'
+include ':wkscan'
+include ':wklogin'
+include ':wkpush'

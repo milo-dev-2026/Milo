@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout style="@style/layoutBgPaddingSmall">
+        <com.chat.base.ui.components.AvatarView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/avatarView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:textSize="@dimen/font_size_16"
+            android:textColor="@color/colorDark"
+            android:ellipsize="end"
+            android:layout_gravity="center"
+            android:id="@+id/nameTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:lines="1"
+            android:layout_marginStart="10dp"/>
+    </LinearLayout>
+</LinearLayout>

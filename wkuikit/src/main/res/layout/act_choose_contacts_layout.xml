@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@color/homeColor"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <include layout="@layout/wk_title_bar_layout" />
+
+    <!-- 搜索框 -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:background="@drawable/search_bar_bg"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center_vertical"
+            android:id="@+id/searchIv"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@mipmap/ic_ab_search"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="5dp" />
+
+        <androidx.appcompat.widget.AppCompatEditText
+            android:textSize="14sp"
+            android:textColor="@color/colorDark"
+            android:textColorHint="@color/color999"
+            android:gravity="start|center_vertical"
+            android:layout_gravity="center_vertical"
+            android:id="@+id/searchEt"
+            android:background="@color/transparent"
+            android:focusable="true"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:hint="@string/str_search"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:layout_weight="1"
+            android:imeOptions="actionSearch"
+            android:layout_marginEnd="8dp" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="center"
+            android:id="@+id/searchCloseImg"
+            android:visibility="gone"
+            android:layout_width="20dp"
+            android:layout_height="match_parent"
+            android:src="@mipmap/ic_search_close"
+            android:layout_marginEnd="10dp" />
+    </LinearLayout>
+
+    <!-- 已选择联系人横向滚动列表 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:layout_gravity="center_vertical"
+        android:orientation="horizontal"
+        android:id="@+id/selectUserRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="10dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="15dp"
+        android:visibility="gone" />
+
+    <!-- 联系人列表区域 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.chat.base.views.sidebar.QuickSideBarTipsView
+            android:layout_gravity="end"
+            android:id="@+id/quickSideBarTipsView"
+            android:layout_width="45dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="30dp"
+            app:sidebarBackgroundColor="@color/black"
+            app:sidebarTextColor="@android:color/white"
+            app:sidebarTextSize="@dimen/font_size_20" />
+
+        <com.chat.base.views.sidebar.QuickSideBarView
+            android:layout_gravity="end"
+            android:id="@+id/quickSideBarView"
+            android:layout_width="20dp"
+            android:layout_height="match_parent"
+            app:sidebarItemHeight="20dp"
+            app:sidebarTextColor="@color/colorAccentDisabled"
+            app:sidebarTextColorChoose="@color/black"
+            app:sidebarTextSize="@dimen/font_size_10"
+            app:sidebarTextSizeChoose="@dimen/font_size_16" />
+    </FrameLayout>
+
+</LinearLayout>

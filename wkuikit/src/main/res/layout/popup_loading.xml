@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:id="@+id/container"
+    android:padding="24dp"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+    <com.opensource.svgaplayer.SVGAImageView
+        android:id="@+id/svgaImageView"
+        android:layout_width="28dp"
+        android:layout_height="10dp"/>
+    <TextView
+        android:textSize="13sp"
+        android:textColor="@color/c888A95"
+        android:id="@+id/textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/loading_message"/>
+</LinearLayout>
