@@ -1,6 +1,6 @@
 import UIKit
 import SnapKit
-import AMap3DMap
+import MAMapKit
 import AMapSearchKit
 
 class LocationMessageCell: UITableViewCell {

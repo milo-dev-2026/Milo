@@ -1,6 +1,6 @@
 import UIKit
 import SnapKit
-import AMap3DMap
+import MAMapKit
 import AMapLocationKit
 import AMapSearchKit
 

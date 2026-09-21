@@ -13,7 +13,7 @@ class StickerPanelView: UIView {
     private let collectionView: UICollectionView
     private let segmentControl = UISegmentedControl(items: ["表情", "贴纸"])
     private var currentMode = 0
-    private let emojis = ["😀", "😂", "😍", "🥰", "😎", "🤔", "😢", "😭", "😡", "🤯", "👍", "👎", "👌", "👏",🙏", "💪", "🎉", "🎁", "❤️", "💔", "🔥", "⭐", "🌈", "☀️"]
+    private let emojis = ["😀", "😂", "😍", "🥰", "😎", "🤔", "😢", "😭", "😡", "🤯", "👍", "👎", "👌", "👏", "🙏", "💪", "🎉", "🎁", "❤️", "💔", "🔥", "⭐", "🌈", "☀️"]
     private let stickers = ["sticker_1", "sticker_2", "sticker_3", "sticker_4", "sticker_5", "sticker_6"]
 
     override init(frame: CGRect) {

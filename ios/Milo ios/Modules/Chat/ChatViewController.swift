@@ -2,7 +2,7 @@ import UIKit
 import SnapKit
 import Kingfisher
 import Photos
-import AMap3DMap
+import MAMapKit
 import AMapLocationKit
 import AMapSearchKit
 import UniformTypeIdentifiers

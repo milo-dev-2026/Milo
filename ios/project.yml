@@ -59,3 +59,14 @@ targets:
         HEADER_SEARCH_PATHS:
           - $(inherited)
           - $(SRCROOT)/Pods/Headers/Public
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/Pods
+          - $(SRCROOT)/Pods/AMap3DMap
+          - $(SRCROOT)/Pods/AMapFoundation
+          - $(SRCROOT)/Pods/AMapLocation
+          - $(SRCROOT)/Pods/AMapSearch
+          - $(SRCROOT)/Pods/TXLiteAVSDK_TRTC/TXLiteAVSDK_TRTC
+    configFiles:
+      Debug: "Pods/Target Support Files/Pods-XianLeiHuHu/Pods-XianLeiHuHu.debug.xcconfig"
+      Release: "Pods/Target Support Files/Pods-XianLeiHuHu/Pods-XianLeiHuHu.release.xcconfig"
