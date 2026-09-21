@@ -148,7 +148,7 @@ extension NoteListViewController: UITableViewDataSource, UITableViewDelegate {
         guard !notes.isEmpty else { return }
         let note = notes[indexPath.row]
         let detail = NoteDetailViewController(note: note)
-        detail.onEdit = { [weak self] updatedNote in
+        detail.onEdit = { [weak self] (updatedNote: NoteEntity) in
             self?.loadData()
         }
         detail.onDelete = { [weak self] _ in

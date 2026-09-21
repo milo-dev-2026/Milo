@@ -31,7 +31,9 @@ class BaseNavigationController: UINavigationController {
 
         // 应用外观
         navigationBar.standardAppearance = appearance
-        navigationBar.scrollEdgeAppearance = appearance
+        if #available(iOS 15.0, *) {
+            navigationBar.scrollEdgeAppearance = appearance
+        }
         navigationBar.compactAppearance = appearance
 
         // 启用大标题（一级页面使用）
@@ -80,7 +82,9 @@ extension UINavigationController {
             .font: ScreenAdapter.boldFont(34)
         ]
         navigationBar.standardAppearance = appearance
-        navigationBar.scrollEdgeAppearance = appearance
+        if #available(iOS 15.0, *) {
+            navigationBar.scrollEdgeAppearance = appearance
+        }
         navigationBar.tintColor = .themePrimary
     }
 
@@ -97,7 +101,9 @@ extension UINavigationController {
             .font: ScreenAdapter.boldFont(34)
         ]
         navigationBar.standardAppearance = appearance
-        navigationBar.scrollEdgeAppearance = appearance
+        if #available(iOS 15.0, *) {
+            navigationBar.scrollEdgeAppearance = appearance
+        }
         navigationBar.tintColor = .themePrimary
     }
 }

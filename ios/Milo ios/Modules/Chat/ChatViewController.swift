@@ -125,7 +125,7 @@ class ChatViewController: UIViewController {
 
     private func startGroupVoiceCall() {
         let vc = ChooseVideoCallMembersViewController(groupId: channelId, groupType: channelType)
-        vc.onSelected = { [weak self] uids in
+        vc.onSelected = { [weak self] (uids: [String]) in
             guard let self = self else { return }
             // 发起语音通话
             let callVC = TRTCCallViewController(channelId: self.channelId)

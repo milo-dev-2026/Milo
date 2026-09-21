@@ -1,5 +1,6 @@
 import UIKit
 import SnapKit
+import Kingfisher
 
 // MARK: - 选择收藏（转发用）
 class FavoriteSelectViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
@@ -113,43 +114,6 @@ class NotePreviewViewController: UIViewController {
         view.backgroundColor = .themeBackground
         textView.text = note["content"] as? String; textView.font = ScreenAdapter.font(16); textView.isEditable = false
         view.addSubview(textView); textView.snp.makeConstraints { make in make.edges.equalToSuperview().inset(UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)) }
-    }
-}
-
-// MARK: - 笔记详情
-class NoteDetailViewController: UIViewController {
-    private var note: [String: Any]
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-
-    init(note: [String: Any]) { self.note = note; super.init(nibName: nil, bundle: nil) }
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        title = "笔记详情"
-        view.backgroundColor = .themeBackground
-        tableView.dataSource = self; tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "NDCell")
-        view.addSubview(tableView); tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-    }
-}
-extension NoteDetailViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 4 }
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "NDCell", for: indexPath)
-        cell.selectionStyle = .none; cell.imageView?.tintColor = .themePrimary
-        switch indexPath.row {
-        case 0: cell.textLabel?.text = "标题"; cell.detailTextLabel?.text = note["title"] as? String
-        case 1: cell.textLabel?.text = "分组"; cell.detailTextLabel?.text = note["group"] as? String ?? "默认"
-        case 2: cell.textLabel?.text = "创建时间"; cell.detailTextLabel?.text = note["createTime"] as? String
-        case 3: cell.textLabel?.text = "内容"; cell.detailTextLabel?.text = (note["content"] as? String ?? "").prefix(20) + "..."
-        default: break
-        }
-        return cell
-    }
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        if indexPath.row == 3 { navigationController?.pushViewController(NotePreviewViewController(note: note), animated: true) }
     }
 }
 

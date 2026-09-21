@@ -59,7 +59,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         UINavigationBar.appearance().tintColor = .themePrimary
         UINavigationBar.appearance().standardAppearance = navBarAppearance
-        UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
+        if #available(iOS 15.0, *) {
+            UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
+        }
         UINavigationBar.appearance().compactAppearance = navBarAppearance
         UINavigationBar.appearance().prefersLargeTitles = true
 
@@ -68,7 +70,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         tabBarAppearance.configureWithDefaultBackground()
         UITabBar.appearance().tintColor = .themePrimary
         UITabBar.appearance().standardAppearance = tabBarAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        }
         UITabBar.appearance().unselectedItemTintColor = .systemGray
 
         // UISwitch 全局颜色

@@ -12,7 +12,7 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
     private var maxSelection: Int
     private var onSelected: (([(uid: String, name: String)]) -> Void)?
 
-    init(maxSelection: Int = 9, onSelected: @escaping ([(uid: String, name: String)]) -> Void) {
+    init(maxSelection: Int = 9, onSelected: (([(uid: String, name: String)]) -> Void)? = nil) {
         self.maxSelection = maxSelection
         self.onSelected = onSelected
         super.init(nibName: nil, bundle: nil)

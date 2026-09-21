@@ -98,7 +98,7 @@ class FavoriteViewController: UIViewController {
                 title: "全选",
                 style: .plain,
                 target: self,
-                action: #selector(selectAll)
+                action: #selector(toggleSelectAll)
             )
         } else {
             navigationItem.rightBarButtonItem = UIBarButtonItem(
@@ -114,7 +114,7 @@ class FavoriteViewController: UIViewController {
         updateBottomToolbar()
     }
     
-    @objc private func selectAll() {
+    @objc private func toggleSelectAll() {
         if selectedIds.count == favorites.count {
             selectedIds.removeAll()
         } else {

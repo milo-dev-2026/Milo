@@ -267,7 +267,7 @@ class NoteDetailViewController: UIViewController {
     
     @objc private func editNote() {
         let editor = NoteEditViewController(note: note)
-        editor.onSave = { [weak self] updatedNote in
+        editor.onSave = { [weak self] (updatedNote: NoteEntity) in
             self?.note = updatedNote
             self?.renderContent()
             self?.onEdit?(updatedNote)
@@ -329,79 +329,5 @@ class NoteDetailViewController: UIViewController {
         })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         present(alert, animated: true)
-    }
-}
-
-// MARK: - 图片预览控制器（本地图片）
-class ImagePreviewViewController: UIViewController {
-    
-    private let scrollView = UIScrollView()
-    private let imageView = UIImageView()
-    private var image: UIImage?
-    
-    init(image: UIImage?) {
-        self.image = image
-        super.init(nibName: nil, bundle: nil)
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        
-        scrollView.minimumZoomScale = 1
-        scrollView.maximumZoomScale = 4
-        scrollView.delegate = self
-        
-        imageView.contentMode = .scaleAspectFit
-        imageView.image = image
-        
-        scrollView.addSubview(imageView)
-        view.addSubview(scrollView)
-        
-        scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-        
-        imageView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-            make.width.height.equalToSuperview()
-        }
-        
-        let closeBtn = UIButton(type: .system)
-        closeBtn.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        closeBtn.tintColor = .white
-        closeBtn.addTarget(self, action: #selector(close), for: .touchUpInside)
-        view.addSubview(closeBtn)
-        closeBtn.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
-            make.width.height.equalTo(ScreenAdapter.scaleW(36))
-        }
-        
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTap(_:)))
-        doubleTap.numberOfTapsRequired = 2
-        scrollView.addGestureRecognizer(doubleTap)
-    }
-    
-    @objc private func close() {
-        dismiss(animated: true)
-    }
-    
-    @objc private func doubleTap(_ gr: UITapGestureRecognizer) {
-        if scrollView.zoomScale > 1 {
-            scrollView.setZoomScale(1, animated: true)
-        } else {
-            scrollView.setZoomScale(2, animated: true)
-        }
-    }
-}
-
-extension ImagePreviewViewController: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
     }
 }

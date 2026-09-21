@@ -1,62 +1,73 @@
 import UIKit
 import SnapKit
 
-// MARK: - 群管理（角色/权限）
-class GroupManageViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var groupId: String
+// MARK: - 群二维码
+class GroupQRCodeViewController: UIViewController {
+    private let groupId: String
+    private let groupName: String
+    private let qrImageView = UIImageView()
+    private let nameLabel = UILabel()
+    private let tipLabel = UILabel()
 
-    init(groupId: String) { self.groupId = groupId; super.init(nibName: nil, bundle: nil) }
+    init(groupId: String, groupName: String) {
+        self.groupId = groupId
+        self.groupName = groupName
+        super.init(nibName: nil, bundle: nil)
+    }
     required init?(coder: NSCoder) { fatalError() }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "群管理"
+        title = "群二维码"
         view.backgroundColor = .themeBackground
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "GroupManageCell")
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+
+        qrImageView.contentMode = .scaleAspectFit
+        qrImageView.backgroundColor = .white
+        qrImageView.layer.cornerRadius = ScreenAdapter.scaleW(12)
+        qrImageView.clipsToBounds = true
+
+        nameLabel.text = groupName
+        nameLabel.font = ScreenAdapter.mediumFont(18)
+        nameLabel.textColor = .label
+        nameLabel.textAlignment = .center
+
+        tipLabel.text = "扫一扫二维码，加入群聊"
+        tipLabel.font = ScreenAdapter.font(14)
+        tipLabel.textColor = .secondaryLabel
+        tipLabel.textAlignment = .center
+
+        view.addSubviews(qrImageView, nameLabel, tipLabel)
+
+        qrImageView.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(ScreenAdapter.scaleH(40))
+            make.width.height.equalTo(ScreenAdapter.scaleW(240))
+        }
+
+        nameLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(qrImageView.snp.bottom).offset(ScreenAdapter.scaleH(20))
+        }
+
+        tipLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(nameLabel.snp.bottom).offset(ScreenAdapter.scaleH(8))
+        }
+
+        generateQRCode()
     }
 
-    func numberOfSections(in tableView: UITableView) -> Int { 3 }
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section { case 0: return 2; case 1: return 2; case 2: return 2; default: return 0 }
-    }
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        switch section { case 0: return "权限设置"; case 1: return "成员管理"; case 2: return "群信息"; default: return nil }
-    }
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "GroupManageCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.imageView?.tintColor = .themePrimary
-        cell.selectionStyle = .none
-        let sw = UISwitch()
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0): cell.textLabel?.text = "仅群主/管理员可邀请"; cell.imageView?.image = UIImage(systemName: "person.badge.plus"); sw.isOn = UserDefaults.standard.bool(forKey: "group_invite_only_admin"); sw.tag = 0; sw.addTarget(self, action: #selector(toggleGroupSetting(_:)), for: .valueChanged); cell.accessoryView = sw; cell.accessoryType = .none
-        case (0, 1): cell.textLabel?.text = "禁止群成员添加好友"; cell.imageView?.image = UIImage(systemName: "person.2.slash"); sw.isOn = UserDefaults.standard.bool(forKey: "group_forbid_add_friend"); sw.tag = 1; sw.addTarget(self, action: #selector(toggleGroupSetting(_:)), for: .valueChanged); cell.accessoryView = sw; cell.accessoryType = .none
-        case (1, 0): cell.textLabel?.text = "全部成员"; cell.imageView?.image = UIImage(systemName: "person.3")
-        case (1, 1): cell.textLabel?.text = "群黑名单"; cell.imageView?.image = UIImage(systemName: "person.badge.minus")
-        case (2, 0): cell.textLabel?.text = "修改群名"; cell.imageView?.image = UIImage(systemName: "pencil")
-        case (2, 1): cell.textLabel?.text = "群备注"; cell.imageView?.image = UIImage(systemName: "tag")
-        default: break
-        }
-        return cell
-    }
-    @objc private func toggleGroupSetting(_ sw: UISwitch) {
-        let key = sw.tag == 0 ? "group_invite_only_admin" : "group_forbid_add_friend"
-        UserDefaults.standard.set(sw.isOn, forKey: key)
-    }
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        switch (indexPath.section, indexPath.row) {
-        case (1, 0): navigationController?.pushViewController(AllMembersViewController(groupId: groupId), animated: true)
-        case (1, 1): navigationController?.pushViewController(GroupBlackListViewController(groupId: groupId), animated: true)
-        case (2, 0): navigationController?.pushViewController(UpdateGroupNameViewController(groupId: groupId), animated: true)
-        case (2, 1): navigationController?.pushViewController(SetGroupRemarkViewController(groupId: groupId), animated: true)
-        default: break
-        }
+    private func generateQRCode() {
+        let qrString = "milo://group?\(groupId)"
+        guard let data = qrString.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else { return }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel")
+        guard let outputImage = filter.outputImage else { return }
+        let scaleX = qrImageView.bounds.width / outputImage.extent.width
+        let scaleY = qrImageView.bounds.height / outputImage.extent.height
+        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: max(scaleX, scaleY), y: max(scaleX, scaleY)))
+        qrImageView.image = UIImage(ciImage: scaledImage)
     }
 }
 

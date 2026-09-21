@@ -276,7 +276,7 @@ extension COSUploadManager: QCloudSignatureProvider {
     /// 生产环境建议：
     /// 1. 从后端接口获取临时密钥（STS）
     /// 2. 由后端计算签名，客户端只负责发起请求
-    func signature(withFields fileds: QCloudSignatureFields!,
+    func signature(with fileds: QCloudSignatureFields!,
                    request: QCloudBizHTTPRequest!,
                    urlRequest urlRequst: NSMutableURLRequest!,
                    compelete continueBlock: QCloudHTTPAuthentationContinueBlock!) {

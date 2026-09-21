@@ -747,30 +747,4 @@ class ForbiddenMembersViewController: UIViewController, UITableViewDataSource, U
 }
 
 // MARK: - MJRefresh 简单占位（如项目未引入则使用空实现）
-// 注：如果项目已集成 MJRefresh，请移除以下代码
-import ObjectiveC
-
-class MJRefreshNormalHeader: UIView {
-    var refreshingBlock: (() -> Void)?
-    func endRefreshing() {}
-}
-
-class MJRefreshAutoNormalFooter: UIView {
-    var refreshingBlock: (() -> Void)?
-    func endRefreshing() {}
-    func endRefreshingWithNoMoreData() {}
-}
-
-private var mjHeaderKey: UInt8 = 0
-private var mjFooterKey: UInt8 = 0
-
-extension UITableView {
-    var mj_header: MJRefreshNormalHeader? {
-        get { objc_getAssociatedObject(self, &mjHeaderKey) as? MJRefreshNormalHeader }
-        set { objc_setAssociatedObject(self, &mjHeaderKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
-    }
-    var mj_footer: MJRefreshAutoNormalFooter? {
-        get { objc_getAssociatedObject(self, &mjFooterKey) as? MJRefreshAutoNormalFooter }
-        set { objc_setAssociatedObject(self, &mjFooterKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
-    }
-}
+import MJRefresh

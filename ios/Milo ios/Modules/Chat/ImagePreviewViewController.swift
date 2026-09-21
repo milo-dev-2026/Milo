@@ -8,6 +8,7 @@ class ImagePreviewViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
     private let imageURL: URL?
+    private let image: UIImage?
     private let closeButton = UIButton(type: .system)
     private let bottomBar = UIView()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
@@ -16,6 +17,13 @@ class ImagePreviewViewController: UIViewController {
 
     init(url: URL?) {
         self.imageURL = url
+        self.image = nil
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    init(image: UIImage?) {
+        self.image = image
+        self.imageURL = nil
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -89,7 +97,10 @@ class ImagePreviewViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        if let url = imageURL {
+        if let image = image {
+            imageView.image = image
+            activityIndicator.stopAnimating()
+        } else if let url = imageURL {
             imageView.kf.setImage(with: url) { [weak self] result in
                 DispatchQueue.main.async {
                     self?.activityIndicator.stopAnimating()
