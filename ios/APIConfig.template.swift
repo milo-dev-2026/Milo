@@ -10,13 +10,13 @@ import Foundation
 struct APIConfig {
 
     // MARK: - 1. 服务器地址
-    static let apiBaseURL = "__PLACEHOLDER_API_BASE_URL__"
-    static let imSocketURL = "__PLACEHOLDER_IM_SOCKET_URL__"
-    static let pushServiceURL = "__PLACEHOLDER_PUSH_SERVICE_URL__"
-    static let smsServiceURL = "__PLACEHOLDER_SMS_SERVICE_URL__"
+    static let apiBaseURL = "http://43.133.39.170:8090"
+    static let imSocketURL = "ws://43.133.39.170:8090"
+    static let pushServiceURL = "http://43.133.39.170:5002"
+    static let smsServiceURL = "http://43.133.39.170:5001"
 
     // MARK: - 2. 高德地图 iOS Key
-    static let amapKey = "__PLACEHOLDER_AMAP_KEY__"
+    static let amapKey = "18fc1fe7d76180fe7ebde0ffdb6ddac0"
 
     // MARK: - 3. APNs 推送配置
     static let apnsKeyID = "__PLACEHOLDER_APNS_KEY_ID__"
