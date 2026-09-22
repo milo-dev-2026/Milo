@@ -58,14 +58,13 @@ class AddFriendViewController: UIViewController {
         view.endEditing(true)
         Task {
             do {
-                let response: APIResponse<User> = try await APIClient.shared.request(.getUserInfo(uid: uid))
-                if let user = response.data {
-                    searchResult = user
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                    }
-                } else {
-                    AppUtility.showToast("用户不存在")
+                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: uid, channelType: 1)
+                )
+                let user = channelInfo.toUser()
+                searchResult = user
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
                 }
             } catch {
                 AppUtility.showToast("搜索失败")

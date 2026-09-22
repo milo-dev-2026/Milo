@@ -190,7 +190,7 @@ class FavoriteViewController: UIViewController {
                     if let item = FavoriteStorageManager.shared.getFavorite(by: id) {
                         do {
                             _ = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue)
+                                .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue, channelType: 1)
                             )
                         } catch {}
                     }
@@ -240,7 +240,7 @@ class FavoriteViewController: UIViewController {
             Task {
                 do {
                     _ = try await APIClient.shared.requestRaw(
-                        .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue)
+                        .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue, channelType: 1)
                     )
                     DispatchQueue.main.async {
                         AppUtility.showToast("已转发")

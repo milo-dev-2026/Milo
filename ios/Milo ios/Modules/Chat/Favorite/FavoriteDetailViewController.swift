@@ -524,7 +524,7 @@ class FavoriteDetailViewController: UIViewController {
             Task {
                 do {
                     _ = try await APIClient.shared.requestRaw(
-                        .sendMessage(channelId: targetId, content: self?.item.content ?? "", type: self?.item.type.rawValue ?? 1)
+                        .sendMessage(channelId: targetId, content: self?.item.content ?? "", type: self?.item.type.rawValue ?? 1, channelType: 1)
                     )
                     DispatchQueue.main.async {
                         AppUtility.showToast("已转发")

@@ -1006,6 +1006,7 @@ class LoginViewController: UIViewController {
         if let zone = resp.zone { UserDefaults.standard.set(zone, forKey: "zone") }
 
         IMManager.shared.connect()
+        DataSyncManager.shared.syncAll()
         showMainScreen()
     }
 

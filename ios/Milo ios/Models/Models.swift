@@ -420,7 +420,7 @@ struct FriendApply: Codable {
 }
 
 // MARK: - API响应包装
-struct APIResponse<T: Codable>: Codable {
+struct APIResponse<T: Decodable>: Decodable {
     var status: Int
     var msg: String
     var data: T?

@@ -56,14 +56,10 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
     private func loadData() {
         Task {
             do {
-                let resp = try await APIClient.shared.requestRaw(.getContacts)
-                if let data = resp["data"] as? [[String: Any]] {
-                    allContacts = data.map {
-                        ($0["uid"] as? String ?? "", $0["name"] as? String ?? "", $0["avatar"] as? String)
-                    }
-                    filteredContacts = allContacts
-                    DispatchQueue.main.async { self.tableView.reloadData() }
-                }
+                let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
+                allContacts = friends.map { ($0.uid, $0.displayName, $0.avatar) }
+                filteredContacts = allContacts
+                DispatchQueue.main.async { self.tableView.reloadData() }
             } catch {
                 DispatchQueue.main.async {
                     AppUtility.showToast("加载联系人失败")

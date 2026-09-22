@@ -257,10 +257,23 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
     private func loadData() {
         Task {
             do {
-                let resp = try await APIClient.shared.requestRaw(.getConversationList)
-                if let data = resp["data"] as? [[String: Any]] {
-                    conversations = data.map { ($0["channel_id"] as? String ?? "", $0["name"] as? String ?? "", $0["avatar"] as? String ?? "") }
-                    DispatchQueue.main.async { self.tableView.reloadData() }
+                let wkConvs: [WKConversation] = try await APIClient.shared.requestFlexible(.syncConversations)
+                conversations = wkConvs.map { ($0.channel_id, "", "") }
+                DispatchQueue.main.async { self.tableView.reloadData() }
+                for (index, conv) in conversations.enumerated() {
+                    Task {
+                        do {
+                            let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                                .getChannelInfo(channelId: conv.channelId, channelType: wkConvs[index].channel_type)
+                            )
+                            DispatchQueue.main.async {
+                                if index < self.conversations.count {
+                                    self.conversations[index].name = channelInfo.displayName
+                                    self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+                                }
+                            }
+                        } catch { }
+                    }
                 }
             } catch { }
         }

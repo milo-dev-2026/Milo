@@ -36,35 +36,36 @@ definitions:
         - name: Build archive (unsigned)
           script: |
             xcodebuild archive \
-              -workspace ios/XianLeiHuHu.xcworkspace \
-              -scheme XianLeiHuHu \
+              -workspace ios/Milo.xcworkspace \
+              -scheme Milo \
               -configuration Release \
-              -archivePath build/XianLeiHuHu.xcarchive \
+              -archivePath build/Milo.xcarchive \
               -sdk iphoneos \
               CODE_SIGNING_ALLOWED=NO \
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY="" \
               DEVELOPMENT_TEAM="" \
-              CODE_SIGN_STYLE=""
+              CODE_SIGN_STYLE="" \
+              SWIFT_VERSION=5
 
         - name: Package unsigned IPA
           script: |
-            APP_PATH="build/XianLeiHuHu.xcarchive/Products/Applications/XianLeiHuHu.app"
+            APP_PATH="build/Milo.xcarchive/Products/Applications/Milo.app"
             if [ ! -d "$APP_PATH" ]; then
-              APP_PATH=$(find build/XianLeiHuHu.xcarchive -name "*.app" -type d | head -1)
+              APP_PATH=$(find build/Milo.xcarchive -name "*.app" -type d | head -1)
             fi
 
             mkdir -p build/Payload
             cp -R "$APP_PATH" build/Payload/
 
             cd build
-            zip -r XianLeiHuHu-unsigned.ipa Payload \
+            zip -r Milo-unsigned.ipa Payload \
               -x "*.DS_Store" \
               -x "*._*"
 
       artifacts:
-        - build/XianLeiHuHu-unsigned.ipa
-        - ios/build/XianLeiHuHu.xcarchive
+        - build/Milo-unsigned.ipa
+        - ios/build/Milo.xcarchive
       publishing:
         email:
           recipients:

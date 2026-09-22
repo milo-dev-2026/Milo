@@ -101,18 +101,19 @@ class ContactDetailViewController: UIViewController {
     private func loadUserInfo() {
         Task {
             do {
-                let response: APIResponse<User> = try await APIClient.shared.request(.getUserInfo(uid: uid))
-                if let data = response.data {
-                    user = data
-                    DispatchQueue.main.async {
-                        self.title = data.name
-                        self.headerViewCache?.name.text = data.name
-                        self.headerViewCache?.uid.text = "ID: \(data.uid)"
-                        if let url = data.avatarURL {
-                            self.headerViewCache?.avatar.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-                        }
-                        self.tableView.reloadData()
+                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: uid, channelType: 1)
+                )
+                let data = channelInfo.toUser()
+                user = data
+                DispatchQueue.main.async {
+                    self.title = data.name
+                    self.headerViewCache?.name.text = data.name
+                    self.headerViewCache?.uid.text = "ID: \(data.uid)"
+                    if let url = data.avatarURL {
+                        self.headerViewCache?.avatar.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
                     }
+                    self.tableView.reloadData()
                 }
             } catch {
                 AppUtility.showToast("加载用户信息失败")

@@ -302,13 +302,12 @@ class AddGroupMembersViewController: UIViewController, UITableViewDataSource, UI
     private func loadFriends() {
         Task {
             do {
-                let response: APIResponse<[User]> = try await APIClient.shared.request(.getContacts)
-                if let data = response.data {
-                    DispatchQueue.main.async {
-                        self.friends = data
-                        self.filteredFriends = data
-                        self.tableView.reloadData()
-                    }
+                let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
+                let users = friends.map { $0.toUser() }
+                DispatchQueue.main.async {
+                    self.friends = users
+                    self.filteredFriends = users
+                    self.tableView.reloadData()
                 }
             } catch {
                 DispatchQueue.main.async {
