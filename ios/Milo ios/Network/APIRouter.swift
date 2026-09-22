@@ -542,17 +542,17 @@ class APIClient {
 }
 
 // MARK: - API错误
-enum APIError: Error {
+enum APIError: LocalizedError {
     case serverError(message: String, code: Int)
     case noData
     case decodingError(Error)
 
-    var localizedDescription: String {
+    var errorDescription: String? {
         switch self {
         case let .serverError(message, _):
             return message
         case .noData:
-            return "无响应数据"
+            return "网络连接失败，请检查网络后重试"
         case .decodingError:
             return "数据解析失败"
         }

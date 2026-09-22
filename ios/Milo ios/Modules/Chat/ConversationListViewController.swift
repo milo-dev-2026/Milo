@@ -9,6 +9,17 @@ class ConversationListViewController: UIViewController {
     private let tableView = UITableView()
     private var conversations: [Conversation] = []
 
+    // MARK: - 自定义顶部视图
+    private let titleBarView = UIView()
+    private let titleLabel = UILabel()
+    private let addButton = UIButton(type: .system)
+
+    // MARK: - 液态玻璃搜索栏
+    private let searchBarContainer = UIView()
+    private let searchBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
+    private let searchIconView = UIImageView()
+    private let searchPlaceholderLabel = UILabel()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -37,25 +48,101 @@ class ConversationListViewController: UIViewController {
         }
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
     private func setupUI() {
-        title = "Milo"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = .white
 
-        let addButton = UIBarButtonItem(
-            image: UIImage(systemName: "plus"),
-            style: .plain,
-            target: self,
-            action: #selector(showAddMenu)
-        )
-        navigationItem.rightBarButtonItem = addButton
-        navigationItem.rightBarButtonItem?.tintColor = .themePrimary
+        // MARK: - 顶部标题栏（48pt，白色背景）
+        titleBarView.backgroundColor = .white
+        view.addSubview(titleBarView)
+        titleBarView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.leading.trailing.equalToSuperview()
+            make.height.equalTo(48)
+        }
 
+        // 居中标题 "消息"
+        titleLabel.text = "消息"
+        titleLabel.font = ScreenAdapter.boldFont(20)
+        titleLabel.textColor = .label
+        titleBarView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+
+        // 右侧加号按钮（40x40pt，右边距 15pt）
+        addButton.setImage(UIImage(systemName: "plus"), for: .normal)
+        addButton.tintColor = .label
+        addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
+        titleBarView.addSubview(addButton)
+        addButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-15)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
+        // MARK: - 液态玻璃搜索栏（36pt高，胶囊形）
+        searchBarContainer.layer.cornerRadius = 18
+        searchBarContainer.clipsToBounds = true
+        view.addSubview(searchBarContainer)
+        searchBarContainer.snp.makeConstraints { make in
+            make.top.equalTo(titleBarView.snp.bottom).offset(4)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
+        }
+
+        // 毛玻璃背景（液态玻璃核心）
+        searchBarContainer.addSubview(searchBlurView)
+        searchBlurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        // 柔光边框效果
+        searchBarContainer.layer.borderWidth = 0.5
+        searchBarContainer.layer.borderColor = UIColor.white.withAlphaComponent(0.6).cgColor
+
+        // 搜索图标（16x16pt）
+        searchIconView.image = UIImage(systemName: "magnifyingglass")
+        searchIconView.tintColor = .secondaryLabel
+        searchIconView.contentMode = .scaleAspectFit
+        searchBarContainer.addSubview(searchIconView)
+        searchIconView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(14)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(16)
+        }
+
+        // 搜索提示文字（14pt）
+        searchPlaceholderLabel.text = "搜索"
+        searchPlaceholderLabel.font = ScreenAdapter.font(14)
+        searchPlaceholderLabel.textColor = .secondaryLabel
+        searchBarContainer.addSubview(searchPlaceholderLabel)
+        searchPlaceholderLabel.snp.makeConstraints { make in
+            make.leading.equalTo(searchIconView.snp.trailing).offset(8)
+            make.centerY.equalToSuperview()
+            make.trailing.lessThanOrEqualToSuperview().offset(-14)
+        }
+
+        // MARK: - 列表区域（白色背景，MJRefresh 下拉刷新）
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ConversationCell.self, forCellReuseIdentifier: "ConversationCell")
-        tableView.rowHeight = ScreenAdapter.scaleH(72)
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: ScreenAdapter.scaleW(68), bottom: 0, right: 0)
+        tableView.rowHeight = 56
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 64, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.1)
+        tableView.separatorStyle = .singleLine
         tableView.tableFooterView = UIView()
+        tableView.backgroundColor = .white
 
         let header = MJRefreshNormalHeader { [weak self] in
             self?.loadData()
@@ -64,7 +151,8 @@ class ConversationListViewController: UIViewController {
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(searchBarContainer.snp.bottom).offset(4)
+            make.leading.trailing.bottom.equalToSuperview()
         }
     }
 
@@ -239,11 +327,11 @@ class ConversationCell: UITableViewCell {
     }
 
     private func setupUI() {
-        let avatarSize = ScreenAdapter.scaleW(48)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(2)
+        let avatarSize: CGFloat = 40
+        let hPad: CGFloat = 12
+        let vPad: CGFloat = 2
 
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
+        avatarView.layer.cornerRadius = 8
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
@@ -263,7 +351,7 @@ class ConversationCell: UITableViewCell {
         unreadBadge.textColor = .white
         unreadBadge.backgroundColor = .systemRed
         unreadBadge.textAlignment = .center
-        unreadBadge.layer.cornerRadius = ScreenAdapter.scaleW(9)
+        unreadBadge.layer.cornerRadius = 9
         unreadBadge.clipsToBounds = true
         unreadBadge.isHidden = true
 
@@ -278,7 +366,7 @@ class ConversationCell: UITableViewCell {
         nameLabel.snp.makeConstraints { make in
             make.leading.equalTo(avatarView.snp.trailing).offset(hPad)
             make.top.equalTo(avatarView.snp.top).offset(vPad)
-            make.trailing.lessThanOrEqualTo(timeLabel.snp.leading).offset(-ScreenAdapter.scaleW(8))
+            make.trailing.lessThanOrEqualTo(timeLabel.snp.leading).offset(-8)
         }
 
         lastMessageLabel.snp.makeConstraints { make in
@@ -295,8 +383,8 @@ class ConversationCell: UITableViewCell {
         unreadBadge.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-hPad)
             make.bottom.equalTo(avatarView.snp.bottom).offset(-vPad)
-            make.width.greaterThanOrEqualTo(ScreenAdapter.scaleW(18))
-            make.height.equalTo(ScreenAdapter.scaleW(18))
+            make.width.greaterThanOrEqualTo(18)
+            make.height.equalTo(18)
         }
     }
 

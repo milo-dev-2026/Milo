@@ -8,6 +8,7 @@ class MySettingViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let headerView = MyProfileHeaderView()
+    private let refreshControl = UIRefreshControl()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -16,19 +17,32 @@ class MySettingViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
         loadUserInfo()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
     private func setupUI() {
-        title = "我的"
         view.backgroundColor = .themeBackground
 
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SettingCell")
+        tableView.backgroundColor = .clear
+        tableView.separatorColor = UIColor.themeSeparator.withAlphaComponent(0.6)
+        tableView.showsVerticalScrollIndicator = false
 
-        // 头部视图
-        headerView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(100))
+        // 下拉刷新
+        refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
+        tableView.refreshControl = refreshControl
+
+        // 头部视图高度：顶部间距 80pt + 玻璃卡片内容 + 底部间距 40pt
+        let headerHeight = ScreenAdapter.scaleH(80) + MyProfileHeaderView.cardHeight + ScreenAdapter.scaleH(40)
+        headerView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: headerHeight)
         headerView.onTap = { [weak self] in
             self?.navigationController?.pushViewController(SettingProfileEditViewController(), animated: true)
         }
@@ -41,7 +55,15 @@ class MySettingViewController: UIViewController {
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+    }
+
+    @objc private func handleRefresh() {
+        loadUserInfo()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.refreshControl.endRefreshing()
         }
     }
 
@@ -93,6 +115,11 @@ extension MySettingViewController: UITableViewDataSource, UITableViewDelegate {
         cell.imageView?.tintColor = .themePrimary
         cell.textLabel?.font = ScreenAdapter.font(16)
 
+        // 玻璃卡片效果：半透明白色背景
+        cell.backgroundColor = UIColor.white.withAlphaComponent(0.85)
+        cell.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.85)
+        cell.tintColor = .themePrimary
+
         switch indexPath.row {
         case 0:
             cell.textLabel?.text = "我的笔记"
@@ -107,6 +134,18 @@ extension MySettingViewController: UITableViewDataSource, UITableViewDelegate {
             break
         }
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return 0.01
+    }
+
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        return ScreenAdapter.scaleH(20)
+    }
+
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        return UIView()
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -132,12 +171,26 @@ extension MySettingViewController: UITableViewDataSource, UITableViewDelegate {
 // MARK: - 个人资料头部视图
 class MyProfileHeaderView: UIView {
 
+    // MARK: - 玻璃卡片高度（供外部计算总高度使用）
+    static var cardHeight: CGFloat {
+        let topPad = ScreenAdapter.scaleH(32)
+        let avatarSize = ScreenAdapter.scaleW(88)
+        let avatarToName = ScreenAdapter.scaleH(16)
+        let nameHeight = ScreenAdapter.scaleH(24)
+        let nameToUid = ScreenAdapter.scaleH(8)
+        let uidHeight = ScreenAdapter.scaleH(20)
+        let bottomPad = ScreenAdapter.scaleH(32)
+        return topPad + avatarSize + avatarToName + nameHeight + nameToUid + uidHeight + bottomPad
+    }
+
     var onTap: (() -> Void)?
     var onTapQR: (() -> Void)?
 
+    private let glassCard = GlassCardView()
     private let avatarView = UIImageView()
     private let nameLabel = UILabel()
     private let uidLabel = UILabel()
+    private let copyButton = UIButton(type: .system)
     private let qrButton = UIButton(type: .system)
 
     override init(frame: CGRect) {
@@ -152,64 +205,83 @@ class MyProfileHeaderView: UIView {
     private func setupUI() {
         backgroundColor = .clear
 
-        let avatarSize = ScreenAdapter.scaleW(60)
-        let hPad = ScreenAdapter.scaleW(16)
-        let avatarRadius = ScreenAdapter.scaleW(30)
+        // MARK: 玻璃卡片
+        addSubview(glassCard)
+        glassCard.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(80))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(MyProfileHeaderView.cardHeight)
+        }
 
-        avatarView.layer.cornerRadius = avatarRadius
+        // MARK: 头像
+        let avatarSize = ScreenAdapter.scaleW(88)
+        avatarView.layer.cornerRadius = avatarSize / 2
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
         avatarView.isUserInteractionEnabled = true
+        // 头像柔光边框
+        avatarView.layer.borderWidth = 3
+        avatarView.layer.borderColor = UIColor.white.withAlphaComponent(0.6).cgColor
 
+        glassCard.addSubview(avatarView)
+        avatarView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(32))
+            make.centerX.equalToSuperview()
+            make.width.height.equalTo(avatarSize)
+        }
+
+        // MARK: 用户名
         nameLabel.font = ScreenAdapter.mediumFont(18)
         nameLabel.textColor = .label
         nameLabel.text = "用户"
+        nameLabel.textAlignment = .center
 
-        uidLabel.font = ScreenAdapter.font(13)
+        glassCard.addSubview(nameLabel)
+        nameLabel.snp.makeConstraints { make in
+            make.top.equalTo(avatarView.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.centerX.equalToSuperview()
+            make.leading.greaterThanOrEqualToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        // MARK: Milo号 + 复制按钮
+        uidLabel.font = ScreenAdapter.font(12)
         uidLabel.textColor = .secondaryLabel
         uidLabel.text = "Milo号: --"
 
-        let textStack = UIStackView(arrangedSubviews: [nameLabel, uidLabel])
-        textStack.axis = .vertical
-        textStack.spacing = ScreenAdapter.scaleH(4)
-        textStack.alignment = .leading
+        copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
+        copyButton.tintColor = .secondaryLabel
+        copyButton.addTarget(self, action: #selector(copyUidTapped), for: .touchUpInside)
 
+        let uidStack = UIStackView(arrangedSubviews: [uidLabel, copyButton])
+        uidStack.axis = .horizontal
+        uidStack.spacing = ScreenAdapter.scaleW(6)
+        uidStack.alignment = .center
+
+        glassCard.addSubview(uidStack)
+        uidStack.snp.makeConstraints { make in
+            make.top.equalTo(nameLabel.snp.bottom).offset(ScreenAdapter.scaleH(8))
+            make.centerX.equalToSuperview()
+        }
+
+        // MARK: 二维码按钮（右上角）
         qrButton.setImage(UIImage(systemName: "qrcode.viewfinder"), for: .normal)
         qrButton.tintColor = .themePrimary
         qrButton.addTarget(self, action: #selector(qrTapped), for: .touchUpInside)
 
-        let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
-        chevron.tintColor = .systemGray3
-
-        addSubviews(avatarView, textStack, qrButton, chevron)
-
-        avatarView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(hPad)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(avatarSize)
-        }
-
-        textStack.snp.makeConstraints { make in
-            make.leading.equalTo(avatarView.snp.trailing).offset(hPad)
-            make.centerY.equalToSuperview()
-        }
-
+        glassCard.addSubview(qrButton)
         qrButton.snp.makeConstraints { make in
-            make.trailing.equalTo(chevron.snp.leading).offset(-ScreenAdapter.scaleW(8))
-            make.centerY.equalToSuperview()
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
-        }
-
-        chevron.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-hPad)
-            make.centerY.equalToSuperview()
         }
 
         // 整体点击手势
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(headerTapped))
-        addGestureRecognizer(tapGesture)
+        glassCard.addGestureRecognizer(tapGesture)
     }
 
     @objc private func headerTapped() {
@@ -218,6 +290,12 @@ class MyProfileHeaderView: UIView {
 
     @objc private func qrTapped() {
         onTapQR?()
+    }
+
+    @objc private func copyUidTapped() {
+        let uidText = uidLabel.text?.replacingOccurrences(of: "Milo号: ", with: "") ?? ""
+        UIPasteboard.general.string = uidText
+        AppUtility.showToast("已复制Milo号")
     }
 
     func configure(with user: User) {
