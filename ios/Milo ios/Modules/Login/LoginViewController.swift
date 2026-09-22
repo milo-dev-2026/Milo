@@ -1249,7 +1249,6 @@ class LoginViewController: UIViewController {
     deinit { countdownTimer?.invalidate() }
 
     private func setupUI() {
-        title = "登录"
         view.backgroundColor = .white
 
         // 顶部：左侧Logo + 右侧标题+副标题
@@ -1738,7 +1737,6 @@ class RegisterViewController: UIViewController {
     deinit { countdownTimer?.invalidate() }
 
     private func setupUI() {
-        title = "注册"
         view.backgroundColor = .white
 
         // 顶部：左侧Logo + 右侧标题+副标题

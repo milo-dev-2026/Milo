@@ -211,7 +211,6 @@ class ResetLoginPwdViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "重置密码"
         view.backgroundColor = .white
         setupUI()
     }
