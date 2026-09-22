@@ -121,7 +121,8 @@ class ConversationListViewController: UIViewController {
     private func loadData() {
         Task {
             do {
-                let wkConversations: [WKConversation] = try await APIClient.shared.requestFlexible(.syncConversations)
+                let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
+                let wkConversations = syncResp.conversations ?? []
                 conversations = wkConversations.map { Conversation(from: $0) }
                 DispatchQueue.main.async {
                     self.tableView.reloadData()

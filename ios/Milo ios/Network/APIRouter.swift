@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Alamofire
 
 enum APIRouter: URLRequestConvertible {
@@ -122,22 +123,23 @@ enum APIRouter: URLRequestConvertible {
         case let .resetPasswordByEmail(email, code, password):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "code": code, "pwd": password])
         case .syncConversations:
-            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
             request.httpBody = try JSONSerialization.data(withJSONObject: [
-                "uid": uid,
+                "last_msg_seqs": "",
+                "msg_count": 1000,
                 "version": 0,
-                "msg_count": 20
+                "device_uuid": deviceUUID
             ])
         case let .syncChannelMessages(channelId, channelType, startMessageSeq, limit):
-            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
             request.httpBody = try JSONSerialization.data(withJSONObject: [
-                "login_uid": uid,
                 "channel_id": channelId,
                 "channel_type": channelType,
                 "start_message_seq": startMessageSeq,
                 "end_message_seq": 0,
                 "limit": limit,
-                "pull_mode": 0
+                "pull_mode": 0,
+                "device_uuid": deviceUUID
             ])
         case let .sendTextMessage(channelId, content, channelType):
             let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
@@ -172,7 +174,11 @@ enum APIRouter: URLRequestConvertible {
         case let .searchGroupMembers(keyword, groupId):
             request = try URLEncoding.default.encode(request, with: ["keyword": keyword, "group_id": groupId])
         case .syncFriends:
-            break
+            request = try URLEncoding.default.encode(request, with: [
+                "version": 0,
+                "limit": 500,
+                "api_version": 1
+            ])
         case let .getChannelInfo(channelId, channelType):
             break
         case let .updateUserInfo(name, avatar):
@@ -328,7 +334,7 @@ enum APIRouter: URLRequestConvertible {
         case .checkLoginAuth: return "/v1/user/login_auth/check"
         case .searchGroupMembers: return "/v1/groups/members/search"
         case .syncConversations: return "/v1/conversation/sync"
-        case .syncChannelMessages: return "/v1/channel/messagesync"
+        case .syncChannelMessages: return "/v1/message/channel/sync"
         case .sendTextMessage: return "/v1/message/send"
         case .sendMessage: return "/v1/message/send"
         case .deleteMessage: return "/v1/messages/delete"

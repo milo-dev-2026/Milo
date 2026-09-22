@@ -88,7 +88,13 @@ struct AnyCodable: Codable {
     }
 }
 
-// MARK: - WuKongIM 会话模型 (POST /conversation/sync 响应)
+// MARK: - WuKongIM 会话同步响应 (POST /conversation/sync 响应)
+struct WKSyncChat: Codable {
+    var uid: String?
+    var conversations: [WKConversation]?
+}
+
+// MARK: - WuKongIM 会话模型
 struct WKConversation: Codable {
     var channel_id: String
     var channel_type: Int
