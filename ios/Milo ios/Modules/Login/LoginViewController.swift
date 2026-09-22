@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 import PhotosUI
 
@@ -172,9 +172,11 @@ class CapsuleTextField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
@@ -230,9 +232,11 @@ class CapsulePhoneField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         countryCodeButton.setTitle("+86", for: .normal)
         countryCodeButton.setTitleColor(.label, for: .normal)
@@ -305,9 +309,11 @@ class CapsuleCodeField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
@@ -370,9 +376,11 @@ class CapsulePasswordField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
@@ -886,7 +894,7 @@ class EntryLoginViewController: UIViewController {
             gradientLayer.frame = gradientView.bounds
         }
 
-        // 顶部：左Logo + 右标题
+        // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
@@ -898,10 +906,17 @@ class EntryLoginViewController: UIViewController {
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
 
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
-        headerStack.axis = .vertical
-        headerStack.spacing = ScreenAdapter.scaleH(6)
-        headerStack.alignment = .leading
+        // 右侧标题+副标题垂直排列
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titleStack.axis = .vertical
+        titleStack.spacing = ScreenAdapter.scaleH(4)
+        titleStack.alignment = .leading
+
+        // 整体：左logo + 右标题
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = ScreenAdapter.scaleW(12)
+        headerStack.alignment = .center
 
         let headerContainer = UIView()
         headerContainer.addSubview(headerStack)
@@ -910,7 +925,7 @@ class EntryLoginViewController: UIViewController {
         }
 
         logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(42))
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
         }
 
         // 玻璃卡片
@@ -1019,7 +1034,8 @@ class EntryLoginViewController: UIViewController {
         contentView.addSubview(bottomAgreementLabel)
 
         scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -1106,14 +1122,17 @@ class EntryLoginViewController: UIViewController {
                         if resp.exist == 1 {
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: email, isEmail: true)
+                            print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(email: email, isEmail: true)
+                            print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
                         }
                     }
                 } catch {
+                    print("loginOrRegister error: \(error)")
                     DispatchQueue.main.async {
                         self.resetButton()
                         AppUtility.showToast("检查失败: \(error.localizedDescription)")
@@ -1135,14 +1154,17 @@ class EntryLoginViewController: UIViewController {
                         if resp.exist == 1 {
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: phone, isEmail: false)
+                            print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(phone: phone, isEmail: false)
+                            print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
                         }
                     }
                 } catch {
+                    print("loginOrRegister error: \(error)")
                     DispatchQueue.main.async {
                         self.resetButton()
                         AppUtility.showToast("检查失败: \(error.localizedDescription)")
@@ -1215,6 +1237,7 @@ class LoginViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        print("[\(type(of: self))] viewDidLoad")
         setupUI()
     }
 
@@ -1224,7 +1247,7 @@ class LoginViewController: UIViewController {
         title = "登录"
         view.backgroundColor = .white
 
-        // 顶部：左Logo + 右标题
+        // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
@@ -1236,18 +1259,26 @@ class LoginViewController: UIViewController {
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
 
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
-        headerStack.axis = .vertical
-        headerStack.spacing = ScreenAdapter.scaleH(6)
-        headerStack.alignment = .leading
+        // 右侧标题+副标题垂直排列
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titleStack.axis = .vertical
+        titleStack.spacing = ScreenAdapter.scaleH(4)
+        titleStack.alignment = .leading
+
+        // 整体：左logo + 右标题
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = ScreenAdapter.scaleW(12)
+        headerStack.alignment = .center
 
         let headerContainer = UIView()
         headerContainer.addSubview(headerStack)
         headerStack.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+
         logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(42))
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
         }
 
         // 玻璃卡片
@@ -1366,14 +1397,15 @@ class LoginViewController: UIViewController {
         contentView.addSubview(registerTipLabel)
 
         scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
         }
@@ -1684,6 +1716,7 @@ class RegisterViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        print("[\(type(of: self))] viewDidLoad")
         setupUI()
     }
 
@@ -1693,7 +1726,7 @@ class RegisterViewController: UIViewController {
         title = "注册"
         view.backgroundColor = .white
 
-        // 顶部：左Logo + 右标题
+        // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
@@ -1705,18 +1738,26 @@ class RegisterViewController: UIViewController {
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
 
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
-        headerStack.axis = .vertical
-        headerStack.spacing = ScreenAdapter.scaleH(6)
-        headerStack.alignment = .leading
+        // 右侧标题+副标题垂直排列
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titleStack.axis = .vertical
+        titleStack.spacing = ScreenAdapter.scaleH(4)
+        titleStack.alignment = .leading
+
+        // 整体：左logo + 右标题
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = ScreenAdapter.scaleW(12)
+        headerStack.alignment = .center
 
         let headerContainer = UIView()
         headerContainer.addSubview(headerStack)
         headerStack.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+
         logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(42))
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
         }
 
         // 玻璃卡片
@@ -1834,14 +1875,15 @@ class RegisterViewController: UIViewController {
         contentView.addSubview(loginTipLabel)
 
         scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
         }

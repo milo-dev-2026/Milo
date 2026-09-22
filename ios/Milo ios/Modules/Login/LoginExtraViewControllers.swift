@@ -219,7 +219,7 @@ class ResetLoginPwdViewController: UIViewController {
     deinit { countdownTimer?.invalidate() }
 
     private func setupUI() {
-        // 顶部：左Logo + 右标题
+        // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
@@ -231,10 +231,17 @@ class ResetLoginPwdViewController: UIViewController {
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
 
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
-        headerStack.axis = .vertical
-        headerStack.spacing = ScreenAdapter.scaleH(6)
-        headerStack.alignment = .leading
+        // 右侧标题+副标题垂直排列
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titleStack.axis = .vertical
+        titleStack.spacing = ScreenAdapter.scaleH(4)
+        titleStack.alignment = .leading
+
+        // 整体：左logo + 右标题
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = ScreenAdapter.scaleW(12)
+        headerStack.alignment = .center
 
         let headerContainer = UIView()
         headerContainer.addSubview(headerStack)
@@ -242,7 +249,7 @@ class ResetLoginPwdViewController: UIViewController {
             make.edges.equalToSuperview()
         }
         logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(42))
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
         }
 
         // 玻璃卡片
@@ -334,7 +341,8 @@ class ResetLoginPwdViewController: UIViewController {
         contentView.addSubview(mainStack)
 
         scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
