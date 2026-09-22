@@ -16,9 +16,10 @@ class MainTabBarController: UITabBarController {
             UIDevice.current.setValue(UIInterfaceOrientationMask.all.rawValue, forKey: "orientation")
         }
 
-        // 毛玻璃效果（使用 UITabBarAppearance 的系统材质）
+        // 毛玻璃效果
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
+        appearance.shadowColor = UIColor.themeSeparator.withAlphaComponent(0.5)
 
         // 选中色和未选中色
         tabBar.tintColor = .themePrimary

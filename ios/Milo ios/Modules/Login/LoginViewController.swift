@@ -405,6 +405,14 @@ class EntryLoginViewController: UIViewController {
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
+        // 副标题
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = "欢迎使用Milo 输入手机号或者邮箱继续"
+        subtitleLabel.font = ScreenAdapter.font(14)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textAlignment = .center
+        subtitleLabel.numberOfLines = 0
+
         // Tab 按钮
         phoneTabButton.setTitle("手机号", for: .normal)
         phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
@@ -483,7 +491,7 @@ class EntryLoginViewController: UIViewController {
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, tabStack, phoneField, emailField, agreementStack, loginButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, tabStack, phoneField, emailField, agreementStack, loginButton])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(24)
         mainStack.alignment = .fill
@@ -696,6 +704,18 @@ class LoginViewController: UIViewController {
         title = "登录"
         view.backgroundColor = .themeBackground
 
+        // Logo
+        let logoView = UIImageView()
+        logoView.image = UIImage(named: "LoginLogo")
+        logoView.contentMode = .scaleAspectFit
+
+        // 副标题
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = "欢迎使用Milo"
+        subtitleLabel.font = ScreenAdapter.font(14)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textAlignment = .center
+
         // 手机号/邮箱输入框
         phoneField.placeholder = "手机号"
         phoneField.textField.text = isEmail ? "" : account
@@ -757,7 +777,7 @@ class LoginViewController: UIViewController {
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [phoneField, emailField, passwordField, codeField, loginButton, bottomBar])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, phoneField, emailField, passwordField, codeField, loginButton, bottomBar])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
         contentView.addSubview(mainStack)
@@ -770,13 +790,17 @@ class LoginViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(40))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
         }
         loginButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(70))
+            make.centerX.equalToSuperview()
         }
         bottomBar.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(30))
@@ -1062,6 +1086,18 @@ class RegisterViewController: UIViewController {
         title = "注册账号"
         view.backgroundColor = .themeBackground
 
+        // Logo
+        let logoView = UIImageView()
+        logoView.image = UIImage(named: "LoginLogo")
+        logoView.contentMode = .scaleAspectFit
+
+        // 副标题
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = "创建您的Milo账号"
+        subtitleLabel.font = ScreenAdapter.font(14)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textAlignment = .center
+
         // Tab 切换
         phoneTabButton.setTitle("手机号注册", for: .normal)
         phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
@@ -1119,7 +1155,7 @@ class RegisterViewController: UIViewController {
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [tabStack, phoneField, emailField, codeField, passwordField, registerButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, tabStack, phoneField, emailField, codeField, passwordField, registerButton])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
         contentView.addSubview(mainStack)
@@ -1132,10 +1168,14 @@ class RegisterViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(40))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(70))
+            make.centerX.equalToSuperview()
         }
         tabStack.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(30))
@@ -1367,6 +1407,18 @@ class ForgotPasswordViewController: UIViewController {
         title = "重置密码"
         view.backgroundColor = .themeBackground
 
+        // Logo
+        let logoView = UIImageView()
+        logoView.image = UIImage(named: "LoginLogo")
+        logoView.contentMode = .scaleAspectFit
+
+        // 副标题
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = "重置您的账号密码"
+        subtitleLabel.font = ScreenAdapter.font(14)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textAlignment = .center
+
         phoneField.placeholder = "手机号"
         phoneField.textField.keyboardType = .numberPad
         phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
@@ -1395,7 +1447,7 @@ class ForgotPasswordViewController: UIViewController {
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [phoneField, codeField, passwordField, resetButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, phoneField, codeField, passwordField, resetButton])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
         contentView.addSubview(mainStack)
@@ -1408,10 +1460,14 @@ class ForgotPasswordViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(40))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(70))
+            make.centerX.equalToSuperview()
         }
         resetButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))

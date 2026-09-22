@@ -60,6 +60,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             .foregroundColor: UIColor.label,
             .font: ScreenAdapter.boldFont(34)
         ]
+        navBarAppearance.shadowColor = UIColor.themeSeparator.withAlphaComponent(0.5)
 
         UINavigationBar.appearance().tintColor = .themePrimary
         UINavigationBar.appearance().standardAppearance = navBarAppearance
@@ -72,6 +73,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // TabBar 全局外观
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithDefaultBackground()
+        tabBarAppearance.shadowColor = UIColor.themeSeparator.withAlphaComponent(0.5)
         UITabBar.appearance().tintColor = .themePrimary
         UITabBar.appearance().standardAppearance = tabBarAppearance
         if #available(iOS 15.0, *) {
@@ -81,9 +83,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // UISwitch 全局颜色
         UISwitch.appearance().onTintColor = .themePrimary
-
-        // UIButton 全局 tint
-        // （保持系统默认，使用扩展方法自定义主题按钮）
     }
 
     // MARK: - 高德隐私合规

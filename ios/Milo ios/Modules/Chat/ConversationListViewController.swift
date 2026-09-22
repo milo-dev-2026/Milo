@@ -17,7 +17,7 @@ class ConversationListViewController: UIViewController {
     }
 
     private func setupUI() {
-        title = "闲雷虎虎"
+        title = "Milo"
         view.backgroundColor = .themeBackground
 
         let addButton = UIBarButtonItem(

@@ -26,6 +26,9 @@ class BaseNavigationController: UINavigationController {
             .font: ScreenAdapter.boldFont(34)
         ]
 
+        // 阴影颜色
+        appearance.shadowColor = UIColor.themeSeparator.withAlphaComponent(0.5)
+
         // 按钮 tintColor
         navigationBar.tintColor = .themePrimary
 
