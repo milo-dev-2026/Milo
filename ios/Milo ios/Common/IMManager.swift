@@ -24,12 +24,11 @@ class IMManager: NSObject {
         let options = WKOptions()
         options.host = "43.133.39.170"
         options.port = 5100
-        options.apiURL = APIConfig.apiBaseURL
 
-        WKSDK.shared().setup(options: options)
+        WKSDK.shared().options = options
 
-        WKSDK.shared().chatManager.addDelegate(self)
-        WKSDK.shared().connectionManager.addDelegate(self)
+        WKSDK.shared().chatManager.add(self)
+        WKSDK.shared().connectionManager.add(self)
     }
 
     // MARK: - 连接
@@ -42,12 +41,10 @@ class IMManager: NSObject {
 
         setupSDK()
 
-        WKSDK.shared().options.connectInfoCallback = {
-            let info = WKConnectInfo()
-            info.uid = uid
-            info.token = imToken
-            return info
-        }
+        let info = WKConnectInfo()
+        info.uid = uid
+        info.token = imToken
+        WKSDK.shared().options.connectInfo = info
 
         WKSDK.shared().connectionManager.connect()
     }
@@ -60,7 +57,7 @@ class IMManager: NSObject {
     func sendTextMessage(channelId: String, content: String) {
         let channel = WKChannel()
         channel.channelId = channelId
-        channel.channelType = WKChannelType.person.rawValue
+        channel.channelType = 1 // WK_PERSON = 1
         let textContent = WKTextContent(content: content)
         WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
