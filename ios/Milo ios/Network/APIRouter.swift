@@ -468,19 +468,42 @@ class APIClient {
                 if let errorResp = try? JSONDecoder().decode(MessageResponse.self, from: data) {
                     throw APIError.serverError(message: errorResp.msg ?? "未知错误", code: statusCode)
                 }
+                let rawStr = String(data: data, encoding: .utf8) ?? ""
+                print("[API] HTTP \(statusCode): \(rawStr.prefix(500))")
             }
             throw APIError.serverError(message: "请求失败(\(statusCode))", code: statusCode)
         }
         guard let data = response.data else {
             throw APIError.noData
         }
+        // Strategy 1: Direct decode as T
         if let result = try? JSONDecoder().decode(T.self, from: data) {
             return result
         }
+        // Strategy 2: Wrapped in APIResponse {status, msg, data}
         if let apiResponse = try? JSONDecoder().decode(APIResponse<T>.self, from: data), let result = apiResponse.data {
             return result
         }
-        throw APIError.decodingError(NSError(domain: "APIError", code: -1, userInfo: [NSLocalizedDescriptionKey: "响应解析失败"]))
+        // Strategy 3: Bare array response when T expects a single object with array field
+        // (e.g. WuKongIM might return [...] instead of {conversations: [...]})
+        if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            let wrappedData = try JSONSerialization.data(withJSONObject: ["conversations": jsonArray])
+            if let result = try? JSONDecoder().decode(T.self, from: wrappedData) {
+                return result
+            }
+        }
+        // Strategy 4: Bare object response when T expects an array
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let conversations = jsonObj["conversations"] as? [[String: Any]] {
+                let arrData = try JSONSerialization.data(withJSONObject: conversations)
+                if let result = try? JSONDecoder().decode(T.self, from: arrData) {
+                    return result
+                }
+            }
+        }
+        let rawStr = String(data: data, encoding: .utf8) ?? ""
+        print("[API] Decode failed. Raw: \(rawStr.prefix(500))")
+        throw APIError.decodingError(NSError(domain: "APIError", code: -1, userInfo: [NSLocalizedDescriptionKey: "响应解析失败: \(rawStr.prefix(200))"]))
     }
 
     func requestRaw(_ router: APIRouter) async throws -> [String: Any] {

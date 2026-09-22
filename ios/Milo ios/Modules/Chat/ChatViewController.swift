@@ -39,14 +39,31 @@ class ChatViewController: UIViewController {
         setupNavBar()
         loadMessages()
         setupKeyboardObserver()
+
         IMManager.shared.onMessageReceived = { [weak self] msg in
-            if msg.channelID == self?.channelId {
-                self?.messages.append(msg)
-                DispatchQueue.main.async {
-                    self?.tableView.reloadData()
-                    self?.scrollToBottom()
-                }
-            }
+            self?.handleIncomingMessage(msg)
+        }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMessageNotification(_:)),
+            name: IMManager.messageReceivedNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleMessageNotification(_ notification: Notification) {
+        guard let msg = notification.object as? Message else { return }
+        handleIncomingMessage(msg)
+    }
+
+    private func handleIncomingMessage(_ msg: Message) {
+        guard msg.channelID == channelId else { return }
+        if messages.contains(where: { $0.messageID == msg.messageID }) { return }
+        messages.append(msg)
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+            self.scrollToBottom()
         }
     }
 

@@ -2,7 +2,6 @@ import Foundation
 import WuKongIMSDK
 
 // MARK: - IM连接管理器
-/// 基于WuKongIM SDK管理IM连接、消息收发
 class IMManager: NSObject {
 
     static let shared = IMManager()
@@ -11,6 +10,8 @@ class IMManager: NSObject {
     var onConnectionChanged: ((Bool) -> Void)?
 
     private var isSetup = false
+
+    static let messageReceivedNotification = NSNotification.Name("IMMessageReceived")
 
     private override init() {
         super.init()
@@ -54,10 +55,10 @@ class IMManager: NSObject {
     }
 
     // MARK: - 发送消息
-    func sendTextMessage(channelId: String, content: String) {
+    func sendTextMessage(channelId: String, content: String, channelType: Int = 1) {
         let channel = WKChannel()
         channel.channelId = channelId
-        channel.channelType = 1 // WK_PERSON = 1
+        channel.channelType = UInt8(channelType)
         let textContent = WKTextContent(content: content)
         WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
@@ -68,19 +69,29 @@ extension IMManager: WKChatManagerDelegate {
 
     func onRecvMessages(_ message: WKMessage!, left: Int) {
         guard let wkMsg = message else { return }
-        let textContent = wkMsg.content as? WKTextContent
+
+        var content = ""
+        var type = MessageType.text
+
+        if let textContent = wkMsg.content as? WKTextContent {
+            content = textContent.content ?? ""
+            type = .text
+        }
+
         let msg = Message(
             messageID: String(wkMsg.messageId),
             channelID: wkMsg.channel.channelId ?? "",
             channelType: Int(wkMsg.channel.channelType),
             fromUID: wkMsg.fromUid ?? "",
-            content: textContent?.content ?? "",
-            type: .text,
+            content: content,
+            type: type,
             timestamp: Int64(wkMsg.timestamp * 1000),
             status: 1
         )
+
         DispatchQueue.main.async {
             self.onMessageReceived?(msg)
+            NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: msg)
         }
     }
 
@@ -96,15 +107,16 @@ extension IMManager: WKConnectionManagerDelegate {
         DispatchQueue.main.async {
             switch status.rawValue {
             case 3: // WKConnected
-                print("IM连接成功")
+                print("[IM] 连接成功")
                 self.onConnectionChanged?(true)
             case 4: // WKDisconnected
-                print("IM断开")
+                print("[IM] 断开")
                 self.onConnectionChanged?(false)
             case 0: // WKNoConnect
-                print("IM未连接")
+                print("[IM] 未连接")
                 self.onConnectionChanged?(false)
             default:
+                print("[IM] 状态: \(status.rawValue), reason: \(reasonCode.rawValue)")
                 break
             }
         }
@@ -112,7 +124,7 @@ extension IMManager: WKConnectionManagerDelegate {
 
     func onKick(_ reasonCode: WKReason) {
         DispatchQueue.main.async {
-            print("IM被踢下线")
+            print("[IM] 被踢下线")
             self.onConnectionChanged?(false)
         }
     }

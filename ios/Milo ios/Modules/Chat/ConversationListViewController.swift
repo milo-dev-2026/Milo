@@ -14,6 +14,27 @@ class ConversationListViewController: UIViewController {
         setupUI()
         loadData()
         setupIMObserver()
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleSyncCompleted(_:)),
+            name: NSNotification.Name("ConversationsSynced"), object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleNewMessage(_:)),
+            name: IMManager.messageReceivedNotification, object: nil
+        )
+    }
+
+    @objc private func handleSyncCompleted(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.loadData()
+        }
+    }
+
+    @objc private func handleNewMessage(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.loadData()
+        }
     }
 
     private func setupUI() {

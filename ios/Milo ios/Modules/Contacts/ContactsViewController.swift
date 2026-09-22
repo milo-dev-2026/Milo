@@ -14,6 +14,17 @@ class ContactsViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         loadData()
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleContactsSynced(_:)),
+            name: NSNotification.Name("ContactsSynced"), object: nil
+        )
+    }
+
+    @objc private func handleContactsSynced(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.loadData()
+        }
     }
 
     private func setupUI() {
