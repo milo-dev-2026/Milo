@@ -171,7 +171,10 @@ class ChatViewController: UIViewController {
                     }
                 }
             } catch {
-                AppUtility.showToast("加载消息失败")
+                print("[Chat] 加载消息失败: \(error)")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("加载消息失败: \(error.localizedDescription)")
+                }
             }
         }
     }

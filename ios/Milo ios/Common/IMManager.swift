@@ -42,10 +42,14 @@ class IMManager: NSObject {
 
         setupSDK()
 
-        let info = WKConnectInfo()
-        info.uid = uid
-        info.token = imToken
-        WKSDK.shared().options.connectInfo = info
+        let uidCopy = uid
+        let tokenCopy = imToken
+        WKSDK.shared().options.connectInfoCallback = {
+            let info = WKConnectInfo()
+            info.uid = uidCopy
+            info.token = tokenCopy
+            return info
+        }
 
         WKSDK.shared().connectionManager.connect()
     }

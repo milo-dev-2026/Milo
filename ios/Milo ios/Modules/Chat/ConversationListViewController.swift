@@ -151,8 +151,9 @@ class ConversationListViewController: UIViewController {
                 }
                 self.fetchChannelInfoForConversations()
             } catch {
+                print("[ConvList] 加载失败: \(error)")
                 DispatchQueue.main.async {
-                    AppUtility.showToast("加载失败")
+                    AppUtility.showToast("加载失败: \(error.localizedDescription)")
                     self.tableView.mj_header?.endRefreshing()
                 }
             }

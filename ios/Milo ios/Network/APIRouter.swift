@@ -124,7 +124,9 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "code": code, "pwd": password])
         case .syncConversations:
             let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
             request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "uid": uid,
                 "last_msg_seqs": "",
                 "msg_count": 1000,
                 "version": 0,
