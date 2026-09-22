@@ -22,7 +22,8 @@ class IMManager: NSObject {
         isSetup = true
 
         let options = WKOptions()
-        options.connectAddr = APIConfig.imSocketURL
+        options.host = "43.133.39.170"
+        options.port = 5100
         options.apiURL = APIConfig.apiBaseURL
 
         WKSDK.shared.setup(options: options)
