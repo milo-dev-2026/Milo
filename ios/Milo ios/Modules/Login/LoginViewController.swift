@@ -960,11 +960,13 @@ class EntryLoginViewController: UIViewController {
             make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
         emailField.snp.makeConstraints { make in
             make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         // 协议勾选行（卡片外）
@@ -1046,9 +1048,6 @@ class EntryLoginViewController: UIViewController {
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
         }
-        glassCard.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(180))
-        }
         nextButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
         }
@@ -1124,15 +1123,18 @@ class EntryLoginViewController: UIViewController {
                             let vc = LoginViewController(account: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
+                            print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(email: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
+                            print("push completed: \(type(of: vc))")
                         }
                     }
                 } catch {
                     print("loginOrRegister error: \(error)")
+                    print("error details: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         self.resetButton()
                         AppUtility.showToast("检查失败: \(error.localizedDescription)")
@@ -1156,15 +1158,18 @@ class EntryLoginViewController: UIViewController {
                             let vc = LoginViewController(account: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
+                            print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(phone: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
                             self.navigationController?.pushViewController(vc, animated: true)
+                            print("push completed: \(type(of: vc))")
                         }
                     }
                 } catch {
                     print("loginOrRegister error: \(error)")
+                    print("error details: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         self.resetButton()
                         AppUtility.showToast("检查失败: \(error.localizedDescription)")
@@ -1331,32 +1336,45 @@ class LoginViewController: UIViewController {
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
         }
 
-        accountDisplayField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        emailInputField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-
-        passwordField.snp.makeConstraints { make in
-            make.top.equalTo(isEmail ? emailInputField.snp.bottom : accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        codeField.snp.makeConstraints { make in
-            make.top.equalTo(isEmail ? emailInputField.snp.bottom : accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        if isEmail {
+            emailInputField.snp.makeConstraints { make in
+                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            passwordField.snp.makeConstraints { make in
+                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            codeField.snp.makeConstraints { make in
+                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+        } else {
+            accountDisplayField.snp.makeConstraints { make in
+                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            passwordField.snp.makeConstraints { make in
+                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            codeField.snp.makeConstraints { make in
+                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
         }
 
         forgotPwdButton.snp.makeConstraints { make in
             make.top.equalTo(passwordField.snp.bottom).offset(ScreenAdapter.scaleH(10))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
             make.height.equalTo(ScreenAdapter.scaleH(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         // 登录按钮
@@ -1408,9 +1426,6 @@ class LoginViewController: UIViewController {
             make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-        }
-        glassCard.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(260))
         }
         loginButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
@@ -1835,6 +1850,7 @@ class RegisterViewController: UIViewController {
             make.centerX.equalToSuperview()
             make.leading.greaterThanOrEqualToSuperview().offset(ScreenAdapter.scaleW(16))
             make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         // 注册按钮
@@ -1886,9 +1902,6 @@ class RegisterViewController: UIViewController {
             make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-        }
-        glassCard.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(280))
         }
         registerButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))

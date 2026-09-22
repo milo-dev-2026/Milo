@@ -315,6 +315,7 @@ class ResetLoginPwdViewController: UIViewController {
             make.top.equalTo(pwdField.snp.bottom).offset(ScreenAdapter.scaleH(12))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         // 提交按钮
@@ -353,9 +354,6 @@ class ResetLoginPwdViewController: UIViewController {
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
-        glassCard.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(340))
         }
         submitButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
