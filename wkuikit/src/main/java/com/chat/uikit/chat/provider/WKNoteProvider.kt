@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
+import com.chat.base.entity.PopupMenuItem
 import com.chat.base.msgitem.WKChatBaseProvider
 import com.chat.base.msgitem.WKChatIteMsgFromType
 import com.chat.base.msgitem.WKContentType
@@ -17,7 +18,9 @@ import com.chat.base.ui.components.FilterImageView
 import com.chat.base.views.BubbleLayout
 import com.chat.uikit.R
 import com.chat.uikit.chat.msgmodel.WKNoteContent
+import com.chat.uikit.note.NoteEntity
 import com.chat.uikit.note.NotePreviewActivity
+import com.chat.uikit.note.NoteStorageManager
 import com.chat.base.utils.singleclick.SingleClickUtil
 
 class WKNoteProvider : WKChatBaseProvider() {
@@ -204,5 +207,44 @@ class WKNoteProvider : WKChatBaseProvider() {
 
         // 相对路径：通过 getShowUrl 转换为完整可访问URL
         return com.chat.base.config.WKApiConfig.getShowUrl(rawUrl.replace("\\/", "/"))
+    }
+
+    override fun getPopupList(mMsg: com.xinbida.wukongim.entity.WKMsg): List<PopupMenuItem> {
+        val list = super.getPopupList(mMsg).toMutableList()
+        val content = mMsg.baseContentMsgModel as? WKNoteContent
+        android.util.Log.d("WKNoteProvider", "getPopupList: contentIsNull=${content == null}, type=${mMsg.type}, msgId=${mMsg.messageID}")
+        if (content != null) {
+            val saveItem = PopupMenuItem("保存笔记", R.mipmap.msg_fave,
+                object : PopupMenuItem.IClick {
+                    override fun onClick() {
+                        val note = NoteEntity()
+                        note.id = if (TextUtils.isEmpty(content.noteId)) {
+                            System.currentTimeMillis().toString()
+                        } else {
+                            content.noteId
+                        }
+                        note.title = content.noteTitle ?: ""
+                        note.content = content.noteContent ?: ""
+                        note.groupName = content.noteGroup ?: ""
+                        note.time = content.noteTime ?: ""
+                        note.isTop = false
+                        note.type = 1
+                        note.blockListJson = content.blockListJson ?: ""
+                        note.coverUrl = if (!TextUtils.isEmpty(content.coverUrl)) {
+                            content.coverUrl
+                        } else {
+                            content.resource ?: ""
+                        }
+                        android.util.Log.d("WKNoteProvider", "saving note: id=${note.id}, title=${note.title}, coverUrl=${note.coverUrl}")
+                        NoteStorageManager.getInstance(context).saveNote(note)
+                        // 验证是否保存成功
+                        val saved = NoteStorageManager.getInstance(context).getNote(note.id)
+                        android.util.Log.d("WKNoteProvider", "save result: noteFound=${saved != null}, title=${saved?.title}")
+                        android.widget.Toast.makeText(context, "已保存到我的笔记", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                })
+            list.add(0, saveItem)
+        }
+        return list
     }
 }

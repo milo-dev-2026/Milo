@@ -1,5 +1,6 @@
 package com.chat.uikit.chat.adapter;
 
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
@@ -37,6 +38,7 @@ import com.chat.base.utils.WKDialogUtils;
 import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKChannelUtils;
 import com.chat.base.utils.WKTimeUtils;
+import com.chat.base.utils.SpecialUserUtils;
 import com.chat.uikit.R;
 import com.chat.uikit.enity.ChatConversationMsg;
 import com.xinbida.wukongim.WKIM;
@@ -482,7 +484,31 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
 //            if (!isScrolling)
             WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
         }
-        helper.setText(R.id.nameTv, showName);
+        // 特殊用户：红色昵称
+        TextView nameTv = helper.getView(R.id.nameTv);
+        String channelId = item.channelID;
+        if (item.getWkChannel() != null && !TextUtils.isEmpty(item.getWkChannel().channelID)) {
+            channelId = item.getWkChannel().channelID;
+        }
+        boolean isSpecialUser = (item.channelType == WKChannelType.PERSONAL && !TextUtils.isEmpty(channelId) && SpecialUserUtils.isSpecialUser(channelId))
+                || SpecialUserUtils.isSpecialUserByName(showName);
+        // 特定群聊：红棕色名字
+        boolean isSpecialGroup = item.channelType == WKChannelType.GROUP && isSpecialGroup(showName);
+        if (isSpecialUser) {
+            nameTv.setTextColor(Color.RED);
+            nameTv.setText(showName);
+        } else if (isSpecialGroup) {
+            nameTv.setTextColor(Color.rgb(139, 69, 19));
+            nameTv.setText(showName);
+        } else {
+            nameTv.setTextColor(ContextCompat.getColor(getContext(), R.color.colorDark));
+            nameTv.setText(showName);
+        }
+    }
+
+    private boolean isSpecialGroup(String groupName) {
+        if (TextUtils.isEmpty(groupName)) return false;
+        return groupName.contains("西安修车车友交流2群") || groupName.contains("西安修车大队");
     }
 
     private boolean isSetChatPwd(WKChannel channel) {

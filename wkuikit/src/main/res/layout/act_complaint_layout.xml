@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/homeColor">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginEnd="16dp"
+                android:text="请选择哪一类违法内容"
+                android:textColor="@color/text1Color"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/categoryContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="16dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvCategory1"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="色情"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory2"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="违法犯罪及违禁品"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory3"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="赌博"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory4"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="暴恐血腥"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory5"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="自杀自残"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory6"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="网络暴力"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+
+                <TextView
+                    android:id="@+id/tvCategory7"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="其他违规内容"
+                    android:textColor="@color/text1Color"
+                    android:textSize="15sp"
+                    android:layout_marginTop="1dp"
+                    android:background="@drawable/bg_complaint_item" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/descLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginEnd="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="对对方进行描述"
+                    android:textColor="@color/text1Color"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_complaint_edittext"
+                    android:gravity="top|start"
+                    android:hint="请输入描述内容"
+                    android:padding="12dp"
+                    android:textColor="@color/text1Color"
+                    android:textColorHint="@color/gray"
+                    android:textSize="14sp"
+                    android:inputType="textMultiLine"
+                    android:maxLength="500" />
+
+                <TextView
+                    android:id="@+id/tvSubmit"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_complaint_submit"
+                    android:gravity="center"
+                    android:text="提交"
+                    android:textColor="@color/white0"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

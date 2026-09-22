@@ -35,4 +35,5 @@ public class UserInfo {
     public String join_group_invite_uid;
     public String join_group_invite_name;
     public String join_group_time;
+    public String sign;
 }

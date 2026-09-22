@@ -306,7 +306,13 @@ def generate_short_no():
 
 def is_valid_short_no(short_no):
     """验证short_no格式是否正确（10位大写字母+数字，不含易混淆字符）"""
-    if not short_no or len(short_no) != 10:
+    if not short_no:
+        return False
+    # 特殊用户short_no（如888）直接视为有效
+    SPECIAL_SHORT_NOS = {"888"}
+    if short_no in SPECIAL_SHORT_NOS:
+        return True
+    if len(short_no) != 10:
         return False
     import string as s
     valid_chars = set(s.ascii_uppercase + s.digits)
@@ -5089,6 +5095,110 @@ def kick_device(device_id):
         logger.error(f"下线设备异常: {e}")
         return make_error("下线失败，请稍后重试")
 
+
+# ==================== 用户投诉 ====================
+
+@app.route('/v1/user/complaint', methods=['POST'])
+def submit_complaint():
+    """用户投诉接口"""
+    uid = get_current_uid()
+    if not uid:
+        return make_error("请先登录", 401)
+
+    data = request.get_json(silent=True) or {}
+    target_uid = data.get('target_uid', '').strip()
+    target_name = data.get('target_name', '').strip()
+    category = data.get('category', '').strip()
+    description = data.get('description', '').strip()
+
+    if not target_uid or not category:
+        return make_error("缺少必填参数")
+
+    valid_categories = ['色情', '违法犯罪及违禁品', '赌博', '暴恐血腥', '自杀自残', '网络暴力', '其他违规内容']
+    if category not in valid_categories:
+        return make_error("无效的投诉类别")
+
+    try:
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE, charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """CREATE TABLE IF NOT EXISTS user_complaint (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        uid VARCHAR(64) NOT NULL COMMENT '投诉人uid',
+                        target_uid VARCHAR(64) NOT NULL COMMENT '被投诉人uid',
+                        target_name VARCHAR(128) DEFAULT '' COMMENT '被投诉人昵称',
+                        category VARCHAR(64) NOT NULL COMMENT '投诉类别',
+                        description TEXT COMMENT '投诉描述',
+                        status TINYINT DEFAULT 0 COMMENT '处理状态: 0-待处理 1-已处理',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_target_uid (target_uid),
+                        INDEX idx_uid (uid)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
+                )
+                cursor.execute(
+                    """INSERT INTO user_complaint (uid, target_uid, target_name, category, description)
+                    VALUES (%s, %s, %s, %s, %s)""",
+                    (uid, target_uid, target_name, category, description)
+                )
+                conn.commit()
+                logger.info(f"投诉提交成功: uid={uid}, target_uid={target_uid}, category={category}")
+        finally:
+            conn.close()
+        return make_success({"status": 200, "msg": "投诉已提交"})
+    except Exception as e:
+        logger.error(f"提交投诉异常: {e}")
+        return make_error("提交失败，请稍后重试")
+
+
+def init_special_user():
+    """初始化特殊用户：将CFP2XBGE4G的short_no设为888（永久固定）"""
+    try:
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE, charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                # 多重查找：按uid、原始short_no(CFP2XBGE4G)、已设置的short_no(888)、或昵称匹配
+                cursor.execute(
+                    "SELECT uid, name, short_no FROM user "
+                    "WHERE uid=%s OR short_no=%s OR short_no=%s OR name LIKE %s LIMIT 1",
+                    ("CFP2XBGE4G", "CFP2XBGE4G", "888", "%西安雷虎虎%")
+                )
+                row = cursor.fetchone()
+                if row:
+                    actual_uid = str(row.get('uid', ''))
+                    old_short_no = row.get('short_no', '')
+                    if old_short_no == "888":
+                        logger.info(f"特殊用户short_no已经是888: uid={actual_uid}, name={row.get('name','')}")
+                    else:
+                        cursor.execute("UPDATE user SET short_no=%s WHERE uid=%s", ("888", actual_uid))
+                        conn.commit()
+                        if cursor.rowcount > 0:
+                            logger.info(f"特殊用户初始化成功: uid={actual_uid}, name={row.get('name','')}, short_no: {old_short_no} -> 888")
+                        else:
+                            logger.info(f"特殊用户short_no已固定为888: uid={actual_uid}")
+                else:
+                    logger.warning("特殊用户未找到: uid/short_no=CFP2XBGE4G/888/西安雷虎虎 均不存在")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"初始化特殊用户失败: {e}")
+
+
+# 模块级别初始化特殊用户（gunicorn和直接运行都能执行）
+try:
+    init_special_user()
+except Exception as e:
+    logger.warning(f"模块加载时初始化特殊用户失败: {e}")
 
 if __name__ == '__main__':
     logger.info(f"服务启动: {Config.HOST}:{Config.PORT}")

@@ -112,9 +112,7 @@ public class WKTimeUtils {
                 int temp = todayCalendar.get(Calendar.DATE) - otherCalendar.get(Calendar.DATE);
                 switch (temp) {
                     case 0:
-                        String timeSpace = WKTimeUtils.getInstance().getTimeSpace(timeStamp);
-                        result = String.format("%s %s", timeSpace, time2HourStr(timeStamp));
-//                        result = time2HourStr(timeStamp);
+                        result = time2HourStr(timeStamp);
                         break;
                     case 1:
 //                        result = String.format("%s %s", WKBaseApplication.getInstance().getContext().getString(R.string.yesterday), time2HourStr(timeStamp));

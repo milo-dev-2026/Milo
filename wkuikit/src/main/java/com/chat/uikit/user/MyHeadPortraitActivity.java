@@ -176,6 +176,8 @@ public class MyHeadPortraitActivity extends WKBaseActivity<ActMyHeadPortraitLayo
                     }
                     channel.avatarCacheKey = UUID.randomUUID().toString().replace("-", "");
                     WKIM.getInstance().getChannelManager().updateAvatarCacheKey(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, channel.avatarCacheKey);
+                    WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+                    WKIM.getInstance().getChannelManager().fetchChannelInfo(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
                     GlideUtils.getInstance().showAvatarImg(this, channel.channelID, WKChannelType.PERSONAL, channel.avatarCacheKey, wkVBinding.avatarIv);
                     String avatarURL = WKApiConfig.getAvatarUrl(WKConfig.getInstance().getUid());
                     avatarURL = avatarURL + "?key=" + channel.avatarCacheKey;

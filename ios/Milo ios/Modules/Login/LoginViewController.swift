@@ -2,6 +2,464 @@ import UIKit
 import SnapKit
 import PhotosUI
 
+// MARK: - 液态玻璃分段控件
+class GlassSegmentedControl: UIView {
+
+    var selectedIndex: Int = 0 {
+        didSet { updateSelection(animated: true) }
+    }
+
+    var onSelected: ((Int) -> Void)?
+
+    private let items: [String]
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialLight))
+    private let selectorView = UIView()
+    private var buttons: [UIButton] = []
+    private let stackView = UIStackView()
+
+    init(items: [String]) {
+        self.items = items
+        super.init(frame: .zero)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        layer.cornerRadius = ScreenAdapter.scaleH(22)
+        layer.masksToBounds = true
+
+        addSubview(blurView)
+        blurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        // 白色半透明背景叠加，增加玻璃质感
+        let overlayView = UIView()
+        overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        addSubview(overlayView)
+        overlayView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        // 选中滑块
+        selectorView.backgroundColor = .white
+        selectorView.layer.cornerRadius = ScreenAdapter.scaleH(18)
+        selectorView.layer.shadowColor = UIColor.black.cgColor
+        selectorView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        selectorView.layer.shadowRadius = 4
+        selectorView.layer.shadowOpacity = 0.1
+        addSubview(selectorView)
+
+        // 按钮
+        stackView.axis = .horizontal
+        stackView.distribution = .fillEqually
+        stackView.alignment = .fill
+        addSubview(stackView)
+
+        for (index, title) in items.enumerated() {
+            let btn = UIButton(type: .system)
+            btn.setTitle(title, for: .normal)
+            btn.titleLabel?.font = ScreenAdapter.mediumFont(14)
+            btn.tag = index
+            btn.addTarget(self, action: #selector(buttonTapped(_:)), for: .touchUpInside)
+            buttons.append(btn)
+            stackView.addArrangedSubview(btn)
+        }
+
+        stackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(44))
+        }
+
+        updateSelection(animated: false)
+    }
+
+    @objc private func buttonTapped(_ sender: UIButton) {
+        guard sender.tag != selectedIndex else { return }
+        selectedIndex = sender.tag
+        onSelected?(selectedIndex)
+    }
+
+    private func updateSelection(animated: Bool) {
+        for (index, btn) in buttons.enumerated() {
+            if index == selectedIndex {
+                btn.setTitleColor(.themePrimary, for: .normal)
+                btn.titleLabel?.font = ScreenAdapter.mediumFont(14)
+            } else {
+                btn.setTitleColor(.secondaryLabel, for: .normal)
+                btn.titleLabel?.font = ScreenAdapter.font(14)
+            }
+        }
+
+        let duration = animated ? 0.25 : 0
+        UIView.animate(withDuration: duration, delay: 0, options: .curveEaseInOut) {
+            self.layoutIfNeeded()
+            let totalWidth = self.bounds.width
+            let itemWidth = totalWidth / CGFloat(self.items.count)
+            let selectorInset = ScreenAdapter.scaleW(4)
+            let selectorWidth = itemWidth - selectorInset * 2
+            let selectorX = itemWidth * CGFloat(self.selectedIndex) + selectorInset
+            self.selectorView.frame = CGRect(
+                x: selectorX,
+                y: ScreenAdapter.scaleH(4),
+                width: selectorWidth,
+                height: ScreenAdapter.scaleH(36)
+            )
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateSelection(animated: false)
+    }
+}
+
+// MARK: - 玻璃卡片容器
+class GlassCardView: UIView {
+
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialLight))
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor.white.withAlphaComponent(0.6)
+        layer.cornerRadius = ScreenAdapter.scaleW(28)
+        layer.masksToBounds = false
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOffset = CGSize(width: 0, height: 8)
+        layer.shadowRadius = 24
+        layer.shadowOpacity = 0.08
+
+        addSubview(blurView)
+        sendSubviewToBack(blurView)
+        blurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
+        blurView.layer.masksToBounds = true
+    }
+}
+
+// MARK: - 胶囊形输入框（玻璃风格）
+class CapsuleTextField: UIView {
+
+    let textField = UITextField()
+
+    var placeholder: String? {
+        didSet { updatePlaceholder() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        layer.cornerRadius = ScreenAdapter.scaleH(24)
+        layer.masksToBounds = true
+
+        textField.borderStyle = .none
+        textField.font = ScreenAdapter.font(16)
+        textField.textColor = .label
+        textField.backgroundColor = .clear
+        addSubview(textField)
+
+        textField.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.centerY.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    private func updatePlaceholder() {
+        guard let placeholder = placeholder else {
+            textField.attributedPlaceholder = nil
+            return
+        }
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.secondaryLabel]
+        )
+    }
+}
+
+// MARK: - 带区号的胶囊输入框
+class CapsulePhoneField: UIView {
+
+    let countryCodeButton = UIButton(type: .system)
+    private let dividerView = UIView()
+    let textField = UITextField()
+
+    var countryCode: String = "+86" {
+        didSet { countryCodeButton.setTitle(countryCode, for: .normal) }
+    }
+
+    var placeholder: String? {
+        didSet { updatePlaceholder() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        layer.cornerRadius = ScreenAdapter.scaleH(24)
+        layer.masksToBounds = true
+
+        countryCodeButton.setTitle("+86", for: .normal)
+        countryCodeButton.setTitleColor(.label, for: .normal)
+        countryCodeButton.titleLabel?.font = ScreenAdapter.font(16)
+        addSubview(countryCodeButton)
+
+        dividerView.backgroundColor = UIColor(red: 0.85, green: 0.86, blue: 0.88, alpha: 1.0)
+        addSubview(dividerView)
+
+        textField.borderStyle = .none
+        textField.font = ScreenAdapter.font(16)
+        textField.textColor = .label
+        textField.keyboardType = .numberPad
+        textField.backgroundColor = .clear
+        addSubview(textField)
+
+        countryCodeButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.centerY.equalToSuperview()
+            make.width.equalTo(ScreenAdapter.scaleW(50))
+        }
+
+        dividerView.snp.makeConstraints { make in
+            make.leading.equalTo(countryCodeButton.snp.trailing).offset(ScreenAdapter.scaleW(8))
+            make.centerY.equalToSuperview()
+            make.width.equalTo(1)
+            make.height.equalTo(ScreenAdapter.scaleH(20))
+        }
+
+        textField.snp.makeConstraints { make in
+            make.leading.equalTo(dividerView.snp.trailing).offset(ScreenAdapter.scaleW(12))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.centerY.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    private func updatePlaceholder() {
+        guard let placeholder = placeholder else {
+            textField.attributedPlaceholder = nil
+            return
+        }
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.secondaryLabel]
+        )
+    }
+}
+
+// MARK: - 带获取验证码按钮的胶囊输入框
+class CapsuleCodeField: UIView {
+
+    let textField = UITextField()
+    let sendCodeButton = UIButton(type: .system)
+
+    var placeholder: String? {
+        didSet { updatePlaceholder() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        layer.cornerRadius = ScreenAdapter.scaleH(24)
+        layer.masksToBounds = true
+
+        textField.borderStyle = .none
+        textField.font = ScreenAdapter.font(16)
+        textField.textColor = .label
+        textField.keyboardType = .numberPad
+        textField.backgroundColor = .clear
+        addSubview(textField)
+
+        sendCodeButton.setTitle("获取验证码", for: .normal)
+        sendCodeButton.setTitleColor(.themePrimary, for: .normal)
+        sendCodeButton.titleLabel?.font = ScreenAdapter.font(14)
+        addSubview(sendCodeButton)
+
+        sendCodeButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.centerY.equalToSuperview()
+            make.width.lessThanOrEqualTo(ScreenAdapter.scaleW(100))
+        }
+
+        textField.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalTo(sendCodeButton.snp.leading).offset(-ScreenAdapter.scaleW(8))
+            make.centerY.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    private func updatePlaceholder() {
+        guard let placeholder = placeholder else {
+            textField.attributedPlaceholder = nil
+            return
+        }
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.secondaryLabel]
+        )
+    }
+}
+
+// MARK: - 带眼睛图标的胶囊密码输入框
+class CapsulePasswordField: UIView {
+
+    let textField = UITextField()
+    private let toggleButton = UIButton(type: .custom)
+
+    var placeholder: String? {
+        didSet { updatePlaceholder() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+        layer.cornerRadius = ScreenAdapter.scaleH(24)
+        layer.masksToBounds = true
+
+        textField.borderStyle = .none
+        textField.font = ScreenAdapter.font(16)
+        textField.textColor = .label
+        textField.isSecureTextEntry = true
+        textField.backgroundColor = .clear
+        addSubview(textField)
+
+        toggleButton.setImage(UIImage(systemName: "eye.slash"), for: .normal)
+        toggleButton.setImage(UIImage(systemName: "eye"), for: .selected)
+        toggleButton.tintColor = .secondaryLabel
+        toggleButton.addTarget(self, action: #selector(togglePassword), for: .touchUpInside)
+        addSubview(toggleButton)
+
+        toggleButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(ScreenAdapter.scaleW(22))
+        }
+
+        textField.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalTo(toggleButton.snp.leading).offset(-ScreenAdapter.scaleW(8))
+            make.centerY.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    @objc private func togglePassword() {
+        textField.isSecureTextEntry.toggle()
+        toggleButton.isSelected = !textField.isSecureTextEntry
+    }
+
+    private func updatePlaceholder() {
+        guard let placeholder = placeholder else {
+            textField.attributedPlaceholder = nil
+            return
+        }
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.secondaryLabel]
+        )
+    }
+}
+
+// MARK: - 只读胶囊显示框（用于脱敏手机号显示）
+class CapsuleDisplayField: UIView {
+
+    let label = UILabel()
+
+    var text: String? {
+        didSet { label.text = text }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = UIColor(red: 0.92, green: 0.93, blue: 0.95, alpha: 1.0)
+        layer.cornerRadius = ScreenAdapter.scaleH(24)
+        layer.masksToBounds = true
+
+        label.font = ScreenAdapter.font(16)
+        label.textColor = .secondaryLabel
+        addSubview(label)
+
+        label.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.centerY.equalToSuperview()
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+}
+
 // MARK: - 浮动标签输入框
 class FloatingLabelTextField: UIView {
 
@@ -373,24 +831,32 @@ class PasswordFloatingLabelField: UIView {
 // MARK: - 页面1：入口页
 class EntryLoginViewController: UIViewController {
 
+    // 顶部区域
     private let logoView = UIImageView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
 
-    private let tabContainer = UIView()
-    private let phoneTabButton = UIButton(type: .custom)
-    private let emailTabButton = UIButton(type: .custom)
+    // 玻璃卡片
+    private let glassCard = GlassCardView()
+    private let segmentedControl = GlassSegmentedControl(items: ["手机号", "邮箱"])
     private var isEmailMode = false
 
-    private let phoneField = PhoneFloatingLabelField()
-    private let emailField = FloatingLabelTextField()
+    private let phoneField = CapsulePhoneField()
+    private let emailField = CapsuleTextField()
 
+    // 卡片外协议勾选行
     private let agreementCheckBox = UIButton(type: .custom)
     private let agreementLabel = UILabel()
     private let userAgreementButton = UIButton(type: .system)
     private let privacyPolicyButton = UIButton(type: .system)
     private var isAgreed = false
 
-    private let loginButton = UIButton(type: .system)
+    // 下一步按钮
+    private let nextButton = UIButton(type: .system)
     private var isLoading = false
+
+    // 底部协议提示
+    private let bottomAgreementLabel = UILabel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -398,67 +864,111 @@ class EntryLoginViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = .white
         navigationController?.setNavigationBarHidden(true, animated: false)
 
-        // Logo
+        // 顶部淡蓝色渐变
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 0.357, green: 0.482, blue: 1.0, alpha: 0.08).cgColor,
+            UIColor.white.cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
+        let gradientView = UIView()
+        gradientView.layer.addSublayer(gradientLayer)
+        view.addSubview(gradientView)
+        gradientView.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.height.equalTo(ScreenAdapter.scaleH(300))
+        }
+        DispatchQueue.main.async {
+            gradientLayer.frame = gradientView.bounds
+        }
+
+        // 顶部：左Logo + 右标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
-        // 副标题
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = "欢迎使用Milo 输入手机号或者邮箱继续"
+        titleLabel.text = "欢迎使用Milo"
+        titleLabel.font = ScreenAdapter.mediumFont(22)
+        titleLabel.textColor = .label
+
+        subtitleLabel.text = "输入手机号或者邮箱继续"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
-        subtitleLabel.textAlignment = .center
-        subtitleLabel.numberOfLines = 0
 
-        // Tab 按钮
-        phoneTabButton.setTitle("手机号", for: .normal)
-        phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        phoneTabButton.setTitleColor(.themePrimary, for: .normal)
-        phoneTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        phoneTabButton.addTarget(self, action: #selector(switchToPhone), for: .touchUpInside)
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
+        headerStack.axis = .vertical
+        headerStack.spacing = ScreenAdapter.scaleH(6)
+        headerStack.alignment = .leading
 
-        emailTabButton.setTitle("邮箱", for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        emailTabButton.setTitleColor(.themePrimary, for: .normal)
-        emailTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        emailTabButton.addTarget(self, action: #selector(switchToEmail), for: .touchUpInside)
+        let headerContainer = UIView()
+        headerContainer.addSubview(headerStack)
+        headerStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
 
-        let tabStack = UIStackView(arrangedSubviews: [phoneTabButton, emailTabButton])
-        tabStack.axis = .horizontal
-        tabStack.spacing = ScreenAdapter.scaleW(32)
-        tabStack.alignment = .center
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(42))
+        }
+
+        // 玻璃卡片
+        view.addSubview(glassCard)
+
+        // 分段控件
+        segmentedControl.onSelected = { [weak self] index in
+            self?.switchMode(index)
+        }
+        glassCard.addSubview(segmentedControl)
 
         // 输入框
-        phoneField.placeholder = "手机号"
-        phoneField.textField.keyboardType = .numberPad
+        phoneField.placeholder = "请输入手机号"
         phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
 
-        emailField.placeholder = "邮箱地址"
+        emailField.placeholder = "请输入邮箱地址"
         emailField.textField.keyboardType = .emailAddress
         emailField.textField.autocapitalizationType = .none
         emailField.isHidden = true
         emailField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
 
-        // 协议勾选
+        glassCard.addSubview(phoneField)
+        glassCard.addSubview(emailField)
+
+        // 卡片内布局
+        segmentedControl.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        phoneField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        emailField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        // 协议勾选行（卡片外）
         agreementCheckBox.setImage(UIImage(systemName: "circle"), for: .normal)
         agreementCheckBox.setImage(UIImage(systemName: "checkmark.circle.fill"), for: .selected)
         agreementCheckBox.tintColor = .themePrimary
         agreementCheckBox.addTarget(self, action: #selector(toggleAgreement), for: .touchUpInside)
 
         agreementLabel.text = "我已阅读并同意"
-        agreementLabel.font = ScreenAdapter.font(14)
+        agreementLabel.font = ScreenAdapter.font(13)
         agreementLabel.textColor = .secondaryLabel
 
         userAgreementButton.setTitle("《用户协议》", for: .normal)
-        userAgreementButton.titleLabel?.font = ScreenAdapter.font(14)
+        userAgreementButton.titleLabel?.font = ScreenAdapter.font(13)
         userAgreementButton.setTitleColor(.themePrimary, for: .normal)
         userAgreementButton.addTarget(self, action: #selector(openUserAgreement), for: .touchUpInside)
 
         privacyPolicyButton.setTitle("《隐私政策》", for: .normal)
-        privacyPolicyButton.titleLabel?.font = ScreenAdapter.font(14)
+        privacyPolicyButton.titleLabel?.font = ScreenAdapter.font(13)
         privacyPolicyButton.setTitleColor(.themePrimary, for: .normal)
         privacyPolicyButton.addTarget(self, action: #selector(openPrivacyPolicy), for: .touchUpInside)
 
@@ -466,36 +976,47 @@ class EntryLoginViewController: UIViewController {
             agreementCheckBox, agreementLabel, userAgreementButton, privacyPolicyButton
         ])
         agreementStack.axis = .horizontal
-        agreementStack.spacing = ScreenAdapter.scaleW(4)
+        agreementStack.spacing = ScreenAdapter.scaleW(3)
         agreementStack.alignment = .center
 
         agreementCheckBox.snp.makeConstraints { make in
-            make.width.height.equalTo(ScreenAdapter.scaleW(22))
+            make.width.height.equalTo(ScreenAdapter.scaleW(18))
         }
 
-        // 登录/注册按钮
-        loginButton.setTitle("登录/注册", for: .normal)
-        loginButton.backgroundColor = .themePrimary
-        loginButton.setTitleColor(.white, for: .normal)
-        loginButton.titleLabel?.font = ScreenAdapter.mediumFont(17)
-        loginButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
-        loginButton.alpha = 0.5
-        loginButton.isEnabled = false
-        loginButton.addTarget(self, action: #selector(loginOrRegister), for: .touchUpInside)
+        // 下一步按钮
+        nextButton.setTitle("下一步", for: .normal)
+        nextButton.backgroundColor = .themePrimary
+        nextButton.setTitleColor(.white, for: .normal)
+        nextButton.titleLabel?.font = ScreenAdapter.mediumFont(17)
+        nextButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
+        nextButton.alpha = 0.5
+        nextButton.isEnabled = false
+        nextButton.addTarget(self, action: #selector(loginOrRegister), for: .touchUpInside)
+
+        // 底部小字
+        bottomAgreementLabel.text = "登录即表示同意《用户协议》和《隐私政策》"
+        bottomAgreementLabel.font = ScreenAdapter.font(12)
+        bottomAgreementLabel.textColor = .tertiaryLabel
+        bottomAgreementLabel.textAlignment = .center
+        bottomAgreementLabel.numberOfLines = 0
 
         // 整体布局
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
+        scrollView.keyboardDismissMode = .interactive
         view.addSubview(scrollView)
 
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, tabStack, phoneField, emailField, agreementStack, loginButton])
+        let mainStack = UIStackView(arrangedSubviews: [
+            headerContainer, glassCard, agreementStack, nextButton
+        ])
         mainStack.axis = .vertical
-        mainStack.spacing = ScreenAdapter.scaleH(24)
+        mainStack.spacing = ScreenAdapter.scaleH(20)
         mainStack.alignment = .fill
         contentView.addSubview(mainStack)
+        contentView.addSubview(bottomAgreementLabel)
 
         scrollView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -505,21 +1026,21 @@ class EntryLoginViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(60))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
         }
-        logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(100))
-            make.centerX.equalToSuperview()
+        glassCard.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(180))
         }
-        tabStack.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(30))
-            make.centerX.equalToSuperview()
-        }
-        loginButton.snp.makeConstraints { make in
+        nextButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+        bottomAgreementLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
     }
 
@@ -533,8 +1054,8 @@ class EntryLoginViewController: UIViewController {
             ? isValidEmail(emailField.textField.text ?? "")
             : AppUtility.isValidPhone(phoneField.textField.text ?? "")
         let enabled = hasAccount && isAgreed
-        loginButton.isEnabled = enabled && !isLoading
-        loginButton.alpha = enabled ? 1.0 : 0.5
+        nextButton.isEnabled = enabled && !isLoading
+        nextButton.alpha = enabled ? 1.0 : 0.5
     }
 
     @objc private func toggleAgreement() {
@@ -551,25 +1072,10 @@ class EntryLoginViewController: UIViewController {
         AppUtility.showToast("隐私政策")
     }
 
-    @objc private func switchToPhone() {
-        isEmailMode = false
-        phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        phoneTabButton.setTitleColor(.themePrimary, for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        emailTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        phoneField.isHidden = false
-        emailField.isHidden = true
-        updateLoginButtonState()
-    }
-
-    @objc private func switchToEmail() {
-        isEmailMode = true
-        phoneTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        phoneTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        emailTabButton.setTitleColor(.themePrimary, for: .normal)
-        phoneField.isHidden = true
-        emailField.isHidden = false
+    private func switchMode(_ index: Int) {
+        isEmailMode = (index == 1)
+        phoneField.isHidden = isEmailMode
+        emailField.isHidden = !isEmailMode
         updateLoginButtonState()
     }
 
@@ -582,8 +1088,8 @@ class EntryLoginViewController: UIViewController {
 
         view.endEditing(true)
         isLoading = true
-        loginButton.isEnabled = false
-        loginButton.setTitle("检查中...", for: .normal)
+        nextButton.isEnabled = false
+        nextButton.setTitle("检查中...", for: .normal)
 
         if isEmailMode {
             let email = emailField.textField.text ?? ""
@@ -648,8 +1154,8 @@ class EntryLoginViewController: UIViewController {
 
     private func resetButton() {
         isLoading = false
-        loginButton.isEnabled = true
-        loginButton.setTitle("登录/注册", for: .normal)
+        nextButton.isEnabled = true
+        nextButton.setTitle("下一步", for: .normal)
         updateLoginButtonState()
     }
 
@@ -668,17 +1174,31 @@ class LoginViewController: UIViewController {
     private enum LoginMode { case password, code }
     private var loginMode: LoginMode = .password
 
-    private let phoneField = PhoneFloatingLabelField()
-    private let emailField = FloatingLabelTextField()
-    private let passwordField = PasswordFloatingLabelField()
-    private let codeField = CodeFloatingLabelField()
+    // 顶部区域
+    private let logoView = UIImageView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
 
-    private let bottomBar = UIView()
-    private let leftButton = UIButton(type: .system)
-    private let rightButton = UIButton(type: .system)
+    // 玻璃卡片
+    private let glassCard = GlassCardView()
+    private let segmentedControl = GlassSegmentedControl(items: ["密码登录", "验证码登录"])
 
+    // 账号显示（只读脱敏）
+    private let accountDisplayField = CapsuleDisplayField()
+    private let emailInputField = CapsuleTextField()
+
+    private let passwordField = CapsulePasswordField()
+    private let codeField = CapsuleCodeField()
+
+    // 忘记密码链接
+    private let forgotPwdButton = UIButton(type: .system)
+
+    // 登录按钮
     private let loginButton = UIButton(type: .system)
     private var isLoading = false
+
+    // 底部注册提示
+    private let registerTipLabel = UILabel()
 
     private var countdown = 0
     private var countdownTimer: Timer?
@@ -702,61 +1222,110 @@ class LoginViewController: UIViewController {
 
     private func setupUI() {
         title = "登录"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = .white
 
-        // Logo
-        let logoView = UIImageView()
+        // 顶部：左Logo + 右标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
-        // 副标题
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = "欢迎使用Milo"
+        titleLabel.text = "登录"
+        titleLabel.font = ScreenAdapter.mediumFont(22)
+        titleLabel.textColor = .label
+
+        subtitleLabel.text = "欢迎回来，登录您的账号"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
-        subtitleLabel.textAlignment = .center
 
-        // 手机号/邮箱输入框
-        phoneField.placeholder = "手机号"
-        phoneField.textField.text = isEmail ? "" : account
-        phoneField.textField.keyboardType = .numberPad
-        phoneField.isHidden = isEmail
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
+        headerStack.axis = .vertical
+        headerStack.spacing = ScreenAdapter.scaleH(6)
+        headerStack.alignment = .leading
 
-        emailField.placeholder = "邮箱地址"
-        emailField.textField.text = isEmail ? account : ""
-        emailField.textField.keyboardType = .emailAddress
-        emailField.textField.autocapitalizationType = .none
-        emailField.isHidden = !isEmail
+        let headerContainer = UIView()
+        headerContainer.addSubview(headerStack)
+        headerStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(42))
+        }
+
+        // 玻璃卡片
+        view.addSubview(glassCard)
+
+        // 分段控件
+        segmentedControl.onSelected = { [weak self] index in
+            self?.switchLoginMode(index)
+        }
+        glassCard.addSubview(segmentedControl)
+
+        // 账号显示/输入
+        if isEmail {
+            accountDisplayField.isHidden = true
+            emailInputField.placeholder = "请输入邮箱地址"
+            emailInputField.textField.text = account
+            emailInputField.textField.keyboardType = .emailAddress
+            emailInputField.textField.autocapitalizationType = .none
+            glassCard.addSubview(emailInputField)
+        } else {
+            emailInputField.isHidden = true
+            accountDisplayField.text = "+86 \(maskPhone(account))"
+            glassCard.addSubview(accountDisplayField)
+        }
 
         // 密码输入框
-        passwordField.placeholder = "密码"
+        passwordField.placeholder = "请输入密码"
         passwordField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        glassCard.addSubview(passwordField)
 
         // 验证码输入框
-        codeField.placeholder = "验证码"
+        codeField.placeholder = "请输入验证码"
         codeField.sendCodeButton.addTarget(self, action: #selector(sendCode), for: .touchUpInside)
         codeField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         codeField.isHidden = true
+        glassCard.addSubview(codeField)
 
-        // 底部按钮栏
-        leftButton.setTitle("忘记密码？", for: .normal)
-        leftButton.titleLabel?.font = ScreenAdapter.font(14)
-        leftButton.setTitleColor(.themePrimary, for: .normal)
-        leftButton.addTarget(self, action: #selector(goForgotPassword), for: .touchUpInside)
+        // 忘记密码链接
+        forgotPwdButton.setTitle("忘记密码？", for: .normal)
+        forgotPwdButton.titleLabel?.font = ScreenAdapter.font(13)
+        forgotPwdButton.setTitleColor(.themePrimary, for: .normal)
+        forgotPwdButton.contentHorizontalAlignment = .right
+        forgotPwdButton.addTarget(self, action: #selector(goForgotPassword), for: .touchUpInside)
+        glassCard.addSubview(forgotPwdButton)
 
-        rightButton.setTitle("验证码登录", for: .normal)
-        rightButton.titleLabel?.font = ScreenAdapter.font(14)
-        rightButton.setTitleColor(.themePrimary, for: .normal)
-        rightButton.addTarget(self, action: #selector(switchLoginMode), for: .touchUpInside)
-
-        bottomBar.addSubview(leftButton)
-        bottomBar.addSubview(rightButton)
-
-        leftButton.snp.makeConstraints { make in
-            make.leading.top.bottom.equalToSuperview()
+        // 卡片内布局
+        segmentedControl.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
         }
-        rightButton.snp.makeConstraints { make in
-            make.trailing.top.bottom.equalToSuperview()
+
+        accountDisplayField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        emailInputField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        passwordField.snp.makeConstraints { make in
+            make.top.equalTo(isEmail ? emailInputField.snp.bottom : accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        codeField.snp.makeConstraints { make in
+            make.top.equalTo(isEmail ? emailInputField.snp.bottom : accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        forgotPwdButton.snp.makeConstraints { make in
+            make.top.equalTo(passwordField.snp.bottom).offset(ScreenAdapter.scaleH(10))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(ScreenAdapter.scaleH(20))
         }
 
         // 登录按钮
@@ -769,18 +1338,32 @@ class LoginViewController: UIViewController {
         loginButton.isEnabled = false
         loginButton.addTarget(self, action: #selector(doLogin), for: .touchUpInside)
 
+        // 底部注册提示
+        registerTipLabel.text = "还没有账号？去注册"
+        registerTipLabel.font = ScreenAdapter.font(14)
+        registerTipLabel.textColor = .secondaryLabel
+        registerTipLabel.textAlignment = .center
+        registerTipLabel.isUserInteractionEnabled = true
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goRegister))
+        registerTipLabel.addGestureRecognizer(tapGesture)
+
         // 整体布局
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
+        scrollView.keyboardDismissMode = .interactive
         view.addSubview(scrollView)
 
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, phoneField, emailField, passwordField, codeField, loginButton, bottomBar])
+        let mainStack = UIStackView(arrangedSubviews: [
+            headerContainer, glassCard, loginButton
+        ])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
+        mainStack.alignment = .fill
         contentView.addSubview(mainStack)
+        contentView.addSubview(registerTipLabel)
 
         scrollView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -790,23 +1373,30 @@ class LoginViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
+        }
+        glassCard.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(260))
         }
         loginButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
         }
-        logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(70))
+        registerTipLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
             make.centerX.equalToSuperview()
-        }
-        bottomBar.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(30))
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         updateLoginButtonState()
+    }
+
+    private func maskPhone(_ phone: String) -> String {
+        guard phone.count >= 7 else { return phone }
+        let prefix = phone.prefix(3)
+        let suffix = phone.suffix(4)
+        return "\(prefix)****\(suffix)"
     }
 
     // MARK: - 交互
@@ -816,8 +1406,8 @@ class LoginViewController: UIViewController {
 
     private func updateLoginButtonState() {
         let hasAccount = isEmail
-            ? !(emailField.textField.text ?? "").isEmpty
-            : AppUtility.isValidPhone(phoneField.textField.text ?? "")
+            ? !(emailInputField.textField.text ?? "").isEmpty
+            : !account.isEmpty
         let hasInput: Bool
         switch loginMode {
         case .password:
@@ -830,19 +1420,17 @@ class LoginViewController: UIViewController {
         loginButton.alpha = enabled ? 1.0 : 0.5
     }
 
-    @objc private func switchLoginMode() {
-        if loginMode == .password {
+    private func switchLoginMode(_ index: Int) {
+        if index == 1 {
             loginMode = .code
             passwordField.isHidden = true
             codeField.isHidden = false
-            rightButton.setTitle("密码登录", for: .normal)
-            leftButton.isHidden = true
+            forgotPwdButton.isHidden = true
         } else {
             loginMode = .password
             passwordField.isHidden = false
             codeField.isHidden = true
-            rightButton.setTitle("验证码登录", for: .normal)
-            leftButton.isHidden = false
+            forgotPwdButton.isHidden = false
         }
         updateLoginButtonState()
     }
@@ -852,10 +1440,14 @@ class LoginViewController: UIViewController {
         navigationController?.pushViewController(vc, animated: true)
     }
 
+    @objc private func goRegister() {
+        navigationController?.popViewController(animated: true)
+    }
+
     // MARK: - 发送验证码
     @objc private func sendCode() {
         if isEmail {
-            let email = emailField.textField.text ?? ""
+            let email = emailInputField.textField.text ?? ""
             guard !email.isEmpty else {
                 AppUtility.showToast("请输入邮箱")
                 return
@@ -874,7 +1466,7 @@ class LoginViewController: UIViewController {
                 }
             }
         } else {
-            let phone = phoneField.textField.text ?? ""
+            let phone = account
             guard AppUtility.isValidPhone(phone) else {
                 AppUtility.showToast("请输入正确的手机号")
                 return
@@ -902,8 +1494,8 @@ class LoginViewController: UIViewController {
         loginButton.isEnabled = false
         loginButton.setTitle("登录中...", for: .normal)
 
-        let phone = phoneField.textField.text ?? ""
-        let email = emailField.textField.text ?? ""
+        let phone = account
+        let email = emailInputField.textField.text ?? ""
 
         switch loginMode {
         case .password:
@@ -1048,18 +1640,33 @@ class RegisterViewController: UIViewController {
     private let email: String?
     private let isEmail: Bool
 
-    private let tabContainer = UIView()
-    private let phoneTabButton = UIButton(type: .custom)
-    private let emailTabButton = UIButton(type: .custom)
-    private var isEmailMode: Bool
+    // 顶部区域
+    private let logoView = UIImageView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
 
-    private let phoneField = PhoneFloatingLabelField()
-    private let emailField = FloatingLabelTextField()
-    private let codeField = CodeFloatingLabelField()
-    private let passwordField = PasswordFloatingLabelField()
+    // 玻璃卡片
+    private let glassCard = GlassCardView()
 
+    // 账号显示（只读）
+    private let accountDisplayField = CapsuleDisplayField()
+
+    private let codeField = CapsuleCodeField()
+    private let passwordField = CapsulePasswordField()
+
+    // 协议勾选（卡片内底部）
+    private let agreementCheckBox = UIButton(type: .custom)
+    private let agreementLabel = UILabel()
+    private let userAgreementButton = UIButton(type: .system)
+    private let privacyPolicyButton = UIButton(type: .system)
+    private var isAgreed = false
+
+    // 注册按钮
     private let registerButton = UIButton(type: .system)
     private var isLoading = false
+
+    // 底部登录提示
+    private let loginTipLabel = UILabel()
 
     private var countdown = 0
     private var countdownTimer: Timer?
@@ -1068,7 +1675,6 @@ class RegisterViewController: UIViewController {
         self.phone = phone
         self.email = email
         self.isEmail = isEmail
-        self.isEmailMode = isEmail
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -1084,59 +1690,111 @@ class RegisterViewController: UIViewController {
     deinit { countdownTimer?.invalidate() }
 
     private func setupUI() {
-        title = "注册账号"
-        view.backgroundColor = .themeBackground
+        title = "注册"
+        view.backgroundColor = .white
 
-        // Logo
-        let logoView = UIImageView()
+        // 顶部：左Logo + 右标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
-        // 副标题
-        let subtitleLabel = UILabel()
+        titleLabel.text = "注册"
+        titleLabel.font = ScreenAdapter.mediumFont(22)
+        titleLabel.textColor = .label
+
         subtitleLabel.text = "创建您的Milo账号"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
-        subtitleLabel.textAlignment = .center
 
-        // Tab 切换
-        phoneTabButton.setTitle("手机号注册", for: .normal)
-        phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        phoneTabButton.setTitleColor(.themePrimary, for: .normal)
-        phoneTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        phoneTabButton.addTarget(self, action: #selector(switchToPhone), for: .touchUpInside)
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleLabel, subtitleLabel])
+        headerStack.axis = .vertical
+        headerStack.spacing = ScreenAdapter.scaleH(6)
+        headerStack.alignment = .leading
 
-        emailTabButton.setTitle("邮箱注册", for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        emailTabButton.setTitleColor(.themePrimary, for: .normal)
-        emailTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        emailTabButton.addTarget(self, action: #selector(switchToEmail), for: .touchUpInside)
+        let headerContainer = UIView()
+        headerContainer.addSubview(headerStack)
+        headerStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(42))
+        }
 
-        let tabStack = UIStackView(arrangedSubviews: [phoneTabButton, emailTabButton])
-        tabStack.axis = .horizontal
-        tabStack.spacing = ScreenAdapter.scaleW(32)
-        tabStack.alignment = .center
+        // 玻璃卡片
+        view.addSubview(glassCard)
 
-        // 输入框
-        phoneField.placeholder = "手机号"
-        phoneField.textField.text = phone ?? ""
-        phoneField.textField.keyboardType = .numberPad
-        phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        phoneField.isHidden = isEmail
+        // 账号显示
+        if isEmail {
+            accountDisplayField.text = email ?? ""
+        } else {
+            accountDisplayField.text = "+86 \(phone ?? "")"
+        }
+        glassCard.addSubview(accountDisplayField)
 
-        emailField.placeholder = "邮箱地址"
-        emailField.textField.text = email ?? ""
-        emailField.textField.keyboardType = .emailAddress
-        emailField.textField.autocapitalizationType = .none
-        emailField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        emailField.isHidden = !isEmail
-
-        codeField.placeholder = "验证码"
+        // 验证码输入框
+        codeField.placeholder = "请输入验证码"
         codeField.sendCodeButton.addTarget(self, action: #selector(sendCode), for: .touchUpInside)
         codeField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        glassCard.addSubview(codeField)
 
-        passwordField.placeholder = "密码(6-20位)"
+        // 密码输入框
+        passwordField.placeholder = "请设置密码(6-20位)"
         passwordField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        glassCard.addSubview(passwordField)
+
+        // 协议勾选（卡片内底部）
+        agreementCheckBox.setImage(UIImage(systemName: "circle"), for: .normal)
+        agreementCheckBox.setImage(UIImage(systemName: "checkmark.circle.fill"), for: .selected)
+        agreementCheckBox.tintColor = .themePrimary
+        agreementCheckBox.addTarget(self, action: #selector(toggleAgreement), for: .touchUpInside)
+
+        agreementLabel.text = "我已阅读并同意"
+        agreementLabel.font = ScreenAdapter.font(12)
+        agreementLabel.textColor = .secondaryLabel
+
+        userAgreementButton.setTitle("《用户协议》", for: .normal)
+        userAgreementButton.titleLabel?.font = ScreenAdapter.font(12)
+        userAgreementButton.setTitleColor(.themePrimary, for: .normal)
+        userAgreementButton.addTarget(self, action: #selector(openUserAgreement), for: .touchUpInside)
+
+        privacyPolicyButton.setTitle("《隐私政策》", for: .normal)
+        privacyPolicyButton.titleLabel?.font = ScreenAdapter.font(12)
+        privacyPolicyButton.setTitleColor(.themePrimary, for: .normal)
+        privacyPolicyButton.addTarget(self, action: #selector(openPrivacyPolicy), for: .touchUpInside)
+
+        let agreementStack = UIStackView(arrangedSubviews: [
+            agreementCheckBox, agreementLabel, userAgreementButton, privacyPolicyButton
+        ])
+        agreementStack.axis = .horizontal
+        agreementStack.spacing = ScreenAdapter.scaleW(3)
+        agreementStack.alignment = .center
+        glassCard.addSubview(agreementStack)
+
+        agreementCheckBox.snp.makeConstraints { make in
+            make.width.height.equalTo(ScreenAdapter.scaleW(16))
+        }
+
+        // 卡片内布局
+        accountDisplayField.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(24))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        codeField.snp.makeConstraints { make in
+            make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        passwordField.snp.makeConstraints { make in
+            make.top.equalTo(codeField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        agreementStack.snp.makeConstraints { make in
+            make.top.equalTo(passwordField.snp.bottom).offset(ScreenAdapter.scaleH(14))
+            make.centerX.equalToSuperview()
+            make.leading.greaterThanOrEqualToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(16))
+        }
 
         // 注册按钮
         registerButton.setTitle("注册", for: .normal)
@@ -1148,18 +1806,32 @@ class RegisterViewController: UIViewController {
         registerButton.isEnabled = false
         registerButton.addTarget(self, action: #selector(doRegister), for: .touchUpInside)
 
+        // 底部登录提示
+        loginTipLabel.text = "已有账号？去登录"
+        loginTipLabel.font = ScreenAdapter.font(14)
+        loginTipLabel.textColor = .secondaryLabel
+        loginTipLabel.textAlignment = .center
+        loginTipLabel.isUserInteractionEnabled = true
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goLogin))
+        loginTipLabel.addGestureRecognizer(tapGesture)
+
         // 整体布局
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
+        scrollView.keyboardDismissMode = .interactive
         view.addSubview(scrollView)
 
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, tabStack, phoneField, emailField, codeField, passwordField, registerButton])
+        let mainStack = UIStackView(arrangedSubviews: [
+            headerContainer, glassCard, registerButton
+        ])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
+        mainStack.alignment = .fill
         contentView.addSubview(mainStack)
+        contentView.addSubview(loginTipLabel)
 
         scrollView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -1169,21 +1841,20 @@ class RegisterViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
         }
-        logoView.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(70))
-            make.centerX.equalToSuperview()
-        }
-        tabStack.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(30))
-            make.centerX.equalToSuperview()
+        glassCard.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(280))
         }
         registerButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+        loginTipLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.centerX.equalToSuperview()
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
 
         updateRegisterButtonState()
@@ -1195,45 +1866,36 @@ class RegisterViewController: UIViewController {
     }
 
     private func updateRegisterButtonState() {
-        let hasAccount: Bool
-        if isEmailMode {
-            hasAccount = !(emailField.textField.text ?? "").isEmpty
-        } else {
-            hasAccount = AppUtility.isValidPhone(phoneField.textField.text ?? "")
-        }
+        let hasAccount = isEmail ? !(email ?? "").isEmpty : !(phone ?? "").isEmpty
         let hasCode = !(codeField.textField.text ?? "").isEmpty
         let hasPassword = (passwordField.textField.text ?? "").count >= 6
-        let enabled = hasAccount && hasCode && hasPassword && !isLoading
+        let enabled = hasAccount && hasCode && hasPassword && isAgreed && !isLoading
         registerButton.isEnabled = enabled
         registerButton.alpha = enabled ? 1.0 : 0.5
     }
 
-    @objc private func switchToPhone() {
-        isEmailMode = false
-        phoneTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        phoneTabButton.setTitleColor(.themePrimary, for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        emailTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        phoneField.isHidden = false
-        emailField.isHidden = true
+    @objc private func toggleAgreement() {
+        isAgreed.toggle()
+        agreementCheckBox.isSelected = isAgreed
         updateRegisterButtonState()
     }
 
-    @objc private func switchToEmail() {
-        isEmailMode = true
-        phoneTabButton.titleLabel?.font = ScreenAdapter.font(16)
-        phoneTabButton.setTitleColor(.secondaryLabel, for: .normal)
-        emailTabButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        emailTabButton.setTitleColor(.themePrimary, for: .normal)
-        phoneField.isHidden = true
-        emailField.isHidden = false
-        updateRegisterButtonState()
+    @objc private func openUserAgreement() {
+        AppUtility.showToast("用户协议")
+    }
+
+    @objc private func openPrivacyPolicy() {
+        AppUtility.showToast("隐私政策")
+    }
+
+    @objc private func goLogin() {
+        navigationController?.popViewController(animated: true)
     }
 
     // MARK: - 发送验证码
     @objc private func sendCode() {
-        if isEmailMode {
-            let email = emailField.textField.text ?? ""
+        if isEmail {
+            let email = email ?? ""
             guard !email.isEmpty else {
                 AppUtility.showToast("请输入邮箱")
                 return
@@ -1252,7 +1914,7 @@ class RegisterViewController: UIViewController {
                 }
             }
         } else {
-            let phone = phoneField.textField.text ?? ""
+            let phone = phone ?? ""
             guard AppUtility.isValidPhone(phone) else {
                 AppUtility.showToast("请输入正确的手机号")
                 return
@@ -1275,6 +1937,11 @@ class RegisterViewController: UIViewController {
 
     // MARK: - 注册
     @objc private func doRegister() {
+        guard isAgreed else {
+            AppUtility.showToast("请先同意用户协议和隐私政策")
+            return
+        }
+
         view.endEditing(true)
         let code = codeField.textField.text ?? ""
         let password = passwordField.textField.text ?? ""
@@ -1291,8 +1958,8 @@ class RegisterViewController: UIViewController {
         registerButton.isEnabled = false
         registerButton.setTitle("注册中...", for: .normal)
 
-        if isEmailMode {
-            let email = emailField.textField.text ?? ""
+        if isEmail {
+            let email = email ?? ""
             guard !email.isEmpty else {
                 AppUtility.showToast("请输入邮箱")
                 resetButton()
@@ -1316,7 +1983,7 @@ class RegisterViewController: UIViewController {
                 }
             }
         } else {
-            let phone = phoneField.textField.text ?? ""
+            let phone = phone ?? ""
             guard AppUtility.isValidPhone(phone) else {
                 AppUtility.showToast("请输入正确的手机号")
                 resetButton()

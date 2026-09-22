@@ -138,6 +138,15 @@ public class TSApplication extends Application {
             return null;
         });
 
+        // 注册退出登录后跳转登录页的端点
+        // exitLogin() 中会 invoke("main_show_home_view")，此端点必须注册才能正常跳转到登录页
+        EndpointManager.getInstance().setMethod("main_show_home_view", object -> {
+            Intent loginIntent = new Intent(getApplicationContext(), com.chat.login.ui.WKLoginActivity.class);
+            loginIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(loginIntent);
+            return null;
+        });
+
         // 注册前后台监听
         appFrontBackHelper = new AppFrontBackHelper();
         appFrontBackHelper.register(this, new AppFrontBackHelper.OnAppStatusListener() {

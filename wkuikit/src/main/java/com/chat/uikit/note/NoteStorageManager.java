@@ -84,6 +84,7 @@ public class NoteStorageManager {
                     note.isTop = obj.optBoolean("isTop", false);
                     note.type = obj.optInt("type", 1);
                     note.blockListJson = obj.optString("blockListJson", "");
+                    note.coverUrl = obj.optString("coverUrl", "");
                     list.add(note);
                 }
             } catch (JSONException e) {
@@ -140,6 +141,7 @@ public class NoteStorageManager {
                 obj.put("isTop", note.isTop);
                 obj.put("type", note.type);
                 obj.put("blockListJson", note.blockListJson != null ? note.blockListJson : "");
+                obj.put("coverUrl", note.coverUrl != null ? note.coverUrl : "");
                 array.put(obj);
             } catch (JSONException e) {
                 e.printStackTrace();

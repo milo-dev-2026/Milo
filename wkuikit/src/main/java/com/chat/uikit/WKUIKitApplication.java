@@ -345,6 +345,7 @@ public class WKUIKitApplication {
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.WK_MULTIPLE_FORWARD, object -> new MsgConfig(true));
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.richText, object -> new MsgConfig(true));
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.WK_FILE, object -> new MsgConfig(true));
+        EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.noteMsg, object -> new MsgConfig(true));
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKRTCType.WK_P2P_CALL, object -> new MsgConfig(true));
         // 设置聊天背景
         EndpointManager.getInstance().setMethod("set_chat_bg", object -> {

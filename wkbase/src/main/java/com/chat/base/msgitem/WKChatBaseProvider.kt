@@ -82,6 +82,7 @@ import org.telegram.ui.Components.RLottieDrawable
 import org.telegram.ui.Components.RLottieImageView
 import java.util.Objects
 import kotlin.math.abs
+import com.chat.base.utils.SpecialUserUtils
 import kotlin.math.max
 
 
@@ -519,20 +520,34 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             }
             val os = getMsgOS(uiChatMsgItemEntity.wkMsg.clientMsgNO)
             if (receivedNameTv.tag is String && receivedNameTv.tag == uiChatMsgItemEntity.wkMsg.fromUID) {
-                if (uiChatMsgItemEntity.wkMsg.type == WKContentType.typing) {
-                    receivedNameTv.text = showName
+                val fromUID = uiChatMsgItemEntity.wkMsg.fromUID
+                if ((SpecialUserUtils.isSpecialUser(fromUID) || SpecialUserUtils.isSpecialUserByName(showName)) && !TextUtils.isEmpty(showName)) {
+                    val displayName = if (uiChatMsgItemEntity.wkMsg.type == WKContentType.typing) {
+                        showName
+                    } else {
+                        String.format("%s/%s", showName, os)
+                    }
+                    SpecialUserUtils.setSpecialUserName(receivedNameTv, displayName)
                 } else {
-                    receivedNameTv.text = String.format("%s/%s", showName, os)
+                    if (uiChatMsgItemEntity.wkMsg.type == WKContentType.typing) {
+                        receivedNameTv.text = showName
+                    } else {
+                        receivedNameTv.text = String.format("%s/%s", showName, os)
+                    }
                 }
             }
 
 
             if (!TextUtils.isEmpty(uiChatMsgItemEntity.wkMsg.fromUID)) {
-                val colors =
-                    WKBaseApplication.getInstance().context.resources.getIntArray(R.array.name_colors)
-                val index =
-                    abs(uiChatMsgItemEntity.wkMsg.fromUID.hashCode()) % colors.size
-                receivedNameTv.setTextColor(colors[index])
+                if (SpecialUserUtils.isSpecialUser(uiChatMsgItemEntity.wkMsg.fromUID) || SpecialUserUtils.isSpecialUserByName(showName)) {
+                    receivedNameTv.setTextColor(Color.RED)
+                } else {
+                    val colors =
+                        WKBaseApplication.getInstance().context.resources.getIntArray(R.array.name_colors)
+                    val index =
+                        abs(uiChatMsgItemEntity.wkMsg.fromUID.hashCode()) % colors.size
+                    receivedNameTv.setTextColor(colors[index])
+                }
             }
             if (from == WKChatIteMsgFromType.RECEIVED) {
                 val showNickName = uiChatMsgItemEntity.showNickName
@@ -1044,7 +1059,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
     var scrimPopupWindow: ActionBarPopupWindow? = null
 
-    protected fun getPopupList(mMsg: WKMsg): List<PopupMenuItem> {
+    protected open fun getPopupList(mMsg: WKMsg): List<PopupMenuItem> {
         var isRegisterMsgPrivacyModule = false
         val obj = EndpointManager.getInstance().invoke("is_register_msg_privacy_module", null)
         if (obj != null && obj is PrivacyMessageMenu) {

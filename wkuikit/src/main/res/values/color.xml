@@ -16,4 +16,6 @@
     <color name="lineViewColor_528FFA">#FF528FFA</color>
     <color name="textuser">#FF333333</color>
     <color name="colorGroupOwner">#FFFFB940</color>
+    <color name="text1Color">#FF333333</color>
+    <color name="gray">#FF999999</color>
 </resources>

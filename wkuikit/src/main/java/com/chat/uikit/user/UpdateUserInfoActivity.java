@@ -22,6 +22,7 @@ import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.Objects;
+import java.util.UUID;
 
 public class UpdateUserInfoActivity extends WKBaseActivity<ActUpdateUserInfoLayoutBinding> {
     private String oldStr;
@@ -80,8 +81,10 @@ public class UpdateUserInfoActivity extends WKBaseActivity<ActUpdateUserInfoLayo
                 WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
                 if (channel != null && updateType == 1) {
                     channel.channelName = userInfoEntity.name;
+                    channel.avatarCacheKey = UUID.randomUUID().toString().replace("-", "");
                     WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
                 }
+                WKIM.getInstance().getChannelManager().fetchChannelInfo(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
                 WKConfig.getInstance().saveUserInfo(userInfoEntity);
                 Intent intent = new Intent();
                 intent.putExtra("updateType", updateType);

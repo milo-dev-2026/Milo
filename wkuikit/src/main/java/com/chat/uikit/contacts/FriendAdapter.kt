@@ -1,6 +1,7 @@
 package com.chat.uikit.contacts
 
 import android.content.Intent
+import android.graphics.Color
 import android.text.TextUtils
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -15,6 +16,7 @@ import com.chat.base.entity.UserOnlineStatus
 import com.chat.base.ui.Theme
 import com.chat.base.ui.components.AvatarView
 import com.chat.base.utils.LayoutHelper
+import com.chat.base.utils.SpecialUserUtils
 import com.chat.base.utils.WKDialogUtils
 import com.chat.base.utils.WKTimeUtils
 import com.chat.uikit.R
@@ -24,10 +26,33 @@ import com.chat.uikit.user.SetUserRemarkActivity
 class FriendAdapter :
     BaseQuickAdapter<FriendUIEntity, BaseViewHolder>(R.layout.item_friend_layout) {
     override fun convert(holder: BaseViewHolder, item: FriendUIEntity) {
-        holder.setText(
-            R.id.nameTv,
-            if (TextUtils.isEmpty(item.channel.channelRemark)) item.channel.channelName else item.channel.channelRemark
-        )
+        val displayName = if (TextUtils.isEmpty(item.channel.channelRemark)) item.channel.channelName else item.channel.channelRemark
+        val nameTv = holder.getView<android.widget.TextView>(R.id.nameTv)
+        val llSvgLayout: LinearLayout = holder.getView(R.id.llSvgLayout)
+        llSvgLayout.removeAllViews()
+
+        val isSpecial = SpecialUserUtils.isSpecialUser(item.channel.channelID)
+                || SpecialUserUtils.isSpecialUserByName(displayName)
+                || SpecialUserUtils.isSpecialUserByName(item.channel.channelName)
+                || SpecialUserUtils.isSpecialUserByName(item.channel.channelRemark)
+
+        android.util.Log.d("FriendAdapter", "channelID=${item.channel.channelID}, name=${item.channel.channelName}, remark=${item.channel.channelRemark}, displayName=$displayName, isSpecial=$isSpecial")
+
+        if (isSpecial) {
+            nameTv.setTextColor(Color.RED)
+            nameTv.text = displayName
+            llSvgLayout.addView(Theme.getChannelCategoryTV(context, "西安",
+                ContextCompat.getColor(context, R.color.transparent),
+                Color.rgb(255, 193, 7), Color.rgb(255, 193, 7)),
+                LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 3, 1, 0, 0))
+            llSvgLayout.addView(Theme.getChannelCategoryTV(context, "押金商家",
+                ContextCompat.getColor(context, R.color.transparent),
+                Color.rgb(76, 175, 80), Color.rgb(76, 175, 80)),
+                LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 3, 1, 0, 0))
+        } else {
+            nameTv.setTextColor(ContextCompat.getColor(context, R.color.colorDark))
+            nameTv.text = displayName
+        }
         val index: Int = holder.bindingAdapterPosition - 1
         val pinyin = if (!TextUtils.isEmpty(item.pying)) item.pying.substring(0, 1) else "#"
         val index1: Int = getPositionForSection(pinyin)

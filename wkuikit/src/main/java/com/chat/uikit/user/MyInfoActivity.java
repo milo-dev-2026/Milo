@@ -91,7 +91,16 @@ public class MyInfoActivity extends WKBaseActivity<ActMyInfoLayoutBinding> {
                 if (shortNoObject != null) {
                     String shortNo = (String) shortNoObject;
                     wkVBinding.identityTv.setText(shortNo);
-                    wkVBinding.nameTv.setText(entity.name);
+                    String myUid = WKConfig.getInstance().getUid();
+                    boolean isSpecial = com.chat.base.utils.SpecialUserUtils.isSpecialUser(myUid) || com.chat.base.utils.SpecialUserUtils.isSpecialUserByShortNo(shortNo) || (entity.name != null && com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(entity.name));
+                    if (isSpecial && entity.name != null) {
+                        wkVBinding.nameTv.setTextColor(android.graphics.Color.RED);
+                        wkVBinding.nameTv.setText(entity.name);
+                        com.chat.base.utils.SpecialUserUtils.setSpecialUserBadges(wkVBinding.specialBadgeLayout, 12f);
+                    } else {
+                        wkVBinding.nameTv.setText(entity.name);
+                        wkVBinding.specialBadgeLayout.setVisibility(android.view.View.GONE);
+                    }
                     if (!TextUtils.isEmpty(shortNo)) {
                         UserInfoEntity userInfoEntity = WKConfig.getInstance().getUserInfo();
                         if (userInfoEntity != null && TextUtils.isEmpty(userInfoEntity.short_no)) {
@@ -150,7 +159,12 @@ public class MyInfoActivity extends WKBaseActivity<ActMyInfoLayoutBinding> {
             String resultStr = result.getData().getStringExtra("result");
             int updateType = result.getData().getIntExtra("updateType", 1);
             if (updateType == 1) {
-                wkVBinding.nameTv.setText(resultStr);
+                String myUid = WKConfig.getInstance().getUid();
+                if (com.chat.base.utils.SpecialUserUtils.isSpecialUser(myUid) || com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(resultStr)) {
+                    com.chat.base.utils.SpecialUserUtils.setSpecialUserName(wkVBinding.nameTv, resultStr);
+                } else {
+                    wkVBinding.nameTv.setText(resultStr);
+                }
                 WKConfig.getInstance().setUserName(resultStr);
             } else if (updateType == 2) {
                 wkVBinding.identityTv.setText(resultStr);

@@ -178,11 +178,11 @@ public class UserDetailActivity extends WKBaseActivity<ActUserDetailLayoutBindin
         wkVBinding.refreshLayout.setEnableOverScrollDrag(true);
         wkVBinding.refreshLayout.setEnableLoadMore(false);
         wkVBinding.refreshLayout.setEnableRefresh(false);
-        // 隐藏朋友圈、投诉、更多信息
+        // 隐藏朋友圈、更多信息（投诉入口保留可见）
         wkVBinding.publishCircleMomentLayout.setVisibility(View.GONE);
         wkVBinding.reviewCircleMomentLayout.setVisibility(View.GONE);
         wkVBinding.reviewCircleManagementLayout.setVisibility(View.GONE);
-        wkVBinding.complaintLayout.setVisibility(View.GONE);
+        wkVBinding.complaintLayout.setVisibility(View.VISIBLE);
         wkVBinding.layoutcircleInformation.setVisibility(View.GONE);
         wkVBinding.otherLayout.removeAllViews();
         List<View> list = EndpointManager.getInstance().invokes(EndpointCategory.wkUserDetailView, new UserDetailViewMenu(this, wkVBinding.otherLayout, uid, groupID));
@@ -323,6 +323,13 @@ public class UserDetailActivity extends WKBaseActivity<ActUserDetailLayoutBindin
             chooseResultLac.launch(intent);
         });
         wkVBinding.avatarView.setOnClickListener(v -> showImg());
+
+        wkVBinding.complaintLayout.setOnClickListener(v -> {
+            Intent intent = new Intent(UserDetailActivity.this, ComplaintActivity.class);
+            intent.putExtra("uid", uid);
+            intent.putExtra("name", wkVBinding.nameTv.getText().toString());
+            startActivity(intent);
+        });
     }
 
     private void showCopy(View view, float[] coordinate, String content) {
@@ -351,12 +358,30 @@ public class UserDetailActivity extends WKBaseActivity<ActUserDetailLayoutBindin
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL);
         if (uid.equals(WKConfig.getInstance().getUid())) hideTitleRightView();
         if (userChannel != null) {
+            boolean isSpecial = com.chat.base.utils.SpecialUserUtils.isSpecialUser(uid) || com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(userChannel.channelName);
+            if (isSpecial) {
+                com.chat.base.utils.SpecialUserUtils.setSpecialUserBadges(wkVBinding.specialBadgeLayout, 12f);
+            } else {
+                wkVBinding.specialBadgeLayout.setVisibility(View.GONE);
+            }
             if (!TextUtils.isEmpty(userChannel.channelRemark)) {
                 wkVBinding.nickNameLayout.setVisibility(View.VISIBLE);
-                wkVBinding.nickNameTv.setText(userChannel.channelName);
-                wkVBinding.nameTv.setText(userChannel.channelRemark);
+                if (isSpecial) {
+                    wkVBinding.nickNameTv.setTextColor(android.graphics.Color.RED);
+                    wkVBinding.nickNameTv.setText(userChannel.channelName);
+                    wkVBinding.nameTv.setTextColor(android.graphics.Color.RED);
+                    wkVBinding.nameTv.setText(userChannel.channelRemark);
+                } else {
+                    wkVBinding.nickNameTv.setText(userChannel.channelName);
+                    wkVBinding.nameTv.setText(userChannel.channelRemark);
+                }
             } else {
-                wkVBinding.nameTv.setText(userChannel.channelName);
+                if (isSpecial) {
+                    wkVBinding.nameTv.setTextColor(android.graphics.Color.RED);
+                    wkVBinding.nameTv.setText(userChannel.channelName);
+                } else {
+                    wkVBinding.nameTv.setText(userChannel.channelName);
+                }
                 wkVBinding.nickNameLayout.setVisibility(View.GONE);
             }
         } else {
@@ -375,14 +400,52 @@ public class UserDetailActivity extends WKBaseActivity<ActUserDetailLayoutBindin
                     if (!TextUtils.isEmpty(userInfo.vercode)) {
                         vercode = userInfo.vercode;
                     }
-                    wkVBinding.nameTv.setText(TextUtils.isEmpty(userInfo.remark) ? userInfo.name : userInfo.remark);
-                    wkVBinding.nickNameTv.setText(userInfo.name);
+                    WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
+                    if (channel != null) {
+                        boolean needUpdate = false;
+                        if (!TextUtils.isEmpty(userInfo.name) && !userInfo.name.equals(channel.channelName)) {
+                            channel.channelName = userInfo.name;
+                            needUpdate = true;
+                        }
+                        if (needUpdate) {
+                            WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+                        }
+                    }
+                    String displayName = TextUtils.isEmpty(userInfo.remark) ? userInfo.name : userInfo.remark;
+                    boolean isSpecial = com.chat.base.utils.SpecialUserUtils.isSpecialUser(uid) || com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(displayName) || com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(userInfo.name);
+                    if (isSpecial) {
+                        com.chat.base.utils.SpecialUserUtils.setSpecialUserBadges(wkVBinding.specialBadgeLayout, 12f);
+                        wkVBinding.nameTv.setTextColor(android.graphics.Color.RED);
+                        wkVBinding.nameTv.setText(displayName);
+                        wkVBinding.nickNameTv.setTextColor(android.graphics.Color.RED);
+                        wkVBinding.nickNameTv.setText(userInfo.name);
+                    } else {
+                        wkVBinding.specialBadgeLayout.setVisibility(View.GONE);
+                        wkVBinding.nameTv.setText(displayName);
+                        wkVBinding.nickNameTv.setText(userInfo.name);
+                    }
                     wkVBinding.nickNameLayout.setVisibility(TextUtils.isEmpty(userInfo.remark) ? View.GONE : View.VISIBLE);
                     if (TextUtils.isEmpty(userInfo.short_no)) {
                         wkVBinding.identityLayout.setVisibility(View.GONE);
                     } else {
                         wkVBinding.identityLayout.setVisibility(View.VISIBLE);
                         wkVBinding.appIdNumTv.setText(userInfo.short_no);
+                    }
+                    // 显示个性签名（优先从userInfo.sign，其次从channel extra）
+                    String signature = userInfo.sign;
+                    if (TextUtils.isEmpty(signature) && channel != null && channel.remoteExtraMap != null) {
+                        Object sigObj = channel.remoteExtraMap.get("signature");
+                        if (sigObj != null) {
+                            signature = String.valueOf(sigObj);
+                        }
+                    }
+                    if (!TextUtils.isEmpty(signature)) {
+                        wkVBinding.personalSignatureLL.setVisibility(View.VISIBLE);
+                        wkVBinding.personalSignatureTv.setText(signature);
+                        wkVBinding.personalSignatureV.setVisibility(View.VISIBLE);
+                    } else {
+                        wkVBinding.personalSignatureLL.setVisibility(View.GONE);
+                        wkVBinding.personalSignatureV.setVisibility(View.GONE);
                     }
                     if (!TextUtils.isEmpty(userInfo.source_desc)) {
                         wkVBinding.sourceFromTv.setText(userInfo.source_desc);

@@ -15,6 +15,7 @@ public class NoteEntity {
     public boolean isTop;
     public int type; // 1: text, 2: image, 3: video, 4: location
     public String blockListJson; // 笔记块列表的 JSON 序列化数据（完整块结构）
+    public String coverUrl; // 笔记封面图URL
 
     public NoteEntity() {
     }

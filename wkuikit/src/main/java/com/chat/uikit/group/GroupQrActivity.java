@@ -149,8 +149,7 @@ public class GroupQrActivity extends WKBaseActivity<ActGroupQrLayoutBinding> imp
             } else {
                 wkVBinding.qrIv.setImageResource(R.mipmap.icon_no_qr);
             }
-            String content = String.format(getString(R.string.group_qr_desc), day, expire);
-            wkVBinding.qrTv.setText(content);
+            wkVBinding.qrTv.setText("该二维码永久有效");
         }
     }
 

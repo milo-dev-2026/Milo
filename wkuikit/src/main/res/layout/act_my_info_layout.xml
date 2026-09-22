@@ -66,6 +66,14 @@
                         <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv"/>
                     </LinearLayout>
                     <LinearLayout
+                        android:id="@+id/specialBadgeLayout"
+                        android:orientation="horizontal"
+                        android:visibility="gone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginStart="15dp"/>
+                    <LinearLayout
                         android:id="@+id/identityLayout"
                         style="@style/layoutBg">
                         <TextView

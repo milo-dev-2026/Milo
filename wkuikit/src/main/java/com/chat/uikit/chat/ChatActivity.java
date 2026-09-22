@@ -1532,7 +1532,25 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         } else {
             showName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
         }
-        wkVBinding.topLayout.titleCenterTv.setText(showName);
+        // 特殊用户：红色昵称 + 标志在名字下方
+        boolean isSpecial = channelType == WKChannelType.PERSONAL
+                && com.chat.base.utils.SpecialUserUtils.isSpecialUser(channelId);
+        // 特定群聊：红棕色名字
+        boolean isSpecialGroup = channelType == WKChannelType.GROUP
+                && (showName.contains("西安修车车友交流2群") || showName.contains("西安修车大队"));
+        if (isSpecial || com.chat.base.utils.SpecialUserUtils.isSpecialUserByName(showName)) {
+            wkVBinding.topLayout.titleCenterTv.setTextColor(android.graphics.Color.RED);
+            wkVBinding.topLayout.titleCenterTv.setText(showName);
+            com.chat.base.utils.SpecialUserUtils.setSpecialUserBadges(wkVBinding.topLayout.specialBadgeLayout, 12f);
+        } else if (isSpecialGroup) {
+            wkVBinding.topLayout.titleCenterTv.setTextColor(android.graphics.Color.rgb(139, 69, 19));
+            wkVBinding.topLayout.titleCenterTv.setText(showName);
+            wkVBinding.topLayout.specialBadgeLayout.setVisibility(View.GONE);
+        } else {
+            wkVBinding.topLayout.titleCenterTv.setTextColor(ContextCompat.getColor(this, R.color.colorDark));
+            wkVBinding.topLayout.titleCenterTv.setText(showName);
+            wkVBinding.topLayout.specialBadgeLayout.setVisibility(View.GONE);
+        }
     }
 
     private void removeMsg(WKMsg msg) {

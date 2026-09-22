@@ -45,9 +45,9 @@
         <activity android:name=".user.UserQrActivity" />
         <activity android:name=".user.MyHeadPortraitActivity" />
         <activity android:name=".setting.MsgNoticesSettingActivity" />
-        <activity
-            android:name=".user.UserDetailActivity"
+        <activity android:name=".user.UserDetailActivity"
             android:launchMode="singleTask" />
+        <activity android:name=".user.ComplaintActivity" />
         <activity android:name=".user.UpdateUserInfoActivity" />
         <activity android:name=".user.PersonalSignatureActivity" />
         <activity android:name=".user.SetUserRemarkActivity" />

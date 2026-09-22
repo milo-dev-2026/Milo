@@ -148,6 +148,32 @@ public class GroupModel extends WKBaseModel {
 
 
     /**
+     * 通过群二维码加入群聊
+     *
+     * @param groupNo         群编号
+     * @param iCommonListener 返回
+     */
+    public void joinGroupByQr(String groupNo, final ICommonListener iCommonListener) {
+        String uid = WKConfig.getInstance().getUid();
+        String name = WKConfig.getInstance().getUserInfo() != null ? WKConfig.getInstance().getUserInfo().name : "";
+        List<String> ids = new ArrayList<>();
+        ids.add(uid);
+        List<String> names = new ArrayList<>();
+        names.add(name);
+        addGroupMembers(groupNo, ids, names, (code, msg) -> {
+            if (code == HttpResponseCode.success) {
+                // 加入成功后，同步群成员信息和频道信息
+                groupMembersSync(groupNo, null);
+                WKCommonModel.getInstance().getChannel(groupNo, WKChannelType.GROUP, null);
+            }
+            if (iCommonListener != null) {
+                iCommonListener.onResult(code, msg);
+            }
+        });
+    }
+
+
+    /**
      * 获取群详情
      *
      * @param groupNo     群编号
