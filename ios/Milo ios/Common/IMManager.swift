@@ -26,10 +26,10 @@ class IMManager: NSObject {
         options.port = 5100
         options.apiURL = APIConfig.apiBaseURL
 
-        WKSDK.shared.setup(options: options)
+        WKSDK.shared().setup(options: options)
 
-        WKSDK.shared.chatManager.addDelegate(self)
-        WKSDK.shared.connectionManager.addDelegate(self)
+        WKSDK.shared().chatManager.addDelegate(self)
+        WKSDK.shared().connectionManager.addDelegate(self)
     }
 
     // MARK: - 连接
@@ -42,25 +42,27 @@ class IMManager: NSObject {
 
         setupSDK()
 
-        WKSDK.shared.options.connectInfoCallback = {
+        WKSDK.shared().options.connectInfoCallback = {
             let info = WKConnectInfo()
             info.uid = uid
             info.token = imToken
             return info
         }
 
-        WKSDK.shared.connectionManager.connect()
+        WKSDK.shared().connectionManager.connect()
     }
 
     func disconnect() {
-        WKSDK.shared.connectionManager.disconnect(false)
+        WKSDK.shared().connectionManager.disconnect(false)
     }
 
     // MARK: - 发送消息
     func sendTextMessage(channelId: String, content: String) {
-        let channel = WKChannel(channelId: channelId, channelType: .person)
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = WKChannelType.person.rawValue
         let textContent = WKTextContent(content: content)
-        WKSDK.shared.chatManager.sendMessage(textContent, channel: channel)
+        WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
 }
 
@@ -72,8 +74,8 @@ extension IMManager: WKChatManagerDelegate {
         let textContent = wkMsg.content as? WKTextContent
         let msg = Message(
             messageID: String(wkMsg.messageId),
-            channelID: wkMsg.channel?.channelId ?? "",
-            channelType: wkMsg.channel?.channelType.rawValue ?? 1,
+            channelID: wkMsg.channel.channelId ?? "",
+            channelType: Int(wkMsg.channel.channelType),
             fromUID: wkMsg.fromUid ?? "",
             content: textContent?.content ?? "",
             type: .text,
@@ -95,15 +97,15 @@ extension IMManager: WKConnectionManagerDelegate {
 
     func onConnectStatus(_ status: WKConnectStatus, reasonCode: WKReason) {
         DispatchQueue.main.async {
-            switch status {
-            case .connected:
+            switch status.rawValue {
+            case 3: // WKConnected
                 print("IM连接成功")
                 self.onConnectionChanged?(true)
-            case .disconnected:
+            case 4: // WKDisconnected
                 print("IM断开")
                 self.onConnectionChanged?(false)
-            case .connectFail:
-                print("IM连接失败")
+            case 0: // WKNoConnect
+                print("IM未连接")
                 self.onConnectionChanged?(false)
             default:
                 break
