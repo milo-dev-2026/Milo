@@ -11,7 +11,10 @@ target 'Milo' do
   # 腾讯实时音视频 TRTC
   pod 'TXLiteAVSDK_TRTC'
 
-  # WebSocket (IM连接)
+  # WuKongIM SDK (IM连接、消息同步)
+  pod 'WuKongIMSDK'
+
+  # WebSocket (备用)
   pod 'Starscream', '~> 4.0'
 
   # 刷新控件

@@ -11,7 +11,7 @@ struct APIConfig {
 
     // MARK: - 1. 服务器地址
     static let apiBaseURL = "http://43.133.39.170:8090"
-    static let imSocketURL = "ws://43.133.39.170:8090"
+    static let imSocketURL = "ws://43.133.39.170:5200"
     static let pushServiceURL = "http://43.133.39.170:5002"
     static let smsServiceURL = "http://43.133.39.170:5001"
 

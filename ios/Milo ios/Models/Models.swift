@@ -238,6 +238,7 @@ struct APIResponse<T: Codable>: Codable {
 struct LoginResponse: Codable {
     var uid: String?
     var token: String?
+    var im_token: String?
     var short_no: String?
     var phone: String?
     var zone: String?

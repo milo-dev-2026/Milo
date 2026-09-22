@@ -26,6 +26,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         } else {
             let vc = MainTabBarController()
             mainWindow.rootViewController = vc
+            // 冷启动时初始化IM连接
+            DispatchQueue.global(qos: .userInitiated).async {
+                IMManager.shared.connect()
+            }
         }
         mainWindow.makeKeyAndVisible()
 
@@ -144,6 +148,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        let authToken = UserDefaults.standard.string(forKey: "token") ?? ""
+        if !authToken.isEmpty {
+            request.setValue(authToken, forHTTPHeaderField: "token")
+        }
         let body: [String: Any] = [
             "uid": uid,
             "device_token": token,

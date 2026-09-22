@@ -974,6 +974,8 @@ class LoginViewController: UIViewController {
 
         UserDefaults.standard.set(uid, forKey: "uid")
         UserDefaults.standard.set(token, forKey: "token")
+        let imToken = resp.im_token ?? token
+        UserDefaults.standard.set(imToken, forKey: "im_token")
         if let phone = resp.phone { UserDefaults.standard.set(phone, forKey: "phone") }
         if let email = resp.email { UserDefaults.standard.set(email, forKey: "email") }
         if let shortNo = resp.short_no { UserDefaults.standard.set(shortNo, forKey: "short_no") }
@@ -1304,6 +1306,8 @@ class RegisterViewController: UIViewController {
 
         UserDefaults.standard.set(uid, forKey: "uid")
         UserDefaults.standard.set(token, forKey: "token")
+        let imToken = resp.im_token ?? token
+        UserDefaults.standard.set(imToken, forKey: "im_token")
         if !phone.isEmpty { UserDefaults.standard.set(phone, forKey: "phone") }
         if !email.isEmpty { UserDefaults.standard.set(email, forKey: "email") }
         if let shortNo = resp.short_no { UserDefaults.standard.set(shortNo, forKey: "short_no") }

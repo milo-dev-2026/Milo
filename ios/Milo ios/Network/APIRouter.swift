@@ -95,7 +95,7 @@ enum APIRouter: URLRequestConvertible {
 
         let token = UserDefaults.standard.string(forKey: "token") ?? ""
         if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(token, forHTTPHeaderField: "token")
         }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -444,7 +444,7 @@ class APIClient {
         request.httpMethod = "POST"
         let token = UserDefaults.standard.string(forKey: "token") ?? ""
         if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(token, forHTTPHeaderField: "token")
         }
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
