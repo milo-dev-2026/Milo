@@ -401,7 +401,7 @@ enum APIRouter: URLRequestConvertible {
 // MARK: - Session
 class APIClient {
     static let shared = APIClient()
-    private let session: Session
+    let session: Session
     private let decoder: JSONDecoder
 
     private init() {
