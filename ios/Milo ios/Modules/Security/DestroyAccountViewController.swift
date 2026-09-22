@@ -202,7 +202,7 @@ class InputDestroyCodeViewController: UIViewController {
                         AppUtility.showToast("账号已注销")
                         IMManager.shared.disconnect()
                         LocalStore.shared.clearAll()
-                        let loginVC = LoginViewController()
+                        let loginVC = EntryLoginViewController()
                         self.view.window?.rootViewController = BaseNavigationController(rootViewController: loginVC)
                     } else {
                         AppUtility.showToast(resp["msg"] as? String ?? "注销失败")

@@ -3,11 +3,15 @@ import Alamofire
 
 enum APIRouter: URLRequestConvertible {
 
-    case login(phone: String, code: String)
-    case loginWithEmail(email: String, code: String)
-    case register(phone: String, code: String, name: String)
+    case login(username: String, password: String, device: [String: Any]?)
+    case register(zone: String, phone: String, code: String, password: String)
     case sendSMSCode(phone: String)
     case sendEmailCode(email: String)
+    case isRegister(phone: String?, email: String?)
+    case sendForgetSMSCode(phone: String)
+    case sendForgetEmailCode(email: String)
+    case resetPasswordByPhone(phone: String, code: String, password: String)
+    case resetPasswordByEmail(email: String, code: String, password: String)
     case sendLoginAuthCode(uid: String)
     case checkLoginAuth(uid: String, code: String)
     case searchGroupMembers(keyword: String, groupId: String)
@@ -96,12 +100,27 @@ enum APIRouter: URLRequestConvertible {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         switch self {
-        case let .login(phone, code):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["phone": phone, "code": code])
-        case let .register(phone, code, name):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["phone": phone, "code": code, "name": name])
+        case let .login(username, password, device):
+            var body: [String: Any] = ["username": username, "password": password]
+            if let device = device { body["device"] = device }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        case let .register(zone, phone, code, password):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["zone": zone, "phone": phone, "code": code, "password": password])
         case let .sendSMSCode(phone):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["phone": phone])
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["zone": "0086", "phone": phone])
+        case let .isRegister(phone, email):
+            var body: [String: Any] = ["zone": "0086"]
+            if let phone = phone { body["phone"] = phone }
+            if let email = email { body["email"] = email }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        case let .sendForgetSMSCode(phone):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["zone": "0086", "phone": phone])
+        case let .sendForgetEmailCode(email):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email])
+        case let .resetPasswordByPhone(phone, code, password):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["zone": "0086", "phone": phone, "code": code, "pwd": password])
+        case let .resetPasswordByEmail(email, code, password):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "code": code, "pwd": password])
         case let .getMessages(channelId, startMessageId, limit):
             let params: [String: Any] = [
                 "channel_id": channelId,
@@ -123,8 +142,6 @@ enum APIRouter: URLRequestConvertible {
             ])
         case let .deleteMessage(messageId):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["message_id": messageId])
-        case let .loginWithEmail(email, code):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "code": code])
         case let .sendEmailCode(email):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email])
         case let .sendLoginAuthCode(uid):
@@ -276,10 +293,14 @@ enum APIRouter: URLRequestConvertible {
     private var path: String {
         switch self {
         case .login: return "/v1/user/login"
-        case .loginWithEmail: return "/v1/user/login/email"
         case .register: return "/v1/user/register"
-        case .sendSMSCode: return "/v1/user/sms/code"
-        case .sendEmailCode: return "/v1/user/email/code"
+        case .sendSMSCode: return "/v1/user/sms/registercode"
+        case .sendEmailCode: return "/v1/user/email/registercode"
+        case .isRegister: return "/v1/user/isregister"
+        case .sendForgetSMSCode: return "/v1/user/sms/forgetpwd"
+        case .sendForgetEmailCode: return "/v1/user/email/forgetpwd"
+        case .resetPasswordByPhone: return "/v1/user/pwdforget"
+        case .resetPasswordByEmail: return "/v1/user/email/pwdforget"
         case .sendLoginAuthCode: return "/v1/user/login_auth/sendcode"
         case .checkLoginAuth: return "/v1/user/login_auth/check"
         case .searchGroupMembers: return "/v1/groups/members/search"
@@ -392,8 +413,24 @@ class APIClient {
     }
 
     func request<T: Decodable>(_ router: APIRouter) async throws -> T {
-        let response = try await session.request(router).serializingDecodable(T.self, decoder: decoder).value
-        return response
+        let response = await session.request(router).serializingData().response
+        if let statusCode = response.response?.statusCode, !(200...299).contains(statusCode) {
+            // 尝试解析错误体
+            if let data = response.data {
+                if let errorResp = try? JSONDecoder().decode(MessageResponse.self, from: data) {
+                    throw APIError.serverError(message: errorResp.msg ?? "未知错误", code: statusCode)
+                }
+            }
+            throw APIError.serverError(message: "请求失败(\(statusCode))", code: statusCode)
+        }
+        guard let data = response.data else {
+            throw APIError.noData
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw APIError.decodingError(error)
+        }
     }
 
     func requestRaw(_ router: APIRouter) async throws -> [String: Any] {
@@ -427,4 +464,47 @@ class APIClient {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         return body
     }
+}
+
+// MARK: - API错误
+enum APIError: Error {
+    case serverError(message: String, code: Int)
+    case noData
+    case decodingError(Error)
+
+    var localizedDescription: String {
+        switch self {
+        case let .serverError(message, _):
+            return message
+        case .noData:
+            return "无响应数据"
+        case .decodingError:
+            return "数据解析失败"
+        }
+    }
+}
+
+// MARK: - 验证码发送响应
+struct SendCodeResponse: Codable {
+    var exist: Int  // 0=未注册, 1=已注册
+}
+
+// MARK: - 检查注册响应（同 SendCodeResponse 结构）
+
+// MARK: - 忘记密码-手机发送响应
+struct ForgetSMSResponse: Codable {
+    var status: Int?
+    var msg: String?
+}
+
+// MARK: - 重置密码响应
+struct ResetPasswordResponse: Codable {
+    var status: Int?
+    var msg: String?
+}
+
+// MARK: - 通用消息响应（用于错误处理）
+struct MessageResponse: Codable {
+    var status: Int?
+    var msg: String?
 }

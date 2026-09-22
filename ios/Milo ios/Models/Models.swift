@@ -236,10 +236,12 @@ struct APIResponse<T: Codable>: Codable {
 
 // MARK: - 登录响应
 struct LoginResponse: Codable {
-    var uid: String
-    var token: String
-    var name: String?
-    var avatar: String?
+    var uid: String?
+    var token: String?
+    var short_no: String?
+    var phone: String?
+    var zone: String?
+    var email: String?
 }
 
 // MARK: - TRTC UserSig 响应

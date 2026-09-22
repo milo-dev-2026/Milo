@@ -21,7 +21,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // 2. 设置根控制器并立即显示
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         if uid.isEmpty {
-            let vc = LoginViewController()
+            let vc = EntryLoginViewController()
             mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
         } else {
             let vc = MainTabBarController()

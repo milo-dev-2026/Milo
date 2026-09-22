@@ -30,7 +30,7 @@ class MySettingViewController: UIViewController {
         // 头部视图
         headerView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(100))
         headerView.onTap = { [weak self] in
-            self?.navigationController?.pushViewController(ProfileEditViewController(), animated: true)
+            self?.navigationController?.pushViewController(SettingProfileEditViewController(), animated: true)
         }
         headerView.onTapQR = { [weak self] in
             let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
@@ -212,7 +212,7 @@ class MyProfileHeaderView: UIView {
 }
 
 // MARK: - 个人资料编辑页
-class ProfileEditViewController: UIViewController {
+class SettingProfileEditViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var user: User?
@@ -323,7 +323,7 @@ class ProfileEditViewController: UIViewController {
     }
 }
 
-extension ProfileEditViewController: UITableViewDataSource, UITableViewDelegate {
+extension SettingProfileEditViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
         return 1
@@ -375,7 +375,7 @@ extension ProfileEditViewController: UITableViewDataSource, UITableViewDelegate 
     }
 }
 
-extension ProfileEditViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+extension SettingProfileEditViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         picker.dismiss(animated: true)

@@ -177,7 +177,7 @@ class LoginPasswordViewController: UIViewController {
     private func exitLogin() {
         IMManager.shared.disconnect()
         LocalStore.shared.clearAll()
-        let loginVC = LoginViewController()
+        let loginVC = EntryLoginViewController()
         view.window?.rootViewController = BaseNavigationController(rootViewController: loginVC)
     }
 }
