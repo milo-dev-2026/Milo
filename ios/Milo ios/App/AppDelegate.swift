@@ -26,9 +26,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         } else {
             let vc = MainTabBarController()
             mainWindow.rootViewController = vc
-            // 冷启动时初始化IM连接
             DispatchQueue.global(qos: .userInitiated).async {
                 IMManager.shared.connect()
+                DataSyncManager.shared.syncAll()
             }
         }
         mainWindow.makeKeyAndVisible()

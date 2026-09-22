@@ -121,19 +121,37 @@ class ConversationListViewController: UIViewController {
     private func loadData() {
         Task {
             do {
-                let response: APIResponse<[Conversation]> = try await APIClient.shared.request(.getConversationList)
-                if let data = response.data {
-                    conversations = data
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.tableView.mj_header?.endRefreshing()
-                    }
+                let wkConversations: [WKConversation] = try await APIClient.shared.requestFlexible(.syncConversations)
+                conversations = wkConversations.map { Conversation(from: $0) }
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.tableView.mj_header?.endRefreshing()
                 }
+                self.fetchChannelInfoForConversations()
             } catch {
                 DispatchQueue.main.async {
                     AppUtility.showToast("加载失败")
                     self.tableView.mj_header?.endRefreshing()
                 }
+            }
+        }
+    }
+
+    private func fetchChannelInfoForConversations() {
+        for (index, conv) in conversations.enumerated() {
+            Task {
+                do {
+                    let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                        .getChannelInfo(channelId: conv.channelID, channelType: conv.channelType)
+                    )
+                    DispatchQueue.main.async {
+                        if index < self.conversations.count {
+                            self.conversations[index].name = channelInfo.displayName
+                            self.conversations[index].avatar = channelInfo.logo ?? channelInfo.avatar
+                            self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+                        }
+                    }
+                } catch { }
             }
         }
     }
@@ -165,7 +183,7 @@ extension ConversationListViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let conversation = conversations[indexPath.row]
-        let chatVC = ChatViewController(channelId: conversation.channelID, title: conversation.name)
+        let chatVC = ChatViewController(channelId: conversation.channelID, title: conversation.name, channelType: conversation.channelType)
         navigationController?.pushViewController(chatVC, animated: true)
     }
 

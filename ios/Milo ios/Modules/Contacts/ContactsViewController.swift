@@ -110,16 +110,16 @@ class ContactsViewController: UIViewController {
     private func loadData() {
         Task {
             do {
-                let response: APIResponse<[User]> = try await APIClient.shared.request(.getContacts)
-                if let data = response.data {
-                    contacts = data.sorted { $0.name < $1.name }
-                    filteredContacts = contacts
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                    }
+                let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
+                contacts = friends.map { $0.toUser() }.sorted { $0.name < $1.name }
+                filteredContacts = contacts
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
                 }
             } catch {
-                AppUtility.showToast("加载通讯录失败")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("加载通讯录失败")
+                }
             }
         }
     }

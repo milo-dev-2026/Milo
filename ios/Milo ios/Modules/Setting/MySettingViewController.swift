@@ -49,13 +49,29 @@ class MySettingViewController: UIViewController {
         guard let uid = UserDefaults.standard.string(forKey: "uid") else { return }
         Task {
             do {
-                let response: APIResponse<User> = try await APIClient.shared.request(.getUserInfo(uid: uid))
-                if let user = response.data {
-                    DispatchQueue.main.async {
-                        self.headerView.configure(with: user)
-                    }
+                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: uid, channelType: 1)
+                )
+                let user = channelInfo.toUser()
+                UserDefaults.standard.set(user.name, forKey: "name")
+                if let avatar = user.avatar {
+                    UserDefaults.standard.set(avatar, forKey: "avatar")
                 }
-            } catch {}
+                let shortNo = UserDefaults.standard.string(forKey: "short_no") ?? ""
+                var fullUser = user
+                fullUser.uid = shortNo.isEmpty ? uid : shortNo
+                DispatchQueue.main.async {
+                    self.headerView.configure(with: fullUser)
+                }
+            } catch {
+                let name = UserDefaults.standard.string(forKey: "name") ?? "用户"
+                let avatar = UserDefaults.standard.string(forKey: "avatar")
+                let shortNo = UserDefaults.standard.string(forKey: "short_no") ?? uid
+                let user = User(uid: shortNo, name: name, avatar: avatar)
+                DispatchQueue.main.async {
+                    self.headerView.configure(with: user)
+                }
+            }
         }
     }
 }
@@ -248,12 +264,12 @@ class SettingProfileEditViewController: UIViewController {
         guard let uid = UserDefaults.standard.string(forKey: "uid") else { return }
         Task {
             do {
-                let response: APIResponse<User> = try await APIClient.shared.request(.getUserInfo(uid: uid))
-                if let data = response.data {
-                    user = data
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                    }
+                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: uid, channelType: 1)
+                )
+                user = channelInfo.toUser()
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
                 }
             } catch {
                 AppUtility.showToast("加载失败")

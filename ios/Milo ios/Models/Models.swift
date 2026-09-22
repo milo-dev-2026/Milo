@@ -18,6 +18,149 @@ struct User: Codable {
         }
         return URL(string: APIConfig.apiBaseURL + "/" + avatar)
     }
+
+    init(uid: String = "", name: String = "", avatar: String? = nil, phone: String? = nil, email: String? = nil, gender: Int? = nil, sign: String? = nil) {
+        self.uid = uid
+        self.name = name
+        self.avatar = avatar
+        self.phone = phone
+        self.email = email
+        self.gender = gender
+        self.sign = sign
+    }
+}
+
+// MARK: - 频道信息（WuKongIM /channels/{id}/{type} 响应）
+struct ChannelInfo: Codable {
+    var channel_id: String?
+    var channel_type: Int?
+    var name: String?
+    var logo: String?
+    var avatar: String?
+    var remark: String?
+    var online: Int?
+    var status: Int?
+    var follow: Int?
+    var extra: [String: AnyCodable]?
+
+    var displayName: String {
+        return remark?.isEmpty == false ? remark! : (name ?? "")
+    }
+
+    var avatarURL: URL? {
+        let avatarStr = logo ?? avatar ?? ""
+        guard !avatarStr.isEmpty else { return nil }
+        if avatarStr.hasPrefix("http") {
+            return URL(string: avatarStr)
+        }
+        return URL(string: APIConfig.apiBaseURL + "/" + avatarStr)
+    }
+
+    func toUser() -> User {
+        return User(
+            uid: channel_id ?? "",
+            name: displayName,
+            avatar: logo ?? avatar
+        )
+    }
+}
+
+// MARK: - AnyCodable (用于解码动态JSON)
+struct AnyCodable: Codable {
+    let value: Any
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let intValue = try? container.decode(Int.self) { value = intValue }
+        else if let doubleValue = try? container.decode(Double.self) { value = doubleValue }
+        else if let stringValue = try? container.decode(String.self) { value = stringValue }
+        else if let boolValue = try? container.decode(Bool.self) { value = boolValue }
+        else { value = "" }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let intValue = value as? Int { try container.encode(intValue) }
+        else if let doubleValue = value as? Double { try container.encode(doubleValue) }
+        else if let stringValue = value as? String { try container.encode(stringValue) }
+        else if let boolValue = value as? Bool { try container.encode(boolValue) }
+        else { try container.encodeNil() }
+    }
+}
+
+// MARK: - WuKongIM 会话模型 (POST /conversation/sync 响应)
+struct WKConversation: Codable {
+    var channel_id: String
+    var channel_type: Int
+    var unread: Int?
+    var timestamp: Int64?
+    var last_msg_seq: Int?
+    var version: Int?
+    var recents: [WKMessageData]?
+
+    var isGroup: Bool { return channel_type == 2 }
+}
+
+// MARK: - WuKongIM 消息数据 (会话同步和消息同步中的消息对象)
+struct WKMessageData: Codable {
+    var message_id: Int64?
+    var message_idstr: String?
+    var client_msg_no: String?
+    var message_seq: Int?
+    var from_uid: String?
+    var channel_id: String?
+    var channel_type: Int?
+    var timestamp: Int64?
+    var payload: String?
+
+    var messageIDString: String {
+        if let str = message_idstr, !str.isEmpty { return str }
+        if let id = message_id { return String(id) }
+        return client_msg_no ?? UUID().uuidString
+    }
+
+    var decodedPayload: (type: Int, content: String) {
+        guard let payload = payload,
+              let data = Data(base64Encoded: payload),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (1, "")
+        }
+        let type = json["type"] as? Int ?? 1
+        let content = json["content"] as? String ?? ""
+        return (type, content)
+    }
+}
+
+// MARK: - WuKongIM 消息同步响应 (POST /channel/messagesync)
+struct WKMessageSyncResponse: Codable {
+    var start_message_seq: Int?
+    var end_message_seq: Int?
+    var more: Int?
+    var messages: [WKMessageData]?
+}
+
+// MARK: - 好友同步响应
+struct FriendSyncInfo: Codable {
+    var uid: String
+    var name: String?
+    var avatar: String?
+    var remark: String?
+
+    var displayName: String {
+        return remark?.isEmpty == false ? remark! : (name ?? uid)
+    }
+
+    var avatarURL: URL? {
+        guard let avatar = avatar, !avatar.isEmpty else { return nil }
+        if avatar.hasPrefix("http") {
+            return URL(string: avatar)
+        }
+        return URL(string: APIConfig.apiBaseURL + "/" + avatar)
+    }
+
+    func toUser() -> User {
+        return User(uid: uid, name: displayName, avatar: avatar)
+    }
 }
 
 // MARK: - 消息模型
@@ -56,6 +199,29 @@ struct Message: Codable {
 
     var isFromMe: Bool {
         return fromUID == UserDefaults.standard.string(forKey: "uid")
+    }
+
+    init(messageID: String, channelID: String, channelType: Int, fromUID: String, content: String, type: MessageType, timestamp: Int64, status: Int) {
+        self.messageID = messageID
+        self.channelID = channelID
+        self.channelType = channelType
+        self.fromUID = fromUID
+        self.content = content
+        self.type = type
+        self.timestamp = timestamp
+        self.status = status
+    }
+
+    init(from wk: WKMessageData) {
+        self.messageID = wk.messageIDString
+        self.channelID = wk.channel_id ?? ""
+        self.channelType = wk.channel_type ?? 1
+        self.fromUID = wk.from_uid ?? ""
+        let decoded = wk.decodedPayload
+        self.content = decoded.content
+        self.type = MessageType(rawValue: decoded.type) ?? .text
+        self.timestamp = (wk.timestamp ?? 0) * 1000
+        self.status = 1
     }
 
     var timeString: String {
@@ -110,6 +276,32 @@ struct Conversation: Codable {
             formatter.dateFormat = "MM/dd"
         }
         return formatter.string(from: date)
+    }
+
+    init(channelID: String, channelType: Int, name: String, avatar: String?, lastMessage: String?, lastMessageTimestamp: Int64?, unreadCount: Int) {
+        self.channelID = channelID
+        self.channelType = channelType
+        self.name = name
+        self.avatar = avatar
+        self.lastMessage = lastMessage
+        self.lastMessageTimestamp = lastMessageTimestamp
+        self.unreadCount = unreadCount
+    }
+
+    init(from wk: WKConversation) {
+        self.channelID = wk.channel_id
+        self.channelType = wk.channel_type
+        self.name = ""
+        self.avatar = nil
+        let recent = wk.recents?.last
+        if let r = recent {
+            let decoded = r.decodedPayload
+            self.lastMessage = decoded.content
+        } else {
+            self.lastMessage = nil
+        }
+        self.lastMessageTimestamp = wk.timestamp.map { $0 * 1000 }
+        self.unreadCount = wk.unread ?? 0
     }
 }
 

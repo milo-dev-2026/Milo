@@ -143,11 +143,11 @@ class ChatViewController: UIViewController {
     private func loadMessages() {
         Task {
             do {
-                let response: APIResponse<[Message]> = try await APIClient.shared.request(
-                    .getMessages(channelId: channelId, startMessageId: "", limit: 50)
+                let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
+                    .syncChannelMessages(channelId: channelId, channelType: self.channelType, startMessageSeq: 0, limit: 50)
                 )
-                if let data = response.data {
-                    messages = data
+                if let msgs = response.messages {
+                    messages = msgs.map { Message(from: $0) }.sorted { $0.timestamp < $1.timestamp }
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
                         self.scrollToBottom()
@@ -400,7 +400,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                   !targetId.isEmpty else { return }
             Task {
                 do {
-                    let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: targetId, content: message.content, type: message.type.rawValue))
+                    let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: targetId, content: message.content, type: message.type.rawValue, channelType: 1))
                     if response["status"] as? Int == 200 {
                         DispatchQueue.main.async {
                             AppUtility.showToast("已转发")
@@ -450,7 +450,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                 _ = try await APIClient.shared.requestRaw(.reactMessage(
                     messageId: message.messageID,
                     channelId: channelId,
-                    channelType: 1,
+                    channelType: self.channelType,
                     emoji: emoji
                 ))
                 DispatchQueue.main.async {
@@ -471,23 +471,23 @@ extension ChatViewController: ChatInputBarDelegate {
     func didSendTextMessage(_ text: String) {
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.sendTextMessage(channelId: channelId, content: text))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: 1,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: text,
-                        type: .text,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
+                let response = try await APIClient.shared.requestRaw(
+                    .sendTextMessage(channelId: channelId, content: text, channelType: channelType)
+                )
+                let msg = Message(
+                    messageID: UUID().uuidString,
+                    channelID: channelId,
+                    channelType: self.channelType,
+                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                    content: text,
+                    type: .text,
+                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                    status: 1
+                )
+                messages.append(msg)
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.scrollToBottom()
                 }
             } catch {
                 AppUtility.showToast("发送失败")
@@ -616,13 +616,13 @@ extension ChatViewController: ChatInputBarDelegate {
                     Task {
                         do {
                             let response = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: self.channelId, content: cdnURL, type: 2)
+                                .sendMessage(channelId: self.channelId, content: cdnURL, type: 2, channelType: self.channelType)
                             )
                             if response["status"] as? Int == 200 {
                                 let msg = Message(
                                     messageID: UUID().uuidString,
                                     channelID: self.channelId,
-                                    channelType: 1,
+                                    channelType: self.channelType,
                                     fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                                     content: cdnURL,
                                     type: .image,
@@ -671,13 +671,13 @@ extension ChatViewController: ChatInputBarDelegate {
                                 Task {
                                     do {
                                         let response = try await APIClient.shared.requestRaw(
-                                            .sendMessage(channelId: self.channelId, content: content, type: 4)
+                                            .sendMessage(channelId: self.channelId, content: content, type: 4, channelType: self.channelType)
                                         )
                                         if response["status"] as? Int == 200 {
                                             let msg = Message(
                                                 messageID: UUID().uuidString,
                                                 channelID: self.channelId,
-                                                channelType: 1,
+                                                channelType: self.channelType,
                                                 fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                                                 content: content,
                                                 type: .video,
@@ -734,13 +734,13 @@ extension ChatViewController: ChatInputBarDelegate {
                     Task {
                         do {
                             let response = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: self.channelId, content: content, type: 5)
+                                .sendMessage(channelId: self.channelId, content: content, type: 5, channelType: self.channelType)
                             )
                             if response["status"] as? Int == 200 {
                                 let msg = Message(
                                     messageID: UUID().uuidString,
                                     channelID: self.channelId,
-                                    channelType: 1,
+                                    channelType: self.channelType,
                                     fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                                     content: content,
                                     type: .file,
@@ -769,12 +769,12 @@ extension ChatViewController: ChatInputBarDelegate {
         let content = "\(location.name)|\(location.latitude),\(location.longitude)"
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 6))
+                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 6, channelType: channelType))
                 if response["status"] as? Int == 200 {
                     let msg = Message(
                         messageID: UUID().uuidString,
                         channelID: channelId,
-                        channelType: 1,
+                        channelType: self.channelType,
                         fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                         content: "[位置] \(location.name)",
                         type: .location,
@@ -799,12 +799,12 @@ extension ChatViewController: ChatInputBarDelegate {
         let content = cardInfo.toString()
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 7))
+                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 7, channelType: channelType))
                 if response["status"] as? Int == 200 {
                     let msg = Message(
                         messageID: UUID().uuidString,
                         channelID: channelId,
-                        channelType: 1,
+                        channelType: self.channelType,
                         fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                         content: content,
                         type: .card,
@@ -833,12 +833,12 @@ extension ChatViewController: ChatInputBarDelegate {
         }
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: noteString, type: 100))
+                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: noteString, type: 100, channelType: channelType))
                 if response["status"] as? Int == 200 {
                     let msg = Message(
                         messageID: UUID().uuidString,
                         channelID: channelId,
-                        channelType: 1,
+                        channelType: self.channelType,
                         fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                         content: noteString,
                         type: .note,

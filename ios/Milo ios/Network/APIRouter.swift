@@ -15,13 +15,13 @@ enum APIRouter: URLRequestConvertible {
     case sendLoginAuthCode(uid: String)
     case checkLoginAuth(uid: String, code: String)
     case searchGroupMembers(keyword: String, groupId: String)
-    case getConversationList
-    case getMessages(channelId: String, startMessageId: String, limit: Int)
-    case sendTextMessage(channelId: String, content: String)
-    case sendMessage(channelId: String, content: String, type: Int)
+    case syncConversations
+    case syncChannelMessages(channelId: String, channelType: Int, startMessageSeq: Int, limit: Int)
+    case sendTextMessage(channelId: String, content: String, channelType: Int)
+    case sendMessage(channelId: String, content: String, type: Int, channelType: Int)
     case deleteMessage(messageId: String)
-    case getContacts
-    case getUserInfo(uid: String)
+    case syncFriends
+    case getChannelInfo(channelId: String, channelType: Int)
     case updateUserInfo(name: String?, avatar: String?)
     case getGroupInfo(groupId: String)
     case uploadFile(fileName: String, data: Data)
@@ -121,24 +121,45 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["zone": "0086", "phone": phone, "code": code, "pwd": password])
         case let .resetPasswordByEmail(email, code, password):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "code": code, "pwd": password])
-        case let .getMessages(channelId, startMessageId, limit):
-            let params: [String: Any] = [
-                "channel_id": channelId,
-                "start_message_id": startMessageId,
-                "limit": limit
-            ]
-            request = try URLEncoding.default.encode(request, with: params)
-        case let .sendTextMessage(channelId, content):
+        case .syncConversations:
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
             request.httpBody = try JSONSerialization.data(withJSONObject: [
-                "channel_id": channelId,
-                "content": content,
-                "type": 1
+                "uid": uid,
+                "version": 0,
+                "msg_count": 20
             ])
-        case let .sendMessage(channelId, content, type):
+        case let .syncChannelMessages(channelId, channelType, startMessageSeq, limit):
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
             request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "login_uid": uid,
                 "channel_id": channelId,
-                "content": content,
-                "type": type
+                "channel_type": channelType,
+                "start_message_seq": startMessageSeq,
+                "end_message_seq": 0,
+                "limit": limit,
+                "pull_mode": 0
+            ])
+        case let .sendTextMessage(channelId, content, channelType):
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            let payloadJson = try JSONSerialization.data(withJSONObject: ["type": 1, "content": content])
+            let payloadBase64 = payloadJson.base64EncodedString()
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "header": ["no_persist": 0, "red_dot": 1, "sync_once": 0],
+                "from_uid": uid,
+                "channel_id": channelId,
+                "channel_type": channelType,
+                "payload": payloadBase64
+            ])
+        case let .sendMessage(channelId, content, type, channelType):
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            let payloadJson = try JSONSerialization.data(withJSONObject: ["type": type, "content": content])
+            let payloadBase64 = payloadJson.base64EncodedString()
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "header": ["no_persist": 0, "red_dot": 1, "sync_once": 0],
+                "from_uid": uid,
+                "channel_id": channelId,
+                "channel_type": channelType,
+                "payload": payloadBase64
             ])
         case let .deleteMessage(messageId):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["message_id": messageId])
@@ -150,8 +171,10 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "code": code])
         case let .searchGroupMembers(keyword, groupId):
             request = try URLEncoding.default.encode(request, with: ["keyword": keyword, "group_id": groupId])
-        case let .getUserInfo(uid):
-            request = try URLEncoding.default.encode(request, with: ["uid": uid])
+        case .syncFriends:
+            break
+        case let .getChannelInfo(channelId, channelType):
+            break
         case let .updateUserInfo(name, avatar):
             var body: [String: Any] = [:]
             if let n = name { body["name"] = n }
@@ -304,14 +327,14 @@ enum APIRouter: URLRequestConvertible {
         case .sendLoginAuthCode: return "/v1/user/login_auth/sendcode"
         case .checkLoginAuth: return "/v1/user/login_auth/check"
         case .searchGroupMembers: return "/v1/groups/members/search"
-        case .getConversationList: return "/v1/conversations"
-        case .getMessages: return "/v1/messages"
-        case .sendTextMessage: return "/v1/messages/send"
-        case .sendMessage: return "/v1/messages/send"
+        case .syncConversations: return "/v1/conversation/sync"
+        case .syncChannelMessages: return "/v1/channel/messagesync"
+        case .sendTextMessage: return "/v1/message/send"
+        case .sendMessage: return "/v1/message/send"
         case .deleteMessage: return "/v1/messages/delete"
-        case .getContacts: return "/v1/friends"
-        case .getUserInfo: return "/v1/users/info"
-        case .updateUserInfo: return "/v1/users/update"
+        case .syncFriends: return "/v1/friend/sync"
+        case let .getChannelInfo(channelId, channelType): return "/v1/channels/\(channelId)/\(channelType)"
+        case .updateUserInfo: return "/v1/user/current"
         case .getGroupInfo: return "/v1/groups/info"
         case .uploadFile: return "/v1/files/upload"
         case .getFriendsApply: return "/v1/friends/apply"
@@ -377,8 +400,8 @@ enum APIRouter: URLRequestConvertible {
 
     private var method: HTTPMethod {
         switch self {
-        case .getConversationList, .getMessages, .getContacts,
-             .getUserInfo, .getGroupInfo, .getFriendsApply, .getTRTCUserSig,
+        case .syncFriends, .getChannelInfo,
+             .getGroupInfo, .getFriendsApply, .getTRTCUserSig,
              .getFavorites, .getGroupAnnouncement, .getDeviceList,
              .getGroupMembers, .getGroupAdmins, .getMutedMembers,
              .getGroupBlackList, .getLeftGroupMembers:
@@ -415,7 +438,6 @@ class APIClient {
     func request<T: Decodable>(_ router: APIRouter) async throws -> T {
         let response = await session.request(router).serializingData().response
         if let statusCode = response.response?.statusCode, !(200...299).contains(statusCode) {
-            // 尝试解析错误体
             if let data = response.data {
                 if let errorResp = try? JSONDecoder().decode(MessageResponse.self, from: data) {
                     throw APIError.serverError(message: errorResp.msg ?? "未知错误", code: statusCode)
@@ -431,6 +453,28 @@ class APIClient {
         } catch {
             throw APIError.decodingError(error)
         }
+    }
+
+    func requestFlexible<T: Decodable>(_ router: APIRouter) async throws -> T {
+        let response = await session.request(router).serializingData().response
+        if let statusCode = response.response?.statusCode, !(200...299).contains(statusCode) {
+            if let data = response.data {
+                if let errorResp = try? JSONDecoder().decode(MessageResponse.self, from: data) {
+                    throw APIError.serverError(message: errorResp.msg ?? "未知错误", code: statusCode)
+                }
+            }
+            throw APIError.serverError(message: "请求失败(\(statusCode))", code: statusCode)
+        }
+        guard let data = response.data else {
+            throw APIError.noData
+        }
+        if let result = try? JSONDecoder().decode(T.self, from: data) {
+            return result
+        }
+        if let apiResponse = try? JSONDecoder().decode(APIResponse<T>.self, from: data), let result = apiResponse.data {
+            return result
+        }
+        throw APIError.decodingError(NSError(domain: "APIError", code: -1, userInfo: [NSLocalizedDescriptionKey: "响应解析失败"]))
     }
 
     func requestRaw(_ router: APIRouter) async throws -> [String: Any] {
