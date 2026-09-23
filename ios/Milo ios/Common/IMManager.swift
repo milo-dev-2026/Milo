@@ -26,7 +26,7 @@ class IMManager: NSObject {
         options.host = "43.133.39.170"
         options.port = 5100
 
-        WKSDK.shared().setup(options: options)
+        WKSDK.shared().options = options
 
         WKSDK.shared().chatManager.add(self)
         WKSDK.shared().connectionManager.add(self)
@@ -80,7 +80,9 @@ class IMManager: NSObject {
 
     // MARK: - 发送消息
     func sendTextMessage(channelId: String, content: String, channelType: Int = 1) {
-        let channel = WKChannel(channelId: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let textContent = WKTextContent(content: content)
         WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
