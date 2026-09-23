@@ -151,7 +151,6 @@ class ContactsViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ContactCell.self, forCellReuseIdentifier: "ContactCell")
-        tableView.register(ContactsHeaderCell.self, forCellReuseIdentifier: "ContactsHeaderCell")
         tableView.rowHeight = ScreenAdapter.scaleH(56)
         tableView.backgroundColor = .white
         tableView.separatorColor = UIColor(white: 0, alpha: 0.1)
