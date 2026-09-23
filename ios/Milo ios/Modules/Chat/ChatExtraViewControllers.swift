@@ -265,7 +265,7 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
                     Task {
                         do {
                             let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
-                                .getChannelInfo(channelId: conv.channelId, channelType: wkConvs[index].channel_type)
+                                .getChannelInfo(channelId: conv.channelId, channelType: wkConvs[index].channel_type ?? 0)
                             )
                             DispatchQueue.main.async {
                                 if index < self.conversations.count {
