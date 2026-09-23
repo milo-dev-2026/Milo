@@ -489,29 +489,21 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 extension ChatViewController: ChatInputBarDelegate {
 
     func didSendTextMessage(_ text: String) {
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(
-                    .sendTextMessage(channelId: channelId, content: text, channelType: channelType)
-                )
-                let msg = Message(
-                    messageID: UUID().uuidString,
-                    channelID: channelId,
-                    channelType: self.channelType,
-                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                    content: text,
-                    type: .text,
-                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                    status: 1
-                )
-                messages.append(msg)
-                DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                    self.scrollToBottom()
-                }
-            } catch {
-                AppUtility.showToast("发送失败")
-            }
+        IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
+        let msg = Message(
+            messageID: UUID().uuidString,
+            channelID: channelId,
+            channelType: self.channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: text,
+            type: .text,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 1
+        )
+        messages.append(msg)
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+            self.scrollToBottom()
         }
     }
 
