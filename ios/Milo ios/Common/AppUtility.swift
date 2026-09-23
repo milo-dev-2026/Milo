@@ -47,7 +47,21 @@ class AppUtility {
             imageView.tintColor = UIColor.systemGray5
             return
         }
-        imageView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
+        imageView.kf.setImage(
+            with: url,
+            placeholder: UIImage(systemName: "person.circle.fill"),
+            options: [
+                .transition(.fade(0.2)),
+                .cacheOriginalImage
+            ]
+        ) { result in
+            switch result {
+            case .failure:
+                imageView.image = UIImage(systemName: "person.circle.fill")
+                imageView.tintColor = UIColor.systemGray5
+            case .success: break
+            }
+        }
     }
 
     // MARK: - 验证手机号

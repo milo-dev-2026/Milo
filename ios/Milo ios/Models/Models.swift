@@ -16,7 +16,8 @@ struct User: Codable {
         if avatar.hasPrefix("http") {
             return URL(string: avatar)
         }
-        return URL(string: APIConfig.apiBaseURL + "/" + avatar)
+        let path = avatar.hasPrefix("/") ? avatar : "/\(avatar)"
+        return URL(string: APIConfig.apiBaseURL + path)
     }
 
     init(uid: String = "", name: String = "", avatar: String? = nil, phone: String? = nil, email: String? = nil, gender: Int? = nil, sign: String? = nil) {
@@ -53,7 +54,8 @@ struct ChannelInfo: Codable {
         if avatarStr.hasPrefix("http") {
             return URL(string: avatarStr)
         }
-        return URL(string: APIConfig.apiBaseURL + "/" + avatarStr)
+        let path = avatarStr.hasPrefix("/") ? avatarStr : "/\(avatarStr)"
+        return URL(string: APIConfig.apiBaseURL + path)
     }
 
     func toUser() -> User {
@@ -96,8 +98,8 @@ struct WKSyncChat: Codable {
 
 // MARK: - WuKongIM 会话模型
 struct WKConversation: Codable {
-    var channel_id: String
-    var channel_type: Int
+    var channel_id: String?
+    var channel_type: Int?
     var unread: Int?
     var timestamp: Int64?
     var last_msg_seq: Int?
@@ -161,7 +163,8 @@ struct FriendSyncInfo: Codable {
         if avatar.hasPrefix("http") {
             return URL(string: avatar)
         }
-        return URL(string: APIConfig.apiBaseURL + "/" + avatar)
+        let path = avatar.hasPrefix("/") ? avatar : "/\(avatar)"
+        return URL(string: APIConfig.apiBaseURL + path)
     }
 
     func toUser() -> User {
@@ -267,7 +270,8 @@ struct Conversation: Codable {
         if avatar.hasPrefix("http") {
             return URL(string: avatar)
         }
-        return URL(string: APIConfig.apiBaseURL + "/" + avatar)
+        let path = avatar.hasPrefix("/") ? avatar : "/\(avatar)"
+        return URL(string: APIConfig.apiBaseURL + path)
     }
 
     var timeString: String {
@@ -295,8 +299,8 @@ struct Conversation: Codable {
     }
 
     init(from wk: WKConversation) {
-        self.channelID = wk.channel_id
-        self.channelType = wk.channel_type
+        self.channelID = wk.channel_id ?? ""
+        self.channelType = wk.channel_type ?? 1
         self.name = ""
         self.avatar = nil
         let recent = wk.recents?.last
@@ -427,9 +431,10 @@ struct FriendApply: Codable {
 
 // MARK: - API响应包装
 struct APIResponse<T: Decodable>: Decodable {
-    var status: Int
-    var msg: String
+    var status: Int?
+    var msg: String?
     var data: T?
+    var message: String?
 }
 
 // MARK: - 登录响应

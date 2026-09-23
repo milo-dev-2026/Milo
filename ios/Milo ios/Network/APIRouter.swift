@@ -503,6 +503,24 @@ class APIClient {
                 }
             }
         }
+        // Strategy 5: Object with "data" field containing an array (when T is array type)
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let dataArr = jsonObj["data"] as? [[String: Any]] {
+                let arrData = try JSONSerialization.data(withJSONObject: dataArr)
+                if let result = try? JSONDecoder().decode(T.self, from: arrData) {
+                    return result
+                }
+            }
+        }
+        // Strategy 6: Object with "data" field containing a dictionary (when T is object type)
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let dataDict = jsonObj["data"] as? [String: Any] {
+                let dictData = try JSONSerialization.data(withJSONObject: dataDict)
+                if let result = try? JSONDecoder().decode(T.self, from: dictData) {
+                    return result
+                }
+            }
+        }
         let rawStr = String(data: data, encoding: .utf8) ?? ""
         print("[API] Decode failed. Raw: \(rawStr.prefix(500))")
         throw APIError.decodingError(NSError(domain: "APIError", code: -1, userInfo: [NSLocalizedDescriptionKey: "响应解析失败: \(rawStr.prefix(200))"]))

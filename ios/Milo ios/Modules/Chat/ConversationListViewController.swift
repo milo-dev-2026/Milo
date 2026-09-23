@@ -18,7 +18,10 @@ class ConversationListViewController: UIViewController {
     private let searchBarContainer = UIView()
     private let searchBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
     private let searchIconView = UIImageView()
-    private let searchPlaceholderLabel = UILabel()
+    private let searchTextField = UITextField()
+
+    // MARK: - 弹窗菜单
+    private var popupMenuView: PopupMenuView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -79,7 +82,7 @@ class ConversationListViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        // 右侧加号按钮（40x40pt，右边距 15pt）
+        // 右侧加号按钮
         addButton.setImage(UIImage(systemName: "plus"), for: .normal)
         addButton.tintColor = .label
         addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
@@ -101,17 +104,17 @@ class ConversationListViewController: UIViewController {
             make.height.equalTo(36)
         }
 
-        // 毛玻璃背景（液态玻璃核心）
+        // 毛玻璃背景
         searchBarContainer.addSubview(searchBlurView)
         searchBlurView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
 
-        // 柔光边框效果
+        // 柔光边框
         searchBarContainer.layer.borderWidth = 0.5
         searchBarContainer.layer.borderColor = UIColor.white.withAlphaComponent(0.6).cgColor
 
-        // 搜索图标（16x16pt）
+        // 搜索图标
         searchIconView.image = UIImage(systemName: "magnifyingglass")
         searchIconView.tintColor = .secondaryLabel
         searchIconView.contentMode = .scaleAspectFit
@@ -122,18 +125,24 @@ class ConversationListViewController: UIViewController {
             make.width.height.equalTo(16)
         }
 
-        // 搜索提示文字（14pt）
-        searchPlaceholderLabel.text = "搜索"
-        searchPlaceholderLabel.font = ScreenAdapter.font(14)
-        searchPlaceholderLabel.textColor = .secondaryLabel
-        searchBarContainer.addSubview(searchPlaceholderLabel)
-        searchPlaceholderLabel.snp.makeConstraints { make in
+        // 搜索输入框（可点击）
+        searchTextField.placeholder = "搜索"
+        searchTextField.font = ScreenAdapter.font(14)
+        searchTextField.textColor = .label
+        searchTextField.tintColor = .themePrimary
+        searchTextField.returnKeyType = .search
+        searchTextField.clearButtonMode = .whileEditing
+        searchTextField.delegate = self
+        searchTextField.addTarget(self, action: #selector(searchTextChanged(_:)), for: .editingChanged)
+        searchBarContainer.addSubview(searchTextField)
+        searchTextField.snp.makeConstraints { make in
             make.leading.equalTo(searchIconView.snp.trailing).offset(8)
+            make.trailing.equalToSuperview().offset(-14)
             make.centerY.equalToSuperview()
-            make.trailing.lessThanOrEqualToSuperview().offset(-14)
+            make.height.equalToSuperview()
         }
 
-        // MARK: - 列表区域（白色背景，MJRefresh 下拉刷新）
+        // MARK: - 列表区域
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ConversationCell.self, forCellReuseIdentifier: "ConversationCell")
@@ -143,6 +152,7 @@ class ConversationListViewController: UIViewController {
         tableView.separatorStyle = .singleLine
         tableView.tableFooterView = UIView()
         tableView.backgroundColor = .white
+        tableView.keyboardDismissMode = .interactive
 
         let header = MJRefreshNormalHeader { [weak self] in
             self?.loadData()
@@ -156,16 +166,82 @@ class ConversationListViewController: UIViewController {
         }
     }
 
+    // MARK: - 加号弹窗菜单（在+号下方显示）
     @objc private func showAddMenu() {
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "扫一扫", style: .default) { [weak self] _ in
-            self?.startScan()
-        })
-        alert.addAction(UIAlertAction(title: "添加好友", style: .default) { [weak self] _ in
-            self?.showAddFriend()
-        })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        present(alert, animated: true)
+        if popupMenuView != nil {
+            closePopupMenu()
+            return
+        }
+
+        let menu = PopupMenuView(items: [
+            ("person.2.fill", "发起群聊"),
+            ("qrcode.viewfinder", "扫一扫"),
+            ("person.badge.plus", "添加好友")
+        ])
+        menu.onSelect = { [weak self] index in
+            self?.closePopupMenu()
+            switch index {
+            case 0: self?.startGroupChat()
+            case 1: self?.startScan()
+            case 2: self?.showAddFriend()
+            default: break
+            }
+        }
+        menu.onDismiss = { [weak self] in
+            self?.popupMenuView = nil
+        }
+
+        view.addSubview(menu)
+        let buttonFrame = addButton.convert(addButton.bounds, to: view)
+        menu.snp.makeConstraints { make in
+            make.top.equalTo(buttonFrame.maxY + 4)
+            make.trailing.equalToSuperview().offset(-15)
+            make.width.equalTo(160)
+        }
+        menu.alpha = 0
+        UIView.animate(withDuration: 0.2) {
+            menu.alpha = 1
+        }
+        popupMenuView = menu
+    }
+
+    private func closePopupMenu() {
+        guard let menu = popupMenuView else { return }
+        UIView.animate(withDuration: 0.2, animations: {
+            menu.alpha = 0
+        }) { _ in
+            menu.removeFromSuperview()
+            self.popupMenuView = nil
+        }
+    }
+
+    private func startGroupChat() {
+        let chooseVC = ChooseContactsViewController(maxSelection: 99)
+        chooseVC.title = "选择联系人"
+        chooseVC.onContactsSelected = { [weak self] selectedUids in
+            self?.createGroup(with: selectedUids)
+        }
+        navigationController?.pushViewController(chooseVC, animated: true)
+    }
+
+    private func createGroup(with uids: [String]) {
+        guard !uids.isEmpty else { return }
+        AppUtility.showToast("正在创建群聊...")
+        Task {
+            do {
+                let groupId = "group_\(Int(Date().timeIntervalSince1970))"
+                let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: groupId, uids: uids))
+                if response["status"] as? Int == 200 {
+                    DispatchQueue.main.async {
+                        AppUtility.showToast("群聊创建成功")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("创建群聊失败")
+                }
+            }
+        }
     }
 
     private func startScan() {
@@ -200,31 +276,7 @@ class ConversationListViewController: UIViewController {
     }
 
     private func showAddFriend() {
-        let alert = UIAlertController(title: "添加好友", message: "请输入对方ID", preferredStyle: .alert)
-        alert.addTextField { tf in
-            tf.placeholder = "用户ID"
-            tf.keyboardType = .asciiCapable
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "发送申请", style: .default) { [weak self] _ in
-            guard let uid = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !uid.isEmpty else { return }
-            Task {
-                do {
-                    let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: ""))
-                    if response["status"] as? Int == 200 {
-                        DispatchQueue.main.async {
-                            AppUtility.showToast("好友申请已发送")
-                        }
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("发送申请失败")
-                    }
-                }
-            }
-        })
-        present(alert, animated: true)
+        navigationController?.pushViewController(AddFriendViewController(), animated: true)
     }
 
     private func loadData() {
@@ -272,6 +324,11 @@ class ConversationListViewController: UIViewController {
             self?.loadData()
         }
     }
+
+    // MARK: - 搜索
+    @objc private func searchTextChanged(_ textField: UITextField) {
+        // 实时搜索过滤
+    }
 }
 
 // MARK: - UITableViewDataSource
@@ -305,6 +362,109 @@ extension ConversationListViewController: UITableViewDelegate {
             completion(true)
         }
         return UISwipeActionsConfiguration(actions: [deleteAction])
+    }
+}
+
+// MARK: - UITextFieldDelegate
+extension ConversationListViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+}
+
+// MARK: - 弹窗菜单视图
+class PopupMenuView: UIView {
+
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    private let stackView = UIStackView()
+    var onSelect: ((Int) -> Void)?
+    var onDismiss: (() -> Void)?
+
+    init(items: [(icon: String, title: String)]) {
+        super.init(frame: .zero)
+        setupUI(items: items)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI(items: [(icon: String, title: String)]) {
+        backgroundColor = .clear
+        layer.cornerRadius = 14
+        layer.masksToBounds = true
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+        layer.shadowRadius = 16
+        layer.shadowOpacity = 0.12
+
+        addSubview(blurView)
+        blurView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        let overlay = UIView()
+        overlay.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        addSubview(overlay)
+        overlay.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        stackView.axis = .vertical
+        stackView.alignment = .fill
+        stackView.distribution = .fillEqually
+        addSubview(stackView)
+        stackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        for (index, item) in items.enumerated() {
+            let btn = UIButton(type: .system)
+            btn.tag = index
+            let iconImg = UIImage(systemName: item.icon)
+            btn.setImage(iconImg, for: .normal)
+            btn.setTitle("  \(item.title)", for: .normal)
+            btn.titleLabel?.font = ScreenAdapter.font(15)
+            btn.tintColor = .label
+            btn.contentHorizontalAlignment = .left
+            btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 0)
+            btn.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 0)
+            btn.addTarget(self, action: #selector(itemTapped(_:)), for: .touchUpInside)
+            stackView.addArrangedSubview(btn)
+            btn.snp.makeConstraints { make in
+                make.height.equalTo(48)
+            }
+        }
+
+        snp.makeConstraints { make in
+            make.height.equalTo(CGFloat(items.count) * 48)
+        }
+
+        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(handleDismiss))
+        self.superview?.addGestureRecognizer(dismissTap)
+    }
+
+    @objc private func itemTapped(_ sender: UIButton) {
+        onSelect?(sender.tag)
+    }
+
+    @objc private func handleDismiss() {
+        onDismiss?()
+    }
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(handleDismissTap(_:)))
+        dismissTap.cancelsTouchesInView = false
+        self.superview?.addGestureRecognizer(dismissTap)
+    }
+
+    @objc private func handleDismissTap(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: self)
+        if !self.bounds.contains(location) {
+            onDismiss?()
+        }
     }
 }
 

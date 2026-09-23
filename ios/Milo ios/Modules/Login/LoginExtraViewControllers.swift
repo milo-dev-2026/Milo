@@ -349,7 +349,7 @@ class ResetLoginPwdViewController: UIViewController {
             make.width.equalTo(scrollView)
         }
         mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
