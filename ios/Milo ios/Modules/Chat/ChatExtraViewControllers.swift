@@ -259,7 +259,7 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
             do {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConvs = syncResp.conversations ?? []
-                conversations = wkConvs.map { ($0.channel_id, "", "") }
+                conversations = wkConvs.map { (channelId: $0.channel_id ?? "", name: "", avatar: "") }
                 DispatchQueue.main.async { self.tableView.reloadData() }
                 for (index, conv) in conversations.enumerated() {
                     Task {

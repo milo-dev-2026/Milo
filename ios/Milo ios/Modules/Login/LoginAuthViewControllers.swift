@@ -85,7 +85,7 @@ class LoginAuthViewController: UIViewController {
                         let vc = InputLoginAuthCodeViewController(uid: self.uid, phone: self.phone)
                         self.navigationController?.pushViewController(vc, animated: true)
                     } else {
-                        AppUtility.showToast(resp.msg)
+                        AppUtility.showToast(resp.msg ?? "操作失败")
                     }
                 }
             } catch {
@@ -188,7 +188,7 @@ class InputLoginAuthCodeViewController: UIViewController {
                     AppUtility.showToast("验证码已发送")
                     startCountdown()
                 } else {
-                    AppUtility.showToast(resp.msg)
+                    AppUtility.showToast(resp.msg ?? "操作失败")
                 }
             } catch {
                 AppUtility.showToast("发送失败")
