@@ -87,6 +87,8 @@ enum APIRouter: URLRequestConvertible {
     // Device management
     case getDeviceList
     case kickDevice(deviceId: String)
+    // IM server info
+    case getIMServer(uid: String)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -199,6 +201,8 @@ enum APIRouter: URLRequestConvertible {
         case let .deleteFriend(uid):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
         case .logout:
+            break
+        case let .getIMServer(uid):
             break
         case let .searchMessages(keyword):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["keyword": keyword])
@@ -403,6 +407,7 @@ enum APIRouter: URLRequestConvertible {
         case .destroyAccount: return "/v1/user/destroy"
         case .getDeviceList: return "/v1/user/devices"
         case .kickDevice(let deviceId): return "/v1/user/devices/\(deviceId)"
+        case .getIMServer(let uid): return "/v1/users/\(uid)/im"
         }
     }
 
@@ -412,7 +417,8 @@ enum APIRouter: URLRequestConvertible {
              .getGroupInfo, .getFriendsApply, .getTRTCUserSig,
              .getFavorites, .getGroupAnnouncement, .getDeviceList,
              .getGroupMembers, .getGroupAdmins, .getMutedMembers,
-             .getGroupBlackList, .getLeftGroupMembers:
+             .getGroupBlackList, .getLeftGroupMembers,
+             .getIMServer:
             return .get
         case .updateGroupAnnouncement, .updateLockAfterMinute,
              .updateGroupInfo, .setJoinApproval, .setGroupMuteAll,
@@ -521,6 +527,33 @@ class APIClient {
                 }
             }
         }
+        // Strategy 7: Object with "friends" field containing an array (friend sync response)
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let friendsArr = jsonObj["friends"] as? [[String: Any]] {
+                let arrData = try JSONSerialization.data(withJSONObject: friendsArr)
+                if let result = try? JSONDecoder().decode(T.self, from: arrData) {
+                    return result
+                }
+            }
+        }
+        // Strategy 8: Object with "results" field containing an array
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let resultsArr = jsonObj["results"] as? [[String: Any]] {
+                let arrData = try JSONSerialization.data(withJSONObject: resultsArr)
+                if let result = try? JSONDecoder().decode(T.self, from: arrData) {
+                    return result
+                }
+            }
+        }
+        // Strategy 9: Object with "list" field containing an array
+        if let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let listArr = jsonObj["list"] as? [[String: Any]] {
+                let arrData = try JSONSerialization.data(withJSONObject: listArr)
+                if let result = try? JSONDecoder().decode(T.self, from: arrData) {
+                    return result
+                }
+            }
+        }
         let rawStr = String(data: data, encoding: .utf8) ?? ""
         print("[API] Decode failed. Raw: \(rawStr.prefix(500))")
         throw APIError.decodingError(NSError(domain: "APIError", code: -1, userInfo: [NSLocalizedDescriptionKey: "响应解析失败: \(rawStr.prefix(200))"]))
@@ -600,4 +633,12 @@ struct ResetPasswordResponse: Codable {
 struct MessageResponse: Codable {
     var status: Int?
     var msg: String?
+}
+
+// MARK: - IM服务器地址响应
+struct IMServerResponse: Codable {
+    var ip: String?
+    var port: Int?
+    var tcp_addr: String?
+    var ws_addr: String?
 }

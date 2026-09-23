@@ -32,7 +32,7 @@ class IMManager: NSObject {
         WKSDK.shared().connectionManager.add(self)
     }
 
-    // MARK: - 连接
+    // MARK: - 连接（动态获取IM服务器地址）
     func connect() {
         guard let uid = UserDefaults.standard.string(forKey: "uid"), !uid.isEmpty else { return }
         let imToken = UserDefaults.standard.string(forKey: "im_token")
@@ -51,7 +51,25 @@ class IMManager: NSObject {
             return info
         }
 
-        WKSDK.shared().connectionManager.connect()
+        // 动态获取IM服务器IP和端口
+        Task {
+            do {
+                let imServer: IMServerResponse = try await APIClient.shared.requestFlexible(.getIMServer(uid: uid))
+                let host = imServer.ip ?? "43.133.39.170"
+                let port = imServer.port ?? 5100
+                print("[IM] 获取到IM服务器: \(host):\(port)")
+                DispatchQueue.main.async {
+                    WKSDK.shared().options.host = host
+                    WKSDK.shared().options.port = port
+                    WKSDK.shared().connectionManager.connect()
+                }
+            } catch {
+                print("[IM] 获取IM服务器地址失败，使用默认值: \(error)")
+                DispatchQueue.main.async {
+                    WKSDK.shared().connectionManager.connect()
+                }
+            }
+        }
     }
 
     func disconnect() {

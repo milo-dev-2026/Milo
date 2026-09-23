@@ -73,8 +73,8 @@ class ConversationListViewController: UIViewController {
             make.height.equalTo(48)
         }
 
-        // 居中标题 "消息"
-        titleLabel.text = "消息"
+        // 居中标题 "Milo"
+        titleLabel.text = "Milo"
         titleLabel.font = ScreenAdapter.boldFont(20)
         titleLabel.textColor = .label
         titleBarView.addSubview(titleLabel)
@@ -83,7 +83,8 @@ class ConversationListViewController: UIViewController {
         }
 
         // 右侧加号按钮
-        addButton.setImage(UIImage(systemName: "plus"), for: .normal)
+        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        addButton.setImage(UIImage(systemName: "plus.circle", withConfiguration: config), for: .normal)
         addButton.tintColor = .label
         addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
         titleBarView.addSubview(addButton)
@@ -293,7 +294,6 @@ class ConversationListViewController: UIViewController {
             } catch {
                 print("[ConvList] 加载失败: \(error)")
                 DispatchQueue.main.async {
-                    AppUtility.showToast("加载失败: \(error.localizedDescription)")
                     self.tableView.mj_header?.endRefreshing()
                 }
             }

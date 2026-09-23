@@ -24,11 +24,11 @@ class ContactsViewController: UIViewController {
 
     // MARK: - 入口项数据
     private let headerEntries: [(icon: String, title: String, color: UIColor, action: Selector)] = [
-        ("person.crop.circle.badge.plus", "新的朋友", UIColor(red: 1.0, green: 0.42, blue: 0.48, alpha: 1.0), #selector(showFriendApplyList)),
-        ("person.2.square.stack.fill", "保存的群聊", UIColor(red: 0.36, green: 0.56, blue: 0.94, alpha: 1.0), #selector(showSavedGroups)),
-        ("person.3.sequence", "加入的群聊", UIColor(red: 0.15, green: 0.65, blue: 0.58, alpha: 1.0), #selector(showJoinedGroups)),
-        ("doc.text.fill", "文件传输助手", UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0), #selector(showFileHelper)),
-        ("bell.fill", "系统通知", UIColor(red: 1.0, green: 0.66, blue: 0.25, alpha: 1.0), #selector(showSystemNotice))
+        ("person.fill.badge.plus", "新的朋友", UIColor(red: 0.07, green: 0.59, blue: 1.0, alpha: 1.0), #selector(showFriendApplyList)),
+        ("person.2.fill", "保存的群聊", UIColor(red: 0.35, green: 0.68, blue: 0.98, alpha: 1.0), #selector(showSavedGroups)),
+        ("person.3.fill", "加入的群聊", UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1.0), #selector(showJoinedGroups)),
+        ("doc.fill", "文件传输助手", UIColor(red: 0.99, green: 0.73, blue: 0.19, alpha: 1.0), #selector(showFileHelper)),
+        ("bell.badge.fill", "系统通知", UIColor(red: 1.0, green: 0.32, blue: 0.31, alpha: 1.0), #selector(showSystemNotice))
     ]
 
     // MARK: - 下拉刷新
@@ -456,11 +456,13 @@ class ContactsHeaderCell: UIView {
         let iconSize: CGFloat = 36
         let hPad: CGFloat = 12
 
-        // 图标背景（圆角方形）
+        // iOS原生风格图标（圆角方形 + 纯色背景 + 白色填充图标）
         iconView.layer.cornerRadius = 8
         iconView.clipsToBounds = true
-        iconView.contentMode = .scaleAspectFit
+        iconView.contentMode = .center
         iconView.tintColor = .white
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        iconView.preferredSymbolConfiguration = config
         addSubview(iconView)
         iconView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
@@ -499,7 +501,8 @@ class ContactsHeaderCell: UIView {
     }
 
     func configure(icon: String, title: String, color: UIColor) {
-        iconView.image = UIImage(systemName: icon)
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        iconView.image = UIImage(systemName: icon, withConfiguration: config)
         iconView.backgroundColor = color
         titleLabel.text = title
     }

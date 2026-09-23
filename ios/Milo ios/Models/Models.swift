@@ -106,6 +106,29 @@ struct WKConversation: Codable {
     var version: Int?
     var recents: [WKMessageData]?
 
+    enum CodingKeys: String, CodingKey {
+        case channel_id, channel_type, unread, timestamp
+        case last_msg_seq, version, recents
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        channel_id = try c.decodeIfPresent(String.self, forKey: .channel_id)
+        channel_type = try c.decodeIfPresent(Int.self, forKey: .channel_type)
+        unread = try c.decodeIfPresent(Int.self, forKey: .unread)
+        last_msg_seq = try c.decodeIfPresent(Int.self, forKey: .last_msg_seq)
+        version = try c.decodeIfPresent(Int.self, forKey: .version)
+        recents = try c.decodeIfPresent([WKMessageData].self, forKey: .recents)
+        // timestamp can be Int or String
+        if let v = try? c.decodeIfPresent(Int64.self, forKey: .timestamp) {
+            timestamp = v
+        } else if let s = try? c.decodeIfPresent(String.self, forKey: .timestamp), let v = Int64(s) {
+            timestamp = v
+        } else {
+            timestamp = nil
+        }
+    }
+
     var isGroup: Bool { return channel_type == 2 }
 }
 
@@ -120,6 +143,38 @@ struct WKMessageData: Codable {
     var channel_type: Int?
     var timestamp: Int64?
     var payload: String?
+
+    enum CodingKeys: String, CodingKey {
+        case message_id, message_idstr, client_msg_no, message_seq
+        case from_uid, channel_id, channel_type, timestamp, payload
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        message_idstr = try c.decodeIfPresent(String.self, forKey: .message_idstr)
+        client_msg_no = try c.decodeIfPresent(String.self, forKey: .client_msg_no)
+        message_seq = try c.decodeIfPresent(Int.self, forKey: .message_seq)
+        from_uid = try c.decodeIfPresent(String.self, forKey: .from_uid)
+        channel_id = try c.decodeIfPresent(String.self, forKey: .channel_id)
+        channel_type = try c.decodeIfPresent(Int.self, forKey: .channel_type)
+        payload = try c.decodeIfPresent(String.self, forKey: .payload)
+        // timestamp can be Int or String
+        if let v = try? c.decodeIfPresent(Int64.self, forKey: .timestamp) {
+            timestamp = v
+        } else if let s = try? c.decodeIfPresent(String.self, forKey: .timestamp), let v = Int64(s) {
+            timestamp = v
+        } else {
+            timestamp = nil
+        }
+        // message_id can be Int or String in JSON
+        if let v = try? c.decodeIfPresent(Int64.self, forKey: .message_id) {
+            message_id = v
+        } else if let s = try? c.decodeIfPresent(String.self, forKey: .message_id), let v = Int64(s) {
+            message_id = v
+        } else {
+            message_id = nil
+        }
+    }
 
     var messageIDString: String {
         if let str = message_idstr, !str.isEmpty { return str }
@@ -443,9 +498,15 @@ struct LoginResponse: Codable {
     var token: String?
     var im_token: String?
     var short_no: String?
+    var name: String?
+    var username: String?
+    var avatar: String?
     var phone: String?
     var zone: String?
     var email: String?
+    var sex: Int?
+    var short_status: Int?
+    var server_id: Int?
 }
 
 // MARK: - TRTC UserSig 响应
