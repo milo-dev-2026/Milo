@@ -56,7 +56,7 @@ class IMManager: NSObject {
             do {
                 let imServer: IMServerResponse = try await APIClient.shared.requestFlexible(.getIMServer(uid: uid))
                 let host = imServer.ip ?? "43.133.39.170"
-                let port = imServer.port ?? 5100
+                let port = UInt16(imServer.port ?? 5100)
                 print("[IM] 获取到IM服务器: \(host):\(port)")
                 DispatchQueue.main.async {
                     WKSDK.shared().options.host = host
