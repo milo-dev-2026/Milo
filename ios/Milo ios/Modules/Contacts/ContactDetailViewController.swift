@@ -2,6 +2,15 @@ import UIKit
 import SnapKit
 import Kingfisher
 
+// MARK: - Tap Helper
+private class TapActionWrapper: NSObject {
+    let action: () -> Void
+    init(action: @escaping () -> Void) { self.action = action }
+    @objc func perform() { action() }
+}
+
+private var actionWrapperKey: UInt8 = 0
+
 // MARK: - 联系人详情
 class ContactDetailViewController: UIViewController {
 
@@ -220,8 +229,9 @@ class ContactDetailViewController: UIViewController {
         let row = UIView()
         row.backgroundColor = .white
         row.isUserInteractionEnabled = true
-        let tap = UITapGestureRecognizer()
-        tap.addAction { action() }
+        let wrapper = TapActionWrapper(action: action)
+        let tap = UITapGestureRecognizer(target: wrapper, action: #selector(TapActionWrapper.perform))
+        objc_setAssociatedObject(row, &actionWrapperKey, wrapper, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         row.addGestureRecognizer(tap)
         container.addSubview(row)
 
@@ -291,7 +301,7 @@ class ContactDetailViewController: UIViewController {
                 self.userInfo = info
                 DispatchQueue.main.async {
                     self.nameLabel.text = info.displayName
-                    self.idLabel.text = "Milo号：\(info.channelID)"
+                    self.idLabel.text = "Milo号：\(info.channel_id ?? "")"
                     if let avatar = info.logo ?? info.avatar, let url = URL(string: avatar) {
                         AppUtility.loadAvatar(url, into: self.avatarImageView)
                     }

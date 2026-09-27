@@ -216,12 +216,12 @@ class MySettingViewController: UIViewController {
 
     // MARK: - 页面跳转
     @objc private func showMyInfo() {
-        let myInfoVC = MyProfileViewController()
-        navigationController?.pushViewController(myInfoVC, animated: true)
+        let profileVC = ProfileEditViewController()
+        navigationController?.pushViewController(profileVC, animated: true)
     }
 
     @objc private func showMyQRCode() {
-        let qrVC = QRCodeViewController()
+        let qrVC = UserQRCodeViewController()
         navigationController?.pushViewController(qrVC, animated: true)
     }
 
@@ -231,7 +231,7 @@ class MySettingViewController: UIViewController {
     }
 
     @objc private func showFavorites() {
-        let favVC = FavoriteListViewController()
+        let favVC = FavoriteViewController()
         navigationController?.pushViewController(favVC, animated: true)
     }
 
