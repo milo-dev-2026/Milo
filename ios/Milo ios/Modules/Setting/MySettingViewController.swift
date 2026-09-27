@@ -221,7 +221,10 @@ class MySettingViewController: UIViewController {
     }
 
     @objc private func showMyQRCode() {
-        let qrVC = UserQRCodeViewController()
+        let userInfo = UserDefaults.standard.dictionary(forKey: "userInfo") ?? [:]
+        let uid = userInfo["uid"] as? String ?? ""
+        let name = userInfo["name"] as? String ?? ""
+        let qrVC = UserQRCodeViewController(uid: uid, name: name)
         navigationController?.pushViewController(qrVC, animated: true)
     }
 

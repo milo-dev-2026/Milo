@@ -6,7 +6,7 @@ import Kingfisher
 private class TapActionWrapper: NSObject {
     let action: () -> Void
     init(action: @escaping () -> Void) { self.action = action }
-    @objc func perform() { action() }
+    @objc func performAction() { action() }
 }
 
 private var actionWrapperKey: UInt8 = 0
@@ -230,7 +230,7 @@ class ContactDetailViewController: UIViewController {
         row.backgroundColor = .white
         row.isUserInteractionEnabled = true
         let wrapper = TapActionWrapper(action: action)
-        let tap = UITapGestureRecognizer(target: wrapper, action: #selector(TapActionWrapper.perform))
+        let tap = UITapGestureRecognizer(target: wrapper, action: #selector(TapActionWrapper.performAction))
         objc_setAssociatedObject(row, &actionWrapperKey, wrapper, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         row.addGestureRecognizer(tap)
         container.addSubview(row)
@@ -305,7 +305,7 @@ class ContactDetailViewController: UIViewController {
                     if let avatar = info.logo ?? info.avatar, let url = URL(string: avatar) {
                         AppUtility.loadAvatar(url, into: self.avatarImageView)
                     }
-                    if let remark = info.channelRemark, !remark.isEmpty {
+                    if let remark = info.remark, !remark.isEmpty {
                         self.remarkLabel.text = "备注：\(remark)"
                     } else {
                         self.remarkLabel.text = ""
