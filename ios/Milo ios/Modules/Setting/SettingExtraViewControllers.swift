@@ -132,6 +132,7 @@ class SettingCell: UITableViewCell {
     private let iconBgView = UIView()
     private let iconImageView = UIImageView()
     private let titleLabel = UILabel()
+    private let detailLabel = UILabel()
     private let arrowView = UIImageView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -178,6 +179,17 @@ class SettingCell: UITableViewCell {
             make.centerY.equalToSuperview()
         }
 
+        // 详情文本（右侧）
+        detailLabel.font = ScreenAdapter.font(13)
+        detailLabel.textColor = .secondaryLabel
+        detailLabel.textAlignment = .right
+        contentView.addSubview(detailLabel)
+        detailLabel.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalToSuperview()
+            make.leading.greaterThanOrEqualTo(titleLabel.snp.trailing).offset(8)
+        }
+
         // 箭头
         arrowView.image = UIImage(systemName: "chevron.right")
         arrowView.tintColor = UIColor(white: 0.75, alpha: 1.0)
@@ -195,6 +207,35 @@ class SettingCell: UITableViewCell {
         iconImageView.image = UIImage(systemName: icon, withConfiguration: config)
         iconBgView.backgroundColor = iconColor
         titleLabel.text = title
+        detailLabel.text = ""
+        arrowView.isHidden = false
+    }
+
+    func setDetailText(_ text: String) {
+        detailLabel.text = text
+        if !text.isEmpty {
+            arrowView.isHidden = false
+            detailLabel.snp.remakeConstraints { make in
+                make.trailing.equalTo(arrowView.snp.leading).offset(-6)
+                make.centerY.equalToSuperview()
+                make.leading.greaterThanOrEqualTo(titleLabel.snp.trailing).offset(8)
+            }
+        }
+    }
+
+    func setTitleColor(_ color: UIColor) {
+        titleLabel.textColor = color
+    }
+
+    func setAccessoryView(_ view: UIView?) {
+        arrowView.isHidden = true
+        if let v = view {
+            contentView.addSubview(v)
+            v.snp.makeConstraints { make in
+                make.trailing.equalToSuperview().offset(-16)
+                make.centerY.equalToSuperview()
+            }
+        }
     }
 }
 
@@ -203,6 +244,18 @@ class MsgNoticesSettingViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
+    private let sectionItems: [[(icon: String, title: String, iconColor: UIColor, isSwitch: Bool)]] = [
+        [
+            ("bell.badge.fill", "新消息通知", UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0), true),
+            ("text.bubble.fill", "通知显示消息详情", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0), true),
+            ("speaker.wave.2.fill", "声音", UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0), true),
+            ("iphone.radiowaves.left.and.right", "震动", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0), true)
+        ],
+        [
+            ("person.3.fill", "群消息免打扰", UIColor(red: 0.15, green: 0.65, blue: 0.60, alpha: 1.0), true)
+        ]
+    ]
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -210,11 +263,13 @@ class MsgNoticesSettingViewController: UIViewController {
 
     private func setupUI() {
         title = "消息通知"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "NotifCell")
+        tableView.register(SettingCell.self, forCellReuseIdentifier: "NotifCell")
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -225,7 +280,6 @@ class MsgNoticesSettingViewController: UIViewController {
     // MARK: - Switch Actions
     @objc private func toggleNewMessage(_ sender: UISwitch) {
         LocalStore.shared.isMessageNotificationEnabled = sender.isOn
-        // 刷新整个表以更新其他开关的可用状态
         tableView.reloadData()
     }
 
@@ -244,20 +298,44 @@ class MsgNoticesSettingViewController: UIViewController {
     @objc private func toggleGroupMute(_ sender: UISwitch) {
         LocalStore.shared.isGroupMuteEnabled = sender.isOn
     }
+
+    private func switchForRow(_ section: Int, _ row: Int) -> UISwitch {
+        let switchControl = UISwitch()
+        switchControl.onTintColor = .themePrimary
+        let isNotifEnabled = LocalStore.shared.isMessageNotificationEnabled
+        switch (section, row) {
+        case (0, 0):
+            switchControl.isOn = isNotifEnabled
+            switchControl.addTarget(self, action: #selector(toggleNewMessage(_:)), for: .valueChanged)
+        case (0, 1):
+            switchControl.isOn = LocalStore.shared.isNotificationDetailEnabled
+            switchControl.isEnabled = isNotifEnabled
+            switchControl.addTarget(self, action: #selector(toggleDetail(_:)), for: .valueChanged)
+        case (0, 2):
+            switchControl.isOn = LocalStore.shared.isSoundEnabled
+            switchControl.isEnabled = isNotifEnabled
+            switchControl.addTarget(self, action: #selector(toggleSound(_:)), for: .valueChanged)
+        case (0, 3):
+            switchControl.isOn = LocalStore.shared.isVibrationEnabled
+            switchControl.isEnabled = isNotifEnabled
+            switchControl.addTarget(self, action: #selector(toggleVibration(_:)), for: .valueChanged)
+        case (1, 0):
+            switchControl.isOn = LocalStore.shared.isGroupMuteEnabled
+            switchControl.addTarget(self, action: #selector(toggleGroupMute(_:)), for: .valueChanged)
+        default: break
+        }
+        return switchControl
+    }
 }
 
 extension MsgNoticesSettingViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 2
+        return sectionItems.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0: return 4
-        case 1: return 1
-        default: return 0
-        }
+        return sectionItems[section].count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -268,57 +346,16 @@ extension MsgNoticesSettingViewController: UITableViewDataSource, UITableViewDel
         }
     }
 
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 52
+    }
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "NotifCell", for: indexPath)
+        let cell = tableView.dequeueReusableCell(withIdentifier: "NotifCell", for: indexPath) as! SettingCell
+        let item = sectionItems[indexPath.section][indexPath.row]
+        cell.configure(icon: item.icon, title: item.title, iconColor: item.iconColor)
         cell.selectionStyle = .none
-        cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.tintColor = .themePrimary
-        cell.accessoryType = .none
-
-        let switchControl = UISwitch()
-        switchControl.onTintColor = .themePrimary
-        let isNotifEnabled = LocalStore.shared.isMessageNotificationEnabled
-
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0):
-            cell.textLabel?.text = "新消息通知"
-            cell.imageView?.image = UIImage(systemName: "bell.badge")
-            switchControl.isOn = isNotifEnabled
-            switchControl.addTarget(self, action: #selector(toggleNewMessage(_:)), for: .valueChanged)
-            cell.accessoryView = switchControl
-        case (0, 1):
-            cell.textLabel?.text = "通知显示消息详情"
-            cell.imageView?.image = UIImage(systemName: "text.bubble")
-            switchControl.isOn = LocalStore.shared.isNotificationDetailEnabled
-            switchControl.isEnabled = isNotifEnabled
-            switchControl.addTarget(self, action: #selector(toggleDetail(_:)), for: .valueChanged)
-            cell.accessoryView = switchControl
-            cell.textLabel?.textColor = isNotifEnabled ? .label : .secondaryLabel
-        case (0, 2):
-            cell.textLabel?.text = "声音"
-            cell.imageView?.image = UIImage(systemName: "speaker.wave.2")
-            switchControl.isOn = LocalStore.shared.isSoundEnabled
-            switchControl.isEnabled = isNotifEnabled
-            switchControl.addTarget(self, action: #selector(toggleSound(_:)), for: .valueChanged)
-            cell.accessoryView = switchControl
-            cell.textLabel?.textColor = isNotifEnabled ? .label : .secondaryLabel
-        case (0, 3):
-            cell.textLabel?.text = "震动"
-            cell.imageView?.image = UIImage(systemName: "iphone.radiowaves.left.and.right")
-            switchControl.isOn = LocalStore.shared.isVibrationEnabled
-            switchControl.isEnabled = isNotifEnabled
-            switchControl.addTarget(self, action: #selector(toggleVibration(_:)), for: .valueChanged)
-            cell.accessoryView = switchControl
-            cell.textLabel?.textColor = isNotifEnabled ? .label : .secondaryLabel
-        case (1, 0):
-            cell.textLabel?.text = "群消息免打扰"
-            cell.imageView?.image = UIImage(systemName: "person.3.fill")
-            switchControl.isOn = LocalStore.shared.isGroupMuteEnabled
-            switchControl.addTarget(self, action: #selector(toggleGroupMute(_:)), for: .valueChanged)
-            cell.accessoryView = switchControl
-        default:
-            break
-        }
+        cell.accessoryView = switchForRow(indexPath.section, indexPath.row)
         return cell
     }
 }
@@ -328,6 +365,23 @@ class GeneralSettingViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var cacheSize: String = "0MB"
+
+    private let sectionItems: [[(icon: String, title: String, iconColor: UIColor)]] = [
+        [
+            ("moon.fill", "深色模式", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0))
+        ],
+        [
+            ("textformat.size", "字体大小", UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0)),
+            ("globe", "语言设置", UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0))
+        ],
+        [
+            ("trash.fill", "清理缓存", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0)),
+            ("internaldrive", "存储空间", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0))
+        ],
+        [
+            ("photo.on.rectangle", "聊天背景设置", UIColor(red: 0.15, green: 0.65, blue: 0.60, alpha: 1.0))
+        ]
+    ]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -342,11 +396,13 @@ class GeneralSettingViewController: UIViewController {
 
     private func setupUI() {
         title = "通用设置"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "GeneralCell")
+        tableView.register(SettingCell.self, forCellReuseIdentifier: "GeneralCell")
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -486,17 +542,11 @@ class GeneralSettingViewController: UIViewController {
 extension GeneralSettingViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 4
+        return sectionItems.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0: return 1
-        case 1: return 2
-        case 2: return 2
-        case 3: return 1
-        default: return 0
-        }
+        return sectionItems[section].count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -509,44 +559,32 @@ extension GeneralSettingViewController: UITableViewDataSource, UITableViewDelega
         }
     }
 
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 52
+    }
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "GeneralCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.tintColor = .themePrimary
-        cell.detailTextLabel?.font = ScreenAdapter.font(14)
-        cell.detailTextLabel?.textColor = .secondaryLabel
+        let cell = tableView.dequeueReusableCell(withIdentifier: "GeneralCell", for: indexPath) as! SettingCell
+        let item = sectionItems[indexPath.section][indexPath.row]
+        cell.configure(icon: item.icon, title: item.title, iconColor: item.iconColor)
 
         switch (indexPath.section, indexPath.row) {
         case (0, 0):
-            cell.textLabel?.text = "深色模式"
-            cell.imageView?.image = UIImage(systemName: "moon")
             let mode = LocalStore.shared.appearanceMode
             let modeTexts = ["跟随系统", "浅色", "深色"]
-            cell.detailTextLabel?.text = modeTexts[mode]
+            cell.setDetailText(modeTexts[mode])
         case (1, 0):
-            cell.textLabel?.text = "字体大小"
-            cell.imageView?.image = UIImage(systemName: "textformat.size")
             let level = LocalStore.shared.fontSizeLevel
             let levelTexts = ["小", "标准", "大", "超大"]
-            cell.detailTextLabel?.text = levelTexts[level]
+            cell.setDetailText(levelTexts[level])
         case (1, 1):
-            cell.textLabel?.text = "语言设置"
-            cell.imageView?.image = UIImage(systemName: "globe")
             let lang = LocalStore.shared.languageSetting
             let langTexts = ["简体中文", "繁体中文", "English"]
-            cell.detailTextLabel?.text = langTexts[lang]
+            cell.setDetailText(langTexts[lang])
         case (2, 0):
-            cell.textLabel?.text = "清理缓存"
-            cell.imageView?.image = UIImage(systemName: "trash")
-            cell.detailTextLabel?.text = cacheSize
+            cell.setDetailText(cacheSize)
         case (2, 1):
-            cell.textLabel?.text = "存储空间"
-            cell.imageView?.image = UIImage(systemName: "internaldrive")
-            cell.detailTextLabel?.text = "查看"
-        case (3, 0):
-            cell.textLabel?.text = "聊天背景设置"
-            cell.imageView?.image = UIImage(systemName: "photo.on.rectangle")
+            cell.setDetailText("查看")
         default:
             break
         }
@@ -580,6 +618,16 @@ class AboutViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
+    private let sectionItems: [[(icon: String, title: String, iconColor: UIColor)]] = [
+        [
+            ("doc.text.fill", "用户协议", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0)),
+            ("hand.raised.fill", "隐私政策", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0))
+        ],
+        [
+            ("info.circle.fill", "功能介绍", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0))
+        ]
+    ]
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -587,21 +635,23 @@ class AboutViewController: UIViewController {
 
     private func setupUI() {
         title = "关于我们"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "AboutCell")
+        tableView.register(SettingCell.self, forCellReuseIdentifier: "AboutCell")
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
 
         // 顶部 Logo Header
-        let headerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(180)))
+        let headerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 180))
         headerView.backgroundColor = .clear
 
         let logoImageView = UIImageView()
         logoImageView.image = UIImage(named: "AppIcon") ?? UIImage(systemName: "message.circle.fill")
         logoImageView.tintColor = .themePrimary
         logoImageView.contentMode = .scaleAspectFit
-        logoImageView.layer.cornerRadius = ScreenAdapter.scaleW(16)
+        logoImageView.layer.cornerRadius = 16
         logoImageView.clipsToBounds = true
 
         let appNameLabel = UILabel()
@@ -626,23 +676,23 @@ class AboutViewController: UIViewController {
         headerView.addSubviews(logoImageView, appNameLabel, versionLabel, descLabel)
 
         logoImageView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.top.equalToSuperview().offset(20)
             make.centerX.equalToSuperview()
-            make.width.height.equalTo(ScreenAdapter.scaleW(72))
+            make.width.height.equalTo(72)
         }
 
         appNameLabel.snp.makeConstraints { make in
-            make.top.equalTo(logoImageView.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.top.equalTo(logoImageView.snp.bottom).offset(12)
             make.centerX.equalToSuperview()
         }
 
         versionLabel.snp.makeConstraints { make in
-            make.top.equalTo(appNameLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
+            make.top.equalTo(appNameLabel.snp.bottom).offset(4)
             make.centerX.equalToSuperview()
         }
 
         descLabel.snp.makeConstraints { make in
-            make.top.equalTo(versionLabel.snp.bottom).offset(ScreenAdapter.scaleH(8))
+            make.top.equalTo(versionLabel.snp.bottom).offset(8)
             make.centerX.equalToSuperview()
             make.leading.equalToSuperview().offset(20)
             make.trailing.equalToSuperview().offset(-20)
@@ -656,7 +706,7 @@ class AboutViewController: UIViewController {
         }
 
         // 底部版权信息
-        let footerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(60)))
+        let footerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 60))
         let copyrightLabel = UILabel()
         copyrightLabel.text = "Copyright © 2024 Milo.\nAll rights reserved."
         copyrightLabel.font = ScreenAdapter.font(12)
@@ -682,15 +732,11 @@ class AboutViewController: UIViewController {
 extension AboutViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 2
+        return sectionItems.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0: return 2
-        case 1: return 1
-        default: return 0
-        }
+        return sectionItems[section].count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -701,25 +747,14 @@ extension AboutViewController: UITableViewDataSource, UITableViewDelegate {
         }
     }
 
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "AboutCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.tintColor = .themePrimary
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 52
+    }
 
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0):
-            cell.textLabel?.text = "用户协议"
-            cell.imageView?.image = UIImage(systemName: "doc.text")
-        case (0, 1):
-            cell.textLabel?.text = "隐私政策"
-            cell.imageView?.image = UIImage(systemName: "hand.raised")
-        case (1, 0):
-            cell.textLabel?.text = "功能介绍"
-            cell.imageView?.image = UIImage(systemName: "info.circle")
-        default:
-            break
-        }
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "AboutCell", for: indexPath) as! SettingCell
+        let item = sectionItems[indexPath.section][indexPath.row]
+        cell.configure(icon: item.icon, title: item.title, iconColor: item.iconColor)
         return cell
     }
 
@@ -727,15 +762,12 @@ extension AboutViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         switch (indexPath.section, indexPath.row) {
         case (0, 0):
-            // 用户协议
             let webVC = SimpleWebViewController(title: "用户协议", url: "about:blank")
             navigationController?.pushViewController(webVC, animated: true)
         case (0, 1):
-            // 隐私政策
             let webVC = SimpleWebViewController(title: "隐私政策", url: "about:blank")
             navigationController?.pushViewController(webVC, animated: true)
         case (1, 0):
-            // 功能介绍
             AppUtility.showToast("Milo - 简洁高效的即时通讯应用")
         default:
             break
@@ -781,6 +813,26 @@ class SecuritySettingViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
+    // 配置项：(图标, 标题, 图标颜色, section, 右侧文本)
+    private let sections: [[(icon: String, title: String, iconColor: UIColor, detail: String)]] = [
+        [
+            ("shield.lefthalf.filled", "安全账号", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0), "未绑定")
+        ],
+        [
+            ("laptopcomputer", "设备管理", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0), ""),
+            ("eye.slash.fill", "消息隐私", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0), ""),
+            ("key.fill", "聊天密码", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0), "未设置"),
+            ("person.badge.minus", "黑名单", UIColor(red: 1.0, green: 0.42, blue: 0.48, alpha: 1.0), "")
+        ],
+        [
+            ("lock.fill", "锁屏密码", UIColor(red: 0.15, green: 0.65, blue: 0.60, alpha: 1.0), "未设置"),
+            ("key.viewfinder", "登录密码", UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0), "已设置")
+        ],
+        [
+            ("person.crop.circle.badge.xmark", "注销账号", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0), "")
+        ]
+    ]
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -793,11 +845,13 @@ class SecuritySettingViewController: UIViewController {
 
     private func setupUI() {
         title = "安全中心"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SecurityCell")
+        tableView.register(SettingCell.self, forCellReuseIdentifier: "SecurityCell")
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -809,17 +863,11 @@ class SecuritySettingViewController: UIViewController {
 extension SecuritySettingViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 4
+        return sections.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0: return 1
-        case 1: return 4
-        case 2: return 2
-        case 3: return 1
-        default: return 0
-        }
+        return sections[section].count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -832,50 +880,32 @@ extension SecuritySettingViewController: UITableViewDataSource, UITableViewDeleg
         }
     }
 
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "SecurityCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.textLabel?.textColor = .label
-        cell.imageView?.tintColor = .themePrimary
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 52
+    }
 
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "SecurityCell", for: indexPath) as! SettingCell
+        let item = sections[indexPath.section][indexPath.row]
+        cell.configure(icon: item.icon, title: item.title, iconColor: item.iconColor)
+        cell.accessoryType = .disclosureIndicator
+
+        // 动态更新详情文本
         switch (indexPath.section, indexPath.row) {
         case (0, 0):
-            cell.textLabel?.text = "安全账号"
-            cell.imageView?.image = UIImage(systemName: "shield.lefthalf.filled")
             let phone = UserDefaults.standard.string(forKey: "bind_phone") ?? ""
             let email = UserDefaults.standard.string(forKey: "bind_email") ?? ""
-            cell.detailTextLabel?.text = !phone.isEmpty || !email.isEmpty ? "已绑定" : "未绑定"
-        case (1, 0):
-            cell.textLabel?.text = "设备管理"
-            cell.imageView?.image = UIImage(systemName: "laptopcomputer")
-        case (1, 1):
-            cell.textLabel?.text = "消息隐私"
-            cell.imageView?.image = UIImage(systemName: "eye.slash")
+            cell.setDetailText(!phone.isEmpty || !email.isEmpty ? "已绑定" : "未绑定")
         case (1, 2):
-            cell.textLabel?.text = "聊天密码"
-            cell.imageView?.image = UIImage(systemName: "key")
             let enabled = UserDefaults.standard.bool(forKey: "chat_password_enabled")
-            cell.detailTextLabel?.text = enabled ? "已设置" : "未设置"
-        case (1, 3):
-            cell.textLabel?.text = "黑名单"
-            cell.imageView?.image = UIImage(systemName: "person.badge.minus")
+            cell.setDetailText(enabled ? "已设置" : "未设置")
         case (2, 0):
-            cell.textLabel?.text = "锁屏密码"
-            cell.imageView?.image = UIImage(systemName: "lock")
             let enabled = LocalStore.shared.isAppLockEnabled
-            cell.detailTextLabel?.text = enabled ? "已设置" : "未设置"
-        case (2, 1):
-            cell.textLabel?.text = "登录密码"
-            cell.imageView?.image = UIImage(systemName: "key.viewfinder")
-            cell.detailTextLabel?.text = "已设置"
+            cell.setDetailText(enabled ? "已设置" : "未设置")
         case (3, 0):
-            cell.textLabel?.text = "注销账号"
-            cell.imageView?.image = UIImage(systemName: "person.crop.circle.badge.xmark")
-            cell.textLabel?.textColor = .systemRed
-            cell.accessoryType = .disclosureIndicator
+            cell.setTitleColor(.systemRed)
         default:
-            break
+            cell.setDetailText(item.detail)
         }
         return cell
     }
