@@ -2,11 +2,29 @@ import UIKit
 import SnapKit
 import Kingfisher
 
+// MARK: - 联系人详情
 class ContactDetailViewController: UIViewController {
 
     private let uid: String
-    private var user: User?
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private var userInfo: ChannelInfo?
+
+    // MARK: - 顶部用户信息
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
+
+    private let headerCard = UIView()
+    private let avatarImageView = UIImageView()
+    private let nameLabel = UILabel()
+    private let idLabel = UILabel()
+    private let remarkLabel = UILabel()
+
+    // MARK: - 信息区
+    private let infoCard = UIView()
+
+    // MARK: - 按钮区
+    private let sendMsgButton = UIButton(type: .system)
+    private let audioCallButton = UIButton(type: .system)
+    private let videoCallButton = UIButton(type: .system)
 
     init(uid: String) {
         self.uid = uid
@@ -23,202 +41,305 @@ class ContactDetailViewController: UIViewController {
         loadUserInfo()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
     private func setupUI() {
-        title = "联系人详情"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
+        title = "个人信息"
 
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "DetailCell")
-        tableView.tableHeaderView = createHeaderView()
+        // 导航栏返回按钮
+        let backBtn = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backTapped)
+        )
+        backBtn.tintColor = .label
+        navigationItem.leftBarButtonItem = backBtn
 
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in
+        // ScrollView
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = false
+        view.addSubview(scrollView)
+        scrollView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+
+        scrollView.addSubview(contentView)
+        contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
+            make.width.equalTo(scrollView)
         }
 
-        let chatBtn = UIButton(type: .system)
-        chatBtn.setTitle("发消息", for: .normal)
-        chatBtn.backgroundColor = .themePrimary
-        chatBtn.setTitleColor(.white, for: .normal)
-        chatBtn.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        chatBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
-        chatBtn.addTarget(self, action: #selector(startChat), for: .touchUpInside)
-
-        view.addSubview(chatBtn)
-        chatBtn.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-ScreenAdapter.scaleH(16))
-            make.height.equalTo(ScreenAdapter.scaleH(44))
+        // MARK: - 顶部用户卡片
+        headerCard.backgroundColor = .white
+        headerCard.layer.cornerRadius = 12
+        headerCard.clipsToBounds = true
+        contentView.addSubview(headerCard)
+        headerCard.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(16)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
         }
 
-        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: ScreenAdapter.scaleH(64), right: 0)
+        // 头像
+        avatarImageView.layer.cornerRadius = 40
+        avatarImageView.clipsToBounds = true
+        avatarImageView.contentMode = .scaleAspectFill
+        avatarImageView.image = UIImage(systemName: "person.circle.fill")
+        avatarImageView.tintColor = .systemGray5
+        headerCard.addSubview(avatarImageView)
+        avatarImageView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(20)
+            make.width.height.equalTo(80)
+        }
+
+        // 名字
+        nameLabel.font = ScreenAdapter.boldFont(20)
+        nameLabel.textColor = .label
+        nameLabel.text = "加载中..."
+        headerCard.addSubview(nameLabel)
+        nameLabel.snp.makeConstraints { make in
+            make.leading.equalTo(avatarImageView.snp.trailing).offset(16)
+            make.top.equalTo(avatarImageView.snp.top).offset(8)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        // Milo号
+        idLabel.font = ScreenAdapter.font(13)
+        idLabel.textColor = .secondaryLabel
+        headerCard.addSubview(idLabel)
+        idLabel.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel)
+            make.top.equalTo(nameLabel.snp.bottom).offset(6)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        // 备注
+        remarkLabel.font = ScreenAdapter.font(13)
+        remarkLabel.textColor = .secondaryLabel
+        remarkLabel.numberOfLines = 0
+        headerCard.addSubview(remarkLabel)
+        remarkLabel.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel)
+            make.top.equalTo(idLabel.snp.bottom).offset(4)
+            make.trailing.equalToSuperview().offset(-16)
+            make.bottom.equalToSuperview().offset(-20)
+        }
+
+        // MARK: - 信息区（设置备注等）
+        infoCard.backgroundColor = .white
+        infoCard.layer.cornerRadius = 12
+        infoCard.clipsToBounds = true
+        contentView.addSubview(infoCard)
+        infoCard.snp.makeConstraints { make in
+            make.top.equalTo(headerCard.snp.bottom).offset(16)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        addInfoRow(to: infoCard, title: "设置备注和标签", showArrow: true, isLast: true) { [weak self] in
+            AppUtility.showToast("设置备注")
+        }
+
+        // MARK: - 操作按钮区
+        let buttonsStack = UIStackView()
+        buttonsStack.axis = .horizontal
+        buttonsStack.distribution = .fillEqually
+        buttonsStack.spacing = 12
+        buttonsStack.backgroundColor = .white
+        buttonsStack.layer.cornerRadius = 12
+        buttonsStack.clipsToBounds = true
+        buttonsStack.isLayoutMarginsRelativeArrangement = true
+        buttonsStack.layoutMargins = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        contentView.addSubview(buttonsStack)
+        buttonsStack.snp.makeConstraints { make in
+            make.top.equalTo(infoCard.snp.bottom).offset(16)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        // 发消息
+        sendMsgButton.setImage(UIImage(systemName: "message.fill"), for: .normal)
+        sendMsgButton.setTitle("  发消息", for: .normal)
+        sendMsgButton.tintColor = .themePrimary
+        sendMsgButton.setTitleColor(.themePrimary, for: .normal)
+        sendMsgButton.titleLabel?.font = ScreenAdapter.font(14)
+        sendMsgButton.addTarget(self, action: #selector(sendMessageTapped), for: .touchUpInside)
+        buttonsStack.addArrangedSubview(sendMsgButton)
+
+        // 语音通话
+        audioCallButton.setImage(UIImage(systemName: "phone.fill"), for: .normal)
+        audioCallButton.setTitle("  语音", for: .normal)
+        audioCallButton.tintColor = .themePrimary
+        audioCallButton.setTitleColor(.themePrimary, for: .normal)
+        audioCallButton.titleLabel?.font = ScreenAdapter.font(14)
+        audioCallButton.addTarget(self, action: #selector(audioCallTapped), for: .touchUpInside)
+        buttonsStack.addArrangedSubview(audioCallButton)
+
+        // 视频通话
+        videoCallButton.setImage(UIImage(systemName: "video.fill"), for: .normal)
+        videoCallButton.setTitle("  视频", for: .normal)
+        videoCallButton.tintColor = .themePrimary
+        videoCallButton.setTitleColor(.themePrimary, for: .normal)
+        videoCallButton.titleLabel?.font = ScreenAdapter.font(14)
+        videoCallButton.addTarget(self, action: #selector(videoCallTapped), for: .touchUpInside)
+        buttonsStack.addArrangedSubview(videoCallButton)
+
+        // MARK: - 更多操作区
+        let moreCard = UIView()
+        moreCard.backgroundColor = .white
+        moreCard.layer.cornerRadius = 12
+        moreCard.clipsToBounds = true
+        contentView.addSubview(moreCard)
+        moreCard.snp.makeConstraints { make in
+            make.top.equalTo(buttonsStack.snp.bottom).offset(16)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        addInfoRow(to: moreCard, title: "推荐给朋友", showArrow: true) {
+            AppUtility.showToast("推荐给朋友")
+        }
+        addInfoRow(to: moreCard, title: "加入黑名单", showArrow: false, isLast: true, isDestructive: true) { [weak self] in
+            self?.showBlockAlert()
+        }
+
+        // 底部约束
+        contentView.snp.makeConstraints { make in
+            make.bottom.equalTo(moreCard.snp.bottom).offset(30)
+        }
     }
 
-    private func createHeaderView() -> UIView {
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(120)))
-        header.backgroundColor = .systemBackground
+    private func addInfoRow(to container: UIView, title: String, showArrow: Bool, isLast: Bool = false, isDestructive: Bool = false, action: @escaping () -> Void) {
+        let row = UIView()
+        row.backgroundColor = .white
+        row.isUserInteractionEnabled = true
+        let tap = UITapGestureRecognizer()
+        tap.addAction { action() }
+        row.addGestureRecognizer(tap)
+        container.addSubview(row)
 
-        let avatarSize = ScreenAdapter.scaleW(60)
-        let avatar = UIImageView()
-        avatar.layer.cornerRadius = avatarSize / 2
-        avatar.clipsToBounds = true
-        avatar.contentMode = .scaleAspectFill
-        avatar.image = UIImage(systemName: "person.circle.fill")
-        avatar.tintColor = .systemGray5
-
-        let nameLabel = UILabel()
-        nameLabel.font = ScreenAdapter.mediumFont(18)
-
-        let uidLabel = UILabel()
-        uidLabel.font = ScreenAdapter.font(13)
-        uidLabel.textColor = .secondaryLabel
-
-        let stack = UIStackView(arrangedSubviews: [nameLabel, uidLabel])
-        stack.axis = .vertical
-        stack.spacing = ScreenAdapter.scaleH(2)
-
-        header.addSubviews(avatar, stack)
-
-        avatar.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(avatarSize)
-        }
-
-        stack.snp.makeConstraints { make in
-            make.leading.equalTo(avatar.snp.trailing).offset(ScreenAdapter.scaleW(16))
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = ScreenAdapter.font(15)
+        titleLabel.textColor = isDestructive ? .systemRed : .label
+        row.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
             make.centerY.equalToSuperview()
         }
 
-        headerViewCache = (avatar, nameLabel, uidLabel)
-        return header
+        if showArrow {
+            let arrowView = UIImageView()
+            arrowView.image = UIImage(systemName: "chevron.right")
+            arrowView.tintColor = UIColor(white: 0.8, alpha: 1.0)
+            arrowView.contentMode = .scaleAspectFit
+            row.addSubview(arrowView)
+            arrowView.snp.makeConstraints { make in
+                make.trailing.equalToSuperview().offset(-16)
+                make.centerY.equalToSuperview()
+                make.width.height.equalTo(14)
+            }
+        }
+
+        // 找到容器中已有的子视图数量
+        let existingRows = container.subviews.filter { $0 is UIView && $0.backgroundColor == .white }
+        if existingRows.isEmpty {
+            row.snp.makeConstraints { make in
+                make.top.leading.trailing.equalToSuperview()
+                make.height.equalTo(48)
+            }
+        } else {
+            let lastRow = existingRows.last!
+            row.snp.makeConstraints { make in
+                make.top.equalTo(lastRow.snp.bottom)
+                make.leading.trailing.equalToSuperview()
+                make.height.equalTo(48)
+            }
+
+            // 添加分割线
+            let line = UIView()
+            line.backgroundColor = UIColor(white: 0, alpha: 0.06)
+            row.addSubview(line)
+            line.snp.makeConstraints { make in
+                make.leading.equalToSuperview().offset(16)
+                make.trailing.top.equalToSuperview()
+                make.height.equalTo(0.5)
+            }
+        }
+
+        if isLast {
+            row.snp.makeConstraints { make in
+                make.bottom.equalToSuperview()
+            }
+        }
     }
 
-    private var headerViewCache: (avatar: UIImageView, name: UILabel, uid: UILabel)?
-
+    // MARK: - 加载用户信息
     private func loadUserInfo() {
         Task {
             do {
-                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                let info: ChannelInfo = try await APIClient.shared.requestFlexible(
                     .getChannelInfo(channelId: uid, channelType: 1)
                 )
-                let data = channelInfo.toUser()
-                user = data
+                self.userInfo = info
                 DispatchQueue.main.async {
-                    self.title = data.name
-                    self.headerViewCache?.name.text = data.name
-                    self.headerViewCache?.uid.text = "ID: \(data.uid)"
-                    if let url = data.avatarURL {
-                        self.headerViewCache?.avatar.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
+                    self.nameLabel.text = info.displayName
+                    self.idLabel.text = "Milo号：\(info.channelID)"
+                    if let avatar = info.logo ?? info.avatar, let url = URL(string: avatar) {
+                        AppUtility.loadAvatar(url, into: self.avatarImageView)
                     }
-                    self.tableView.reloadData()
-                }
-            } catch {
-                AppUtility.showToast("加载用户信息失败")
-            }
-        }
-    }
-
-    @objc private func startChat() {
-        let name = user?.name ?? uid
-        let chatVC = ChatViewController(channelId: uid, title: name)
-        navigationController?.pushViewController(chatVC, animated: true)
-    }
-}
-
-extension ContactDetailViewController: UITableViewDataSource, UITableViewDelegate {
-
-    func numberOfSections(in tableView: UITableView) -> Int {
-        return 1
-    }
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 2
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "DetailCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.imageView?.tintColor = .themePrimary
-        cell.textLabel?.font = ScreenAdapter.font(16)
-
-        switch indexPath.row {
-        case 0:
-            cell.textLabel?.text = "设置备注"
-            cell.imageView?.image = UIImage(systemName: "pencil")
-        case 1:
-            cell.textLabel?.text = "删除好友"
-            cell.imageView?.image = UIImage(systemName: "person.badge.minus")
-            cell.textLabel?.textColor = .systemRed
-        default:
-            break
-        }
-        return cell
-    }
-
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        switch indexPath.row {
-        case 0:
-            showSetRemarkAlert()
-        case 1:
-            confirmDeleteFriend()
-        default:
-            break
-        }
-    }
-
-    private func showSetRemarkAlert() {
-        let alert = UIAlertController(title: "设置备注", message: nil, preferredStyle: .alert)
-        alert.addTextField { tf in
-            tf.placeholder = "备注名"
-            tf.text = self.user?.name ?? ""
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "确定", style: .default) { [weak self] _ in
-            guard let remark = alert.textFields?.first?.text, !remark.isEmpty else { return }
-            self?.setRemark(remark)
-        })
-        present(alert, animated: true)
-    }
-
-    private func setRemark(_ remark: String) {
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: remark))
-                if response["status"] as? Int == 200 {
-                    AppUtility.showToast("已设置备注")
-                }
-            } catch {
-                AppUtility.showToast("设置失败")
-            }
-        }
-    }
-
-    private func confirmDeleteFriend() {
-        let alert = UIAlertController(title: "删除好友", message: "确定删除该好友？", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
-            self?.deleteFriend()
-        })
-        present(alert, animated: true)
-    }
-
-    private func deleteFriend() {
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.deleteFriend(uid: uid))
-                if response["status"] as? Int == 200 {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("已删除好友")
-                        self.navigationController?.popViewController(animated: true)
+                    if let remark = info.channelRemark, !remark.isEmpty {
+                        self.remarkLabel.text = "备注：\(remark)"
+                    } else {
+                        self.remarkLabel.text = ""
                     }
                 }
             } catch {
-                AppUtility.showToast("删除失败")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("加载用户信息失败")
+                }
             }
         }
+    }
+
+    // MARK: - 按钮操作
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
+    }
+
+    @objc private func sendMessageTapped() {
+        let chatVC = ChatViewController(channelId: uid, title: userInfo?.displayName ?? uid, channelType: 1)
+        // 替换当前控制器
+        if var vcs = navigationController?.viewControllers {
+            vcs.removeLast()
+            vcs.append(chatVC)
+            navigationController?.setViewControllers(vcs, animated: true)
+        } else {
+            navigationController?.pushViewController(chatVC, animated: true)
+        }
+    }
+
+    @objc private func audioCallTapped() {
+        AppUtility.showToast("发起语音通话")
+    }
+
+    @objc private func videoCallTapped() {
+        AppUtility.showToast("发起视频通话")
+    }
+
+    private func showBlockAlert() {
+        let alert = UIAlertController(title: "加入黑名单", message: "加入黑名单后将不再接收对方消息", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { _ in
+            AppUtility.showToast("已加入黑名单")
+        })
+        present(alert, animated: true)
     }
 }

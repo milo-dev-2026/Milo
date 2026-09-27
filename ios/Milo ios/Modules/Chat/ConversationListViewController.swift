@@ -1,7 +1,6 @@
 import UIKit
 import SnapKit
 import Kingfisher
-import MJRefresh
 
 // MARK: - 会话列表
 class ConversationListViewController: UIViewController {
@@ -9,14 +8,15 @@ class ConversationListViewController: UIViewController {
     private let tableView = UITableView()
     private var conversations: [Conversation] = []
 
-    // MARK: - 自定义顶部视图
+    // MARK: - 顶部标题栏
     private let titleBarView = UIView()
     private let titleLabel = UILabel()
-    private let addButton = UIButton(type: .system)
+    private let deviceButton = UIButton(type: .custom)
+    private let searchButton = UIButton(type: .custom)
+    private let addButton = UIButton(type: .custom)
 
-    // MARK: - 液态玻璃搜索栏
+    // MARK: - 搜索栏
     private let searchBarContainer = UIView()
-    private let searchBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
     private let searchIconView = UIImageView()
     private let searchTextField = UITextField()
 
@@ -64,7 +64,7 @@ class ConversationListViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .white
 
-        // MARK: - 顶部标题栏（48pt，白色背景）
+        // MARK: - 顶部标题栏
         titleBarView.backgroundColor = .white
         view.addSubview(titleBarView)
         titleBarView.snp.makeConstraints { make in
@@ -73,7 +73,19 @@ class ConversationListViewController: UIViewController {
             make.height.equalTo(48)
         }
 
-        // 居中标题 "Milo"
+        // 左侧设备按钮
+        let deviceConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        deviceButton.setImage(UIImage(systemName: "desktopcomputer", withConfiguration: deviceConfig), for: .normal)
+        deviceButton.tintColor = .label
+        deviceButton.addTarget(self, action: #selector(deviceButtonTapped), for: .touchUpInside)
+        titleBarView.addSubview(deviceButton)
+        deviceButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(12)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
+        // 中间标题 "Milo"
         titleLabel.text = "Milo"
         titleLabel.font = ScreenAdapter.boldFont(20)
         titleLabel.textColor = .label
@@ -82,38 +94,41 @@ class ConversationListViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        // 右侧加号按钮
-        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        addButton.setImage(UIImage(systemName: "plus.circle", withConfiguration: config), for: .normal)
-        addButton.tintColor = .label
-        addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
-        titleBarView.addSubview(addButton)
-        addButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-15)
+        // 右侧搜索按钮
+        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
+        searchButton.tintColor = .label
+        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
+        titleBarView.addSubview(searchButton)
+        searchButton.snp.makeConstraints { make in
+            make.trailing.equalTo(addButton.snp.leading).offset(-8)
             make.centerY.equalToSuperview()
             make.width.height.equalTo(40)
         }
 
-        // MARK: - 液态玻璃搜索栏（36pt高，胶囊形）
+        // 右侧加号按钮
+        let addConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        addButton.setImage(UIImage(systemName: "plus.circle", withConfiguration: addConfig), for: .normal)
+        addButton.tintColor = .label
+        addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
+        titleBarView.addSubview(addButton)
+        addButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-12)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
+        // MARK: - 搜索栏
+        searchBarContainer.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
         searchBarContainer.layer.cornerRadius = 18
         searchBarContainer.clipsToBounds = true
         view.addSubview(searchBarContainer)
         searchBarContainer.snp.makeConstraints { make in
-            make.top.equalTo(titleBarView.snp.bottom).offset(4)
+            make.top.equalTo(titleBarView.snp.bottom).offset(8)
             make.leading.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().offset(-16)
             make.height.equalTo(36)
         }
-
-        // 毛玻璃背景
-        searchBarContainer.addSubview(searchBlurView)
-        searchBlurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        // 柔光边框
-        searchBarContainer.layer.borderWidth = 0.5
-        searchBarContainer.layer.borderColor = UIColor.white.withAlphaComponent(0.6).cgColor
 
         // 搜索图标
         searchIconView.image = UIImage(systemName: "magnifyingglass")
@@ -126,7 +141,7 @@ class ConversationListViewController: UIViewController {
             make.width.height.equalTo(16)
         }
 
-        // 搜索输入框（可点击）
+        // 搜索输入框
         searchTextField.placeholder = "搜索"
         searchTextField.font = ScreenAdapter.font(14)
         searchTextField.textColor = .label
@@ -147,27 +162,32 @@ class ConversationListViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ConversationCell.self, forCellReuseIdentifier: "ConversationCell")
-        tableView.rowHeight = 56
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: 64, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.1)
+        tableView.rowHeight = 64
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 72, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
         tableView.separatorStyle = .singleLine
         tableView.tableFooterView = UIView()
         tableView.backgroundColor = .white
         tableView.keyboardDismissMode = .interactive
 
-        let header = MJRefreshNormalHeader { [weak self] in
-            self?.loadData()
-        }
-        tableView.mj_header = header
-
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(searchBarContainer.snp.bottom).offset(4)
+            make.top.equalTo(searchBarContainer.snp.bottom).offset(8)
             make.leading.trailing.bottom.equalToSuperview()
         }
     }
 
-    // MARK: - 加号弹窗菜单（在+号下方显示）
+    // MARK: - 按钮点击
+    @objc private func deviceButtonTapped() {
+        AppUtility.showToast("PC端登录")
+    }
+
+    @objc private func searchButtonTapped() {
+        let searchVC = SearchAllViewController()
+        navigationController?.pushViewController(searchVC, animated: true)
+    }
+
+    // MARK: - 加号弹窗菜单
     @objc private func showAddMenu() {
         if popupMenuView != nil {
             closePopupMenu()
@@ -195,8 +215,8 @@ class ConversationListViewController: UIViewController {
         view.addSubview(menu)
         let buttonFrame = addButton.convert(addButton.bounds, to: view)
         menu.snp.makeConstraints { make in
-            make.top.equalTo(buttonFrame.maxY + 4)
-            make.trailing.equalToSuperview().offset(-15)
+            make.top.equalTo(buttonFrame.maxY + 6)
+            make.trailing.equalToSuperview().offset(-12)
             make.width.equalTo(160)
         }
         menu.alpha = 0
@@ -288,14 +308,10 @@ class ConversationListViewController: UIViewController {
                 conversations = wkConversations.map { Conversation(from: $0) }
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
-                    self.tableView.mj_header?.endRefreshing()
                 }
                 self.fetchChannelInfoForConversations()
             } catch {
                 print("[ConvList] 加载失败: \(error)")
-                DispatchQueue.main.async {
-                    self.tableView.mj_header?.endRefreshing()
-                }
             }
         }
     }
@@ -361,7 +377,12 @@ extension ConversationListViewController: UITableViewDelegate {
             tableView.deleteRows(at: [indexPath], with: .automatic)
             completion(true)
         }
-        return UISwipeActionsConfiguration(actions: [deleteAction])
+        let muteAction = UIContextualAction(style: .normal, title: "免打扰") { _, _, completion in
+            AppUtility.showToast("已设为免打扰")
+            completion(true)
+        }
+        muteAction.backgroundColor = .systemOrange
+        return UISwipeActionsConfiguration(actions: [deleteAction, muteAction])
     }
 }
 
@@ -376,7 +397,7 @@ extension ConversationListViewController: UITextFieldDelegate {
 // MARK: - 弹窗菜单视图
 class PopupMenuView: UIView {
 
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    private let backgroundView = UIView()
     private let stackView = UIStackView()
     var onSelect: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
@@ -392,22 +413,19 @@ class PopupMenuView: UIView {
 
     private func setupUI(items: [(icon: String, title: String)]) {
         backgroundColor = .clear
-        layer.cornerRadius = 14
-        layer.masksToBounds = true
+        layer.cornerRadius = 12
+        layer.masksToBounds = false
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOffset = CGSize(width: 0, height: 4)
         layer.shadowRadius = 16
-        layer.shadowOpacity = 0.12
+        layer.shadowOpacity = 0.15
 
-        addSubview(blurView)
-        blurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        let overlay = UIView()
-        overlay.backgroundColor = UIColor.white.withAlphaComponent(0.5)
-        addSubview(overlay)
-        overlay.snp.makeConstraints { make in
+        // 背景
+        backgroundView.backgroundColor = UIColor.systemBackground
+        backgroundView.layer.cornerRadius = 12
+        backgroundView.clipsToBounds = true
+        addSubview(backgroundView)
+        backgroundView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
 
@@ -435,22 +453,27 @@ class PopupMenuView: UIView {
             btn.snp.makeConstraints { make in
                 make.height.equalTo(48)
             }
+
+            // 分割线
+            if index < items.count - 1 {
+                let line = UIView()
+                line.backgroundColor = UIColor(white: 0, alpha: 0.08)
+                btn.addSubview(line)
+                line.snp.makeConstraints { make in
+                    make.leading.equalToSuperview().offset(16)
+                    make.trailing.bottom.equalToSuperview()
+                    make.height.equalTo(0.5)
+                }
+            }
         }
 
         snp.makeConstraints { make in
             make.height.equalTo(CGFloat(items.count) * 48)
         }
-
-        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(handleDismiss))
-        self.superview?.addGestureRecognizer(dismissTap)
     }
 
     @objc private func itemTapped(_ sender: UIButton) {
         onSelect?(sender.tag)
-    }
-
-    @objc private func handleDismiss() {
-        onDismiss?()
     }
 
     override func didMoveToSuperview() {
@@ -475,7 +498,9 @@ class ConversationCell: UITableViewCell {
     private let nameLabel = UILabel()
     private let lastMessageLabel = UILabel()
     private let timeLabel = UILabel()
-    private let unreadBadge = UILabel()
+    private let unreadBadge = UIView()
+    private let unreadLabel = UILabel()
+    private let muteIcon = UIImageView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -487,35 +512,51 @@ class ConversationCell: UITableViewCell {
     }
 
     private func setupUI() {
-        let avatarSize: CGFloat = 40
+        let avatarSize: CGFloat = 48
         let hPad: CGFloat = 12
-        let vPad: CGFloat = 2
 
+        backgroundColor = .white
+        contentView.backgroundColor = .white
+
+        // 头像
         avatarView.layer.cornerRadius = 8
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
 
+        // 名字
         nameLabel.font = ScreenAdapter.mediumFont(16)
         nameLabel.textColor = .label
 
+        // 最后一条消息
         lastMessageLabel.font = ScreenAdapter.font(13)
         lastMessageLabel.textColor = .secondaryLabel
         lastMessageLabel.numberOfLines = 1
 
+        // 时间
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
+        timeLabel.textAlignment = .right
 
-        unreadBadge.font = ScreenAdapter.font(11)
-        unreadBadge.textColor = .white
+        // 未读红点
         unreadBadge.backgroundColor = .systemRed
-        unreadBadge.textAlignment = .center
         unreadBadge.layer.cornerRadius = 9
         unreadBadge.clipsToBounds = true
         unreadBadge.isHidden = true
 
-        contentView.addSubviews(avatarView, nameLabel, lastMessageLabel, timeLabel, unreadBadge)
+        unreadLabel.font = ScreenAdapter.font(10)
+        unreadLabel.textColor = .white
+        unreadLabel.textAlignment = .center
+
+        // 免打扰图标
+        muteIcon.image = UIImage(systemName: "bell.slash.fill")
+        muteIcon.tintColor = .systemGray3
+        muteIcon.contentMode = .scaleAspectFit
+        muteIcon.isHidden = true
+
+        contentView.addSubviews(avatarView, nameLabel, lastMessageLabel, timeLabel, unreadBadge, muteIcon)
+        unreadBadge.addSubview(unreadLabel)
 
         avatarView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
@@ -525,26 +566,38 @@ class ConversationCell: UITableViewCell {
 
         nameLabel.snp.makeConstraints { make in
             make.leading.equalTo(avatarView.snp.trailing).offset(hPad)
-            make.top.equalTo(avatarView.snp.top).offset(vPad)
+            make.top.equalTo(avatarView.snp.top).offset(2)
             make.trailing.lessThanOrEqualTo(timeLabel.snp.leading).offset(-8)
         }
 
         lastMessageLabel.snp.makeConstraints { make in
             make.leading.equalTo(nameLabel)
-            make.bottom.equalTo(avatarView.snp.bottom).offset(-vPad)
-            make.trailing.lessThanOrEqualToSuperview().offset(-hPad)
+            make.bottom.equalTo(avatarView.snp.bottom).offset(-2)
+            make.trailing.lessThanOrEqualTo(unreadBadge.snp.leading).offset(-8)
         }
 
         timeLabel.snp.makeConstraints { make in
-            make.top.equalTo(avatarView.snp.top).offset(vPad)
+            make.top.equalTo(avatarView.snp.top).offset(4)
             make.trailing.equalToSuperview().offset(-hPad)
         }
 
         unreadBadge.snp.makeConstraints { make in
+            make.bottom.equalTo(avatarView.snp.bottom).offset(-2)
             make.trailing.equalToSuperview().offset(-hPad)
-            make.bottom.equalTo(avatarView.snp.bottom).offset(-vPad)
-            make.width.greaterThanOrEqualTo(18)
             make.height.equalTo(18)
+            make.width.greaterThanOrEqualTo(18)
+        }
+
+        unreadLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.equalToSuperview().offset(6)
+            make.trailing.equalToSuperview().offset(-6)
+        }
+
+        muteIcon.snp.makeConstraints { make in
+            make.bottom.equalTo(avatarView.snp.bottom).offset(-2)
+            make.trailing.equalToSuperview().offset(-hPad)
+            make.width.height.equalTo(14)
         }
     }
 
@@ -557,9 +610,12 @@ class ConversationCell: UITableViewCell {
 
         if conversation.unreadCount > 0 {
             unreadBadge.isHidden = false
-            unreadBadge.text = conversation.unreadCount > 99 ? "99+" : "\(conversation.unreadCount)"
+            muteIcon.isHidden = true
+            unreadLabel.text = conversation.unreadCount > 99 ? "99+" : "\(conversation.unreadCount)"
         } else {
             unreadBadge.isHidden = true
+            // TODO: 根据免打扰状态显示
+            muteIcon.isHidden = true
         }
     }
 }

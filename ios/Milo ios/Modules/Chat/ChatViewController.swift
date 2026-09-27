@@ -106,17 +106,138 @@ class ChatViewController: UIViewController {
     }
 
     private func setupNavBar() {
-        // 群聊时显示 "+" 按钮，单聊时不显示通话入口
-        if channelType == 2 {
-            let moreBtn = UIBarButtonItem(
-                image: UIImage(systemName: "plus.circle"),
-                style: .plain,
-                target: self,
-                action: #selector(showGroupMoreOptions)
-            )
-            moreBtn.tintColor = .themePrimary
-            navigationItem.rightBarButtonItem = moreBtn
+        // 自定义标题视图（头像+名字）
+        let titleView = UIView()
+        titleView.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
+
+        // 头像
+        let navAvatar = UIImageView()
+        navAvatar.layer.cornerRadius = 16
+        navAvatar.clipsToBounds = true
+        navAvatar.contentMode = .scaleAspectFill
+        navAvatar.image = UIImage(systemName: "person.circle.fill")
+        navAvatar.tintColor = .systemGray5
+        titleView.addSubview(navAvatar)
+        navAvatar.snp.makeConstraints { make in
+            make.leading.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(32)
         }
+
+        // 名字
+        let navTitleLabel = UILabel()
+        navTitleLabel.text = titleText
+        navTitleLabel.font = ScreenAdapter.mediumFont(16)
+        navTitleLabel.textColor = .label
+        titleView.addSubview(navTitleLabel)
+        navTitleLabel.snp.makeConstraints { make in
+            make.leading.equalTo(navAvatar.snp.trailing).offset(8)
+            make.centerY.equalToSuperview()
+        }
+
+        // 加载头像
+        Task {
+            do {
+                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: channelId, channelType: channelType)
+                )
+                DispatchQueue.main.async {
+                    navTitleLabel.text = channelInfo.displayName
+                    if let avatar = channelInfo.logo ?? channelInfo.avatar, let url = URL(string: avatar) {
+                        AppUtility.loadAvatar(url, into: navAvatar)
+                    }
+                }
+            } catch { }
+        }
+
+        navigationItem.titleView = titleView
+
+        // 右侧更多按钮
+        let moreBtn = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(showMoreOptions)
+        )
+        moreBtn.tintColor = .label
+        navigationItem.rightBarButtonItem = moreBtn
+
+        // 返回按钮
+        let backBtn = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backTapped)
+        )
+        backBtn.tintColor = .label
+        navigationItem.leftBarButtonItem = backBtn
+    }
+
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
+    }
+
+    @objc private func showMoreOptions() {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        if channelType == 2 {
+            alert.addAction(UIAlertAction(title: "群聊详情", style: .default) { [weak self] _ in
+                self?.openGroupDetail()
+            })
+            alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
+                self?.startGroupVoiceCall()
+            })
+            alert.addAction(UIAlertAction(title: "查找聊天记录", style: .default) { [weak self] _ in
+                self?.searchChatHistory()
+            })
+        } else {
+            alert.addAction(UIAlertAction(title: "联系人资料", style: .default) { [weak self] _ in
+                self?.openContactDetail()
+            })
+            alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
+                AppUtility.showToast("语音通话")
+            })
+            alert.addAction(UIAlertAction(title: "视频通话", style: .default) { [weak self] _ in
+                AppUtility.showToast("视频通话")
+            })
+            alert.addAction(UIAlertAction(title: "查找聊天记录", style: .default) { [weak self] _ in
+                self?.searchChatHistory()
+            })
+            alert.addAction(UIAlertAction(title: "设为免打扰", style: .default) { _ in
+                AppUtility.showToast("已设为免打扰")
+            })
+        }
+
+        alert.addAction(UIAlertAction(title: "清空聊天记录", style: .destructive) { [weak self] _ in
+            self?.clearChatHistory()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+
+        if let popover = alert.popoverPresentationController {
+            popover.barButtonItem = navigationItem.rightBarButtonItem
+        }
+
+        present(alert, animated: true)
+    }
+
+    private func openContactDetail() {
+        let detailVC = ContactDetailViewController(uid: channelId)
+        navigationController?.pushViewController(detailVC, animated: true)
+    }
+
+    private func searchChatHistory() {
+        AppUtility.showToast("查找聊天记录")
+    }
+
+    private func clearChatHistory() {
+        let alert = UIAlertController(title: "确认清空聊天记录？", message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "清空", style: .destructive) { [weak self] _ in
+            self?.messages.removeAll()
+            self?.tableView.reloadData()
+            AppUtility.showToast("已清空")
+        })
+        present(alert, animated: true)
     }
 
     @objc private func showGroupMoreOptions() {

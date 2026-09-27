@@ -14,25 +14,26 @@ class ContactsViewController: UIViewController {
     // MARK: - 标题栏
     private let titleBarView = UIView()
     private let titleLabel = UILabel()
+    private let searchButton = UIButton(type: .custom)
     private let addButton = UIButton(type: .custom)
 
-    // MARK: - 搜索栏（液态玻璃风格）
+    // MARK: - 搜索栏
     private let searchContainer = UIView()
-    private let searchBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialLight))
     private let searchIconImageView = UIImageView()
     private let searchTextField = UITextField()
 
+    // MARK: - 右侧字母索引条
+    private let indexSidebar = UIView()
+    private var indexButtons: [UIButton] = []
+
     // MARK: - 入口项数据
     private let headerEntries: [(icon: String, title: String, color: UIColor, action: Selector)] = [
-        ("person.fill.badge.plus", "新的朋友", UIColor(red: 0.07, green: 0.59, blue: 1.0, alpha: 1.0), #selector(showFriendApplyList)),
-        ("person.2.fill", "保存的群聊", UIColor(red: 0.35, green: 0.68, blue: 0.98, alpha: 1.0), #selector(showSavedGroups)),
-        ("person.3.fill", "加入的群聊", UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1.0), #selector(showJoinedGroups)),
-        ("doc.fill", "文件传输助手", UIColor(red: 0.99, green: 0.73, blue: 0.19, alpha: 1.0), #selector(showFileHelper)),
-        ("bell.badge.fill", "系统通知", UIColor(red: 1.0, green: 0.32, blue: 0.31, alpha: 1.0), #selector(showSystemNotice))
+        ("person.fill.badge.plus", "新的朋友", UIColor(red: 1.0, green: 0.42, blue: 0.48, alpha: 1.0), #selector(showFriendApplyList)),
+        ("person.2.fill", "保存的群聊", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0), #selector(showSavedGroups)),
+        ("person.3.fill", "加入的群聊", UIColor(red: 0.15, green: 0.65, blue: 0.60, alpha: 1.0), #selector(showJoinedGroups)),
+        ("doc.fill", "文件传输助手", UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0), #selector(showFileHelper)),
+        ("bell.badge.fill", "系统通知", UIColor(red: 1.0, green: 0.66, blue: 0.25, alpha: 1.0), #selector(showSystemNotice))
     ]
-
-    // MARK: - 下拉刷新
-    private let refreshControl = UIRefreshControl()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -65,18 +66,18 @@ class ContactsViewController: UIViewController {
         view.backgroundColor = .white
         navigationController?.setNavigationBarHidden(true, animated: false)
 
-        // MARK: 标题栏（48pt 高，白色背景）
+        // MARK: 标题栏
         titleBarView.backgroundColor = .white
         view.addSubview(titleBarView)
         titleBarView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             make.leading.trailing.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(48))
+            make.height.equalTo(48)
         }
 
         // 标题
         titleLabel.text = "通讯录"
-        titleLabel.font = ScreenAdapter.boldFont(18)
+        titleLabel.font = ScreenAdapter.boldFont(20)
         titleLabel.textColor = .label
         titleLabel.textAlignment = .center
         titleBarView.addSubview(titleLabel)
@@ -84,50 +85,51 @@ class ContactsViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
+        // 搜索按钮
+        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
+        searchButton.tintColor = .label
+        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
+        titleBarView.addSubview(searchButton)
+        searchButton.snp.makeConstraints { make in
+            make.trailing.equalTo(addButton.snp.leading).offset(-8)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
         // 加号按钮
-        addButton.setImage(UIImage(systemName: "person.badge.plus"), for: .normal)
-        addButton.tintColor = .themePrimary
+        let addConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        addButton.setImage(UIImage(systemName: "person.badge.plus", withConfiguration: addConfig), for: .normal)
+        addButton.tintColor = .label
         addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
         titleBarView.addSubview(addButton)
         addButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(15))
+            make.trailing.equalToSuperview().offset(-12)
             make.centerY.equalToSuperview()
-            make.width.height.equalTo(ScreenAdapter.scaleW(24))
+            make.width.height.equalTo(40)
         }
 
-        // MARK: 搜索栏（36pt 高，液态玻璃风格）
-        searchContainer.backgroundColor = UIColor.white.withAlphaComponent(0.6)
-        searchContainer.layer.cornerRadius = ScreenAdapter.scaleH(18)
-        searchContainer.layer.masksToBounds = false
-        searchContainer.layer.shadowColor = UIColor.black.cgColor
-        searchContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
-        searchContainer.layer.shadowRadius = 12
-        searchContainer.layer.shadowOpacity = 0.06
+        // MARK: 搜索栏
+        searchContainer.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
+        searchContainer.layer.cornerRadius = 18
+        searchContainer.clipsToBounds = true
         view.addSubview(searchContainer)
         searchContainer.snp.makeConstraints { make in
-            make.top.equalTo(titleBarView.snp.bottom).offset(ScreenAdapter.scaleH(8))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
-            make.height.equalTo(ScreenAdapter.scaleH(36))
-        }
-
-        // 毛玻璃效果
-        searchBlurView.layer.cornerRadius = ScreenAdapter.scaleH(18)
-        searchBlurView.layer.masksToBounds = true
-        searchContainer.insertSubview(searchBlurView, at: 0)
-        searchBlurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.equalTo(titleBarView.snp.bottom).offset(8)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
         }
 
         // 搜索图标
         searchIconImageView.image = UIImage(systemName: "magnifyingglass")
-        searchIconImageView.tintColor = .themeTextTertiary
+        searchIconImageView.tintColor = .secondaryLabel
         searchIconImageView.contentMode = .scaleAspectFit
         searchContainer.addSubview(searchIconImageView)
         searchIconImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+            make.leading.equalToSuperview().offset(14)
             make.centerY.equalToSuperview()
-            make.width.height.equalTo(ScreenAdapter.scaleW(16))
+            make.width.height.equalTo(16)
         }
 
         // 搜索输入框
@@ -141,8 +143,8 @@ class ContactsViewController: UIViewController {
         searchTextField.addTarget(self, action: #selector(searchTextDidChange(_:)), for: .editingChanged)
         searchContainer.addSubview(searchTextField)
         searchTextField.snp.makeConstraints { make in
-            make.leading.equalTo(searchIconImageView.snp.trailing).offset(ScreenAdapter.scaleW(8))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+            make.leading.equalTo(searchIconImageView.snp.trailing).offset(8)
+            make.trailing.equalToSuperview().offset(-14)
             make.centerY.equalToSuperview()
             make.height.equalToSuperview()
         }
@@ -151,34 +153,76 @@ class ContactsViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ContactCell.self, forCellReuseIdentifier: "ContactCell")
-        tableView.rowHeight = ScreenAdapter.scaleH(56)
+        tableView.rowHeight = 56
         tableView.backgroundColor = .white
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.1)
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: ScreenAdapter.scaleW(64), bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 72, bottom: 0, right: 0)
         tableView.tableFooterView = UIView()
         tableView.sectionIndexColor = .themePrimary
         tableView.sectionIndexBackgroundColor = .clear
         tableView.keyboardDismissMode = .interactive
-
-        // 下拉刷新
-        refreshControl.tintColor = .themePrimary
-        refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
-        tableView.refreshControl = refreshControl
 
         // 入口项作为tableHeaderView
         updateTableHeader()
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(searchContainer.snp.bottom).offset(ScreenAdapter.scaleH(8))
+            make.top.equalTo(searchContainer.snp.bottom).offset(8)
             make.leading.trailing.equalToSuperview()
+            make.bottom.equalToSuperview()
+        }
+
+        // MARK: 右侧字母索引条
+        setupIndexSidebar()
+    }
+
+    private func setupIndexSidebar() {
+        indexSidebar.backgroundColor = .clear
+        view.addSubview(indexSidebar)
+        indexSidebar.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-4)
+            make.centerY.equalTo(tableView)
+            make.width.equalTo(20)
+        }
+
+        let letters = ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+        var lastBtn: UIButton?
+        for letter in letters {
+            let btn = UIButton(type: .system)
+            btn.setTitle(letter, for: .normal)
+            btn.titleLabel?.font = ScreenAdapter.font(10, weight: .medium)
+            btn.setTitleColor(.themePrimary, for: .normal)
+            btn.addTarget(self, action: #selector(indexButtonTapped(_:)), for: .touchUpInside)
+            indexSidebar.addSubview(btn)
+            btn.snp.makeConstraints { make in
+                make.centerX.equalToSuperview()
+                make.width.equalTo(20)
+                make.height.equalTo(14)
+                if let last = lastBtn {
+                    make.top.equalTo(last.snp.bottom)
+                } else {
+                    make.top.equalToSuperview()
+                }
+            }
+            lastBtn = btn
+            indexButtons.append(btn)
+        }
+        lastBtn?.snp.makeConstraints { make in
             make.bottom.equalToSuperview()
         }
     }
 
+    @objc private func indexButtonTapped(_ sender: UIButton) {
+        guard let letter = sender.titleLabel?.text else { return }
+        let sectionIndex = sectionTitles.firstIndex(of: letter) ?? 0
+        if sectionIndex < sectionTitles.count {
+            tableView.scrollToRow(at: IndexPath(row: 0, section: sectionIndex), at: .top, animated: true)
+        }
+    }
+
     private func updateTableHeader() {
-        let headerView = ContactsHeaderView(entries: headerEntries, target: self)
-        headerView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 56 * CGFloat(headerEntries.count) + 8)
+        let headerHeight = CGFloat(headerEntries.count) * 56 + 8
+        let headerView = ContactsHeaderView(entries: headerEntries, target: self, frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: headerHeight))
         tableView.tableHeaderView = headerView
     }
 
@@ -189,9 +233,15 @@ class ContactsViewController: UIViewController {
         }
     }
 
+    // MARK: - 按钮点击
+    @objc private func searchButtonTapped() {
+        let searchVC = GlobalSearchViewController()
+        navigationController?.pushViewController(searchVC, animated: true)
+    }
+
     // MARK: - 入口项点击
     @objc private func showFriendApplyList() {
-        navigationController?.pushViewController(FriendApplyListViewController(), animated: true)
+        AppUtility.showToast("新的朋友")
     }
 
     @objc private func showSavedGroups() {
@@ -219,15 +269,12 @@ class ContactsViewController: UIViewController {
     }
 
     @objc private func showAddMenu() {
-        let alert = UIAlertController(title: "添加好友", message: nil, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "搜索用户ID", style: .default) { [weak self] _ in
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "添加好友", style: .default) { [weak self] _ in
             self?.navigationController?.pushViewController(AddFriendViewController(), animated: true)
         })
         alert.addAction(UIAlertAction(title: "扫一扫", style: .default) { [weak self] _ in
             self?.startScan()
-        })
-        alert.addAction(UIAlertAction(title: "好友申请", style: .default) { [weak self] _ in
-            self?.showFriendApplyList()
         })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         present(alert, animated: true)
@@ -267,12 +314,10 @@ class ContactsViewController: UIViewController {
                 filteredContacts = contacts
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
-                    self.refreshControl.endRefreshing()
                 }
             } catch {
                 DispatchQueue.main.async {
                     AppUtility.showToast("加载通讯录失败")
-                    self.refreshControl.endRefreshing()
                 }
             }
         }
@@ -286,11 +331,6 @@ class ContactsViewController: UIViewController {
         tableView.reloadData()
     }
 
-    // MARK: - 下拉刷新
-    @objc private func handleRefresh() {
-        loadData()
-    }
-
     private var displayContacts: [User] {
         return isSearching ? filteredContacts : contacts
     }
@@ -298,11 +338,9 @@ class ContactsViewController: UIViewController {
     // MARK: - 拼音首字母
     private func pinyinFirstLetter(of name: String) -> String {
         guard let firstChar = name.first else { return "#" }
-        // 如果是字母，直接返回大写
         if firstChar.isASCII && firstChar.isLetter {
             return String(firstChar).uppercased()
         }
-        // 中文名转拼音首字母
         let mutableStr = NSMutableString(string: String(firstChar))
         CFStringTransform(mutableStr, nil, kCFStringTransformToLatin, false)
         CFStringTransform(mutableStr, nil, kCFStringTransformStripDiacritics, false)
@@ -331,6 +369,11 @@ class ContactsViewController: UIViewController {
             }
         }
     }
+
+    // MARK: - 获取联系人数量
+    private var contactsCount: Int {
+        return contacts.count
+    }
 }
 
 // MARK: - UITableViewDataSource & Delegate
@@ -353,7 +396,7 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        return ScreenAdapter.scaleH(28)
+        return 28
     }
 
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
@@ -379,6 +422,32 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
         let detailVC = ContactDetailViewController(uid: user.uid)
         navigationController?.pushViewController(detailVC, animated: true)
     }
+
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        // 最后一个 section 的 footer 显示联系人总数
+        if section == sectionTitles.count - 1 {
+            let footerView = UIView()
+            footerView.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
+            let countLabel = UILabel()
+            countLabel.text = "\(contactsCount) 位联系人"
+            countLabel.font = ScreenAdapter.font(12)
+            countLabel.textColor = .secondaryLabel
+            countLabel.textAlignment = .center
+            footerView.addSubview(countLabel)
+            countLabel.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+            return footerView
+        }
+        return UIView()
+    }
+
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        if section == sectionTitles.count - 1 {
+            return 40
+        }
+        return 0.01
+    }
 }
 
 // MARK: - UITextFieldDelegate
@@ -392,8 +461,10 @@ extension ContactsViewController: UITextFieldDelegate {
 
 // MARK: - 入口项容器视图
 class ContactsHeaderView: UIView {
-    init(entries: [(icon: String, title: String, color: UIColor, action: Selector)], target: Any?) {
-        super.init(frame: .zero)
+    private let stackView = UIStackView()
+
+    init(entries: [(icon: String, title: String, color: UIColor, action: Selector)], target: Any?, frame: CGRect) {
+        super.init(frame: frame)
         setupUI(entries: entries, target: target)
     }
 
@@ -404,7 +475,6 @@ class ContactsHeaderView: UIView {
     private func setupUI(entries: [(icon: String, title: String, color: UIColor, action: Selector)], target: Any?) {
         backgroundColor = .white
 
-        let stackView = UIStackView()
         stackView.axis = .vertical
         stackView.spacing = 0
         addSubview(stackView)
@@ -424,7 +494,7 @@ class ContactsHeaderView: UIView {
             }
         }
 
-        // 底部间距
+        // 底部分隔区域
         let spacer = UIView()
         spacer.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
         stackView.addArrangedSubview(spacer)
@@ -453,15 +523,15 @@ class ContactsHeaderCell: UIView {
     private func setupUI() {
         backgroundColor = .white
 
-        let iconSize: CGFloat = 36
+        let iconSize: CGFloat = 40
         let hPad: CGFloat = 12
 
-        // iOS原生风格图标（圆角方形 + 纯色背景 + 白色填充图标）
+        // 图标背景
         iconView.layer.cornerRadius = 8
         iconView.clipsToBounds = true
         iconView.contentMode = .center
         iconView.tintColor = .white
-        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
         iconView.preferredSymbolConfiguration = config
         addSubview(iconView)
         iconView.snp.makeConstraints { make in
@@ -490,7 +560,7 @@ class ContactsHeaderCell: UIView {
 
         // 底部分割线
         let line = UIView()
-        line.backgroundColor = UIColor(white: 0, alpha: 0.1)
+        line.backgroundColor = UIColor(white: 0, alpha: 0.06)
         addSubview(line)
         line.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad + iconSize + 12)
@@ -501,7 +571,7 @@ class ContactsHeaderCell: UIView {
     }
 
     func configure(icon: String, title: String, color: UIColor) {
-        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
         iconView.image = UIImage(systemName: icon, withConfiguration: config)
         iconView.backgroundColor = color
         titleLabel.text = title
@@ -524,19 +594,20 @@ class ContactCell: UITableViewCell {
     }
 
     private func setupUI() {
-        let avatarSize = ScreenAdapter.scaleW(40)
-        let hPad = ScreenAdapter.scaleW(12)
+        let avatarSize: CGFloat = 40
+        let hPad: CGFloat = 12
 
         backgroundColor = .white
         contentView.backgroundColor = .white
 
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
+        avatarView.layer.cornerRadius = 6
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
 
         nameLabel.font = ScreenAdapter.font(15)
+        nameLabel.textColor = .label
 
         contentView.addSubviews(avatarView, nameLabel)
 

@@ -6,6 +6,19 @@ class SettingMainViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
+    // 设置项配置：(图标, 标题, 图标背景色, section)
+    private let settingItems: [[(icon: String, title: String, iconColor: UIColor)]] = [
+        [
+            ("shield.lefthalf.filled", "账号安全", UIColor(red: 0.96, green: 0.26, blue: 0.21, alpha: 1.0)),
+            ("bell.fill", "消息通知", UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0)),
+            ("lock.fill", "隐私设置", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0)),
+            ("gearshape.fill", "通用设置", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0)),
+        ],
+        [
+            ("info.circle.fill", "关于我们", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0)),
+        ]
+    ]
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -13,9 +26,9 @@ class SettingMainViewController: UIViewController {
 
     private func setupUI() {
         title = "设置"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
-        // 毛玻璃导航栏
+        // 导航栏
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
         navigationController?.navigationBar.standardAppearance = appearance
@@ -25,7 +38,9 @@ class SettingMainViewController: UIViewController {
 
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "MainSettingCell")
+        tableView.register(SettingCell.self, forCellReuseIdentifier: "SettingCell")
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -47,78 +62,139 @@ class SettingMainViewController: UIViewController {
 extension SettingMainViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 2
+        return settingItems.count + 1 // +1 for logout button section
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0: return 4
-        case 1: return 1
-        default: return 0
+        if section < settingItems.count {
+            return settingItems[section].count
         }
+        return 1 // logout section
     }
 
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        switch section {
-        case 0: return "通用"
-        default: return nil
-        }
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 52
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return section == 0 ? 20 : 10
+    }
+
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        return 0.01
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "MainSettingCell", for: indexPath)
-        cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.tintColor = .themePrimary
-
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0):
-            cell.textLabel?.text = "账号安全"
-            cell.imageView?.image = UIImage(systemName: "shield.lefthalf.filled")
-            cell.accessoryType = .disclosureIndicator
-            cell.textLabel?.textColor = .label
-        case (0, 1):
-            cell.textLabel?.text = "消息通知"
-            cell.imageView?.image = UIImage(systemName: "bell")
-            cell.accessoryType = .disclosureIndicator
-            cell.textLabel?.textColor = .label
-        case (0, 2):
-            cell.textLabel?.text = "通用设置"
-            cell.imageView?.image = UIImage(systemName: "gear")
-            cell.accessoryType = .disclosureIndicator
-            cell.textLabel?.textColor = .label
-        case (0, 3):
-            cell.textLabel?.text = "关于我们"
-            cell.imageView?.image = UIImage(systemName: "info.circle")
-            cell.accessoryType = .disclosureIndicator
-            cell.textLabel?.textColor = .label
-        case (1, 0):
+        if indexPath.section < settingItems.count {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "SettingCell", for: indexPath) as! SettingCell
+            let item = settingItems[indexPath.section][indexPath.row]
+            cell.configure(icon: item.icon, title: item.title, iconColor: item.iconColor)
+            return cell
+        } else {
+            let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
             cell.textLabel?.text = "退出登录"
             cell.textLabel?.textColor = .systemRed
             cell.textLabel?.textAlignment = .center
-            cell.imageView?.image = nil
-            cell.accessoryType = .none
-        default:
-            break
+            cell.textLabel?.font = ScreenAdapter.font(16)
+            return cell
         }
-        return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0):
-            navigationController?.pushViewController(SecurityAccountViewController(), animated: true)
-        case (0, 1):
-            navigationController?.pushViewController(MsgNoticesSettingViewController(), animated: true)
-        case (0, 2):
-            navigationController?.pushViewController(GeneralSettingViewController(), animated: true)
-        case (0, 3):
-            navigationController?.pushViewController(AboutViewController(), animated: true)
-        case (1, 0):
+        if indexPath.section == 0 {
+            switch indexPath.row {
+            case 0:
+                navigationController?.pushViewController(SecurityAccountViewController(), animated: true)
+            case 1:
+                navigationController?.pushViewController(MsgNoticesSettingViewController(), animated: true)
+            case 2:
+                AppUtility.showToast("隐私设置")
+            case 3:
+                navigationController?.pushViewController(GeneralSettingViewController(), animated: true)
+            default: break
+            }
+        } else if indexPath.section == 1 {
+            switch indexPath.row {
+            case 0:
+                navigationController?.pushViewController(AboutViewController(), animated: true)
+            default: break
+            }
+        } else if indexPath.section == 2 {
             logout()
-        default:
-            break
         }
+    }
+}
+
+// MARK: - 设置Cell
+class SettingCell: UITableViewCell {
+
+    private let iconBgView = UIView()
+    private let iconImageView = UIImageView()
+    private let titleLabel = UILabel()
+    private let arrowView = UIImageView()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = .white
+        contentView.backgroundColor = .white
+
+        let iconSize: CGFloat = 28
+
+        // 图标背景
+        iconBgView.layer.cornerRadius = 6
+        iconBgView.clipsToBounds = true
+        contentView.addSubview(iconBgView)
+        iconBgView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(iconSize)
+        }
+
+        // 图标
+        iconImageView.tintColor = .white
+        iconImageView.contentMode = .center
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        iconImageView.preferredSymbolConfiguration = config
+        iconBgView.addSubview(iconImageView)
+        iconImageView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+
+        // 标题
+        titleLabel.font = ScreenAdapter.font(15)
+        titleLabel.textColor = .label
+        contentView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.leading.equalTo(iconBgView.snp.trailing).offset(12)
+            make.centerY.equalToSuperview()
+        }
+
+        // 箭头
+        arrowView.image = UIImage(systemName: "chevron.right")
+        arrowView.tintColor = UIColor(white: 0.75, alpha: 1.0)
+        arrowView.contentMode = .scaleAspectFit
+        contentView.addSubview(arrowView)
+        arrowView.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(14)
+        }
+    }
+
+    func configure(icon: String, title: String, iconColor: UIColor) {
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        iconImageView.image = UIImage(systemName: icon, withConfiguration: config)
+        iconBgView.backgroundColor = iconColor
+        titleLabel.text = title
     }
 }
 
