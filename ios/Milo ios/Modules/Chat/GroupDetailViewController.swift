@@ -50,38 +50,38 @@ class GroupDetailViewController: UIViewController {
         }
     }
 
-    // MARK: - Header View
+    // MARK: - Header View（安卓风格：左对齐布局）
     private func createHeaderView() -> UIView {
         let header = UIView()
         header.backgroundColor = .clear
 
         let cardView = UIView()
         cardView.backgroundColor = .systemBackground
-        cardView.layer.cornerRadius = ScreenAdapter.scaleW(12)
+        cardView.layer.cornerRadius = 12
         cardView.layer.masksToBounds = true
 
-        // 群头像
-        let avatarSize = ScreenAdapter.scaleW(64)
+        // 群头像（方形圆角）
+        let avatarSize: CGFloat = 56
         let avatarImageView = UIImageView()
-        avatarImageView.layer.cornerRadius = avatarSize / 2
+        avatarImageView.layer.cornerRadius = 8
         avatarImageView.clipsToBounds = true
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.image = UIImage(systemName: "person.3.fill")
         avatarImageView.tintColor = .systemGray5
         avatarImageView.backgroundColor = .systemGray6
 
-        // 群名称
+        // 群名称（左对齐）
         let nameLabel = UILabel()
-        nameLabel.font = ScreenAdapter.mediumFont(18)
+        nameLabel.font = ScreenAdapter.boldFont(18)
         nameLabel.textColor = .label
-        nameLabel.textAlignment = .center
-        nameLabel.numberOfLines = 0
+        nameLabel.textAlignment = .left
+        nameLabel.numberOfLines = 2
 
         // 成员数
         let memberCountLabel = UILabel()
         memberCountLabel.font = ScreenAdapter.font(13)
         memberCountLabel.textColor = .secondaryLabel
-        memberCountLabel.textAlignment = .center
+        memberCountLabel.textAlignment = .left
 
         // 群公告
         let noticeContainer = UIView()
@@ -90,7 +90,7 @@ class GroupDetailViewController: UIViewController {
         noticeContainer.addGestureRecognizer(tapNotice)
 
         let noticeIcon = UIImageView(image: UIImage(systemName: "megaphone.fill"))
-        noticeIcon.tintColor = .themePrimary
+        noticeIcon.tintColor = .systemOrange
         noticeIcon.contentMode = .scaleAspectFit
 
         let noticeLabel = UILabel()
@@ -100,7 +100,7 @@ class GroupDetailViewController: UIViewController {
         noticeLabel.text = "点击编辑群公告"
 
         let noticeArrow = UIImageView(image: UIImage(systemName: "chevron.right"))
-        noticeArrow.tintColor = .tertiaryLabel
+        noticeArrow.tintColor = UIColor(white: 0.75, alpha: 1.0)
         noticeArrow.contentMode = .scaleAspectFit
 
         noticeContainer.addSubviews(noticeIcon, noticeLabel, noticeArrow)
@@ -108,24 +108,24 @@ class GroupDetailViewController: UIViewController {
         noticeIcon.snp.makeConstraints { make in
             make.leading.equalToSuperview()
             make.centerY.equalToSuperview()
-            make.width.height.equalTo(ScreenAdapter.scaleW(18))
+            make.width.height.equalTo(18)
         }
 
         noticeArrow.snp.makeConstraints { make in
             make.trailing.equalToSuperview()
             make.centerY.equalToSuperview()
-            make.width.height.equalTo(ScreenAdapter.scaleW(14))
+            make.width.height.equalTo(14)
         }
 
         noticeLabel.snp.makeConstraints { make in
-            make.leading.equalTo(noticeIcon.snp.trailing).offset(ScreenAdapter.scaleW(8))
-            make.trailing.equalTo(noticeArrow.snp.leading).offset(-ScreenAdapter.scaleW(4))
+            make.leading.equalTo(noticeIcon.snp.trailing).offset(8)
+            make.trailing.equalTo(noticeArrow.snp.leading).offset(-4)
             make.top.bottom.equalToSuperview()
         }
 
         // 分割线
         let divider = UIView()
-        divider.backgroundColor = .systemGray5
+        divider.backgroundColor = UIColor(white: 0, alpha: 0.08)
 
         // 成员网格
         let membersTitleLabel = UILabel()
@@ -133,62 +133,84 @@ class GroupDetailViewController: UIViewController {
         membersTitleLabel.textColor = .secondaryLabel
         membersTitleLabel.text = "群成员"
 
+        let memberCountRightLabel = UILabel()
+        memberCountRightLabel.font = ScreenAdapter.font(14)
+        memberCountRightLabel.textColor = .secondaryLabel
+        memberCountRightLabel.textAlignment = .right
+        memberCountRightLabel.tag = 999
+
         let memberGridView = UIView()
 
         cardView.addSubviews(avatarImageView, nameLabel, memberCountLabel,
-                             noticeContainer, divider, membersTitleLabel, memberGridView)
+                             noticeContainer, divider, membersTitleLabel, memberCountRightLabel, memberGridView)
         header.addSubview(cardView)
 
         cardView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(8))
+            make.top.equalToSuperview().offset(12)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.bottom.equalToSuperview().offset(-8)
         }
 
+        // 左对齐头像
         avatarImageView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.centerX.equalToSuperview()
+            make.top.equalToSuperview().offset(16)
+            make.leading.equalToSuperview().offset(16)
             make.width.height.equalTo(avatarSize)
         }
 
+        // 名字在头像右侧
         nameLabel.snp.makeConstraints { make in
-            make.top.equalTo(avatarImageView.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.top.equalTo(avatarImageView.snp.top).offset(2)
+            make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
+            make.trailing.equalToSuperview().offset(-16)
         }
 
+        // 成员数在名字下方
         memberCountLabel.snp.makeConstraints { make in
-            make.top.equalTo(nameLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
-            make.leading.trailing.equalTo(nameLabel)
+            make.top.equalTo(nameLabel.snp.bottom).offset(6)
+            make.leading.equalTo(nameLabel)
+            make.trailing.equalToSuperview().offset(-16)
         }
 
+        // 群公告区域
         noticeContainer.snp.makeConstraints { make in
-            make.top.equalTo(memberCountLabel.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
-            make.height.equalTo(ScreenAdapter.scaleH(36))
+            make.top.equalTo(avatarImageView.snp.bottom).offset(16)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
         }
 
+        // 分割线
         divider.snp.makeConstraints { make in
-            make.top.equalTo(noticeContainer.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.top.equalTo(noticeContainer.snp.bottom).offset(12)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
             make.height.equalTo(0.5)
         }
 
+        // 群成员标题
         membersTitleLabel.snp.makeConstraints { make in
-            make.top.equalTo(divider.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.top.equalTo(divider.snp.bottom).offset(12)
+            make.leading.equalToSuperview().offset(16)
+        }
+
+        // 右侧查看全部箭头
+        memberCountRightLabel.snp.makeConstraints { make in
+            make.centerY.equalTo(membersTitleLabel)
+            make.trailing.equalToSuperview().offset(-16)
         }
 
         memberGridView.snp.makeConstraints { make in
-            make.top.equalTo(membersTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(16))
+            make.top.equalTo(membersTitleLabel.snp.bottom).offset(12)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.bottom.equalToSuperview().offset(-16)
         }
+
+        // 添加点击成员区域手势
+        let memberTap = UITapGestureRecognizer(target: self, action: #selector(didTapAllMembers))
+        memberGridView.superview?.addGestureRecognizer(memberTap)
 
         headerCache = HeaderCache(
             avatar: avatarImageView,
@@ -200,12 +222,17 @@ class GroupDetailViewController: UIViewController {
 
         // 计算 header 高度
         let headerWidth = view.bounds.width > 0 ? view.bounds.width : ScreenAdapter.screenWidth
-        let cardWidth = headerWidth - ScreenAdapter.scaleW(32)
+        let cardWidth = headerWidth - 32
         let memberGridHeight = calculateMemberGridHeight(cardWidth: cardWidth)
-        let headerHeight = ScreenAdapter.scaleH(20) + avatarSize + ScreenAdapter.scaleH(12 + 4 + 16 + 36 + 12 + 12 + 12) + memberGridHeight + ScreenAdapter.scaleH(16 + 20)
+        let headerHeight = 12 + 16 + avatarSize + 16 + 36 + 12 + 12 + 12 + memberGridHeight + 16 + 8
         header.frame = CGRect(x: 0, y: 0, width: headerWidth, height: headerHeight)
 
         return header
+    }
+
+    @objc private func didTapAllMembers() {
+        let vc = GroupMembersViewController(groupId: groupId)
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     private struct HeaderCache {

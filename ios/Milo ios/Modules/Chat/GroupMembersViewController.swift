@@ -3,11 +3,14 @@ import SnapKit
 import Kingfisher
 
 // MARK: - 全部成员列表（分页+搜索）
-class GroupMembersViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate {
+class GroupMembersViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
 
     private let groupId: String
     private let tableView = UITableView(frame: .zero, style: .plain)
-    private let searchBar = UISearchBar()
+    // 自定义搜索栏
+    private let searchContainer = UIView()
+    private let searchIconImageView = UIImageView()
+    private let searchTextField = UITextField()
 
     private var members: [GroupMember] = []
     private var filteredMembers: [GroupMember] = []
@@ -34,18 +37,54 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
 
     private func setupUI() {
         title = "全部成员"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
 
-        searchBar.placeholder = "搜索成员"
-        searchBar.delegate = self
-        searchBar.searchBarStyle = .minimal
-        searchBar.backgroundColor = .themeBackground
+        // 自定义搜索栏
+        searchContainer.backgroundColor = UIColor(white: 0.92, alpha: 1.0)
+        searchContainer.layer.cornerRadius = 18
+        searchContainer.clipsToBounds = true
+        view.addSubview(searchContainer)
+        searchContainer.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(8)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
+        }
+
+        searchIconImageView.image = UIImage(systemName: "magnifyingglass")
+        searchIconImageView.tintColor = .secondaryLabel
+        searchIconImageView.contentMode = .scaleAspectFit
+        searchContainer.addSubview(searchIconImageView)
+        searchIconImageView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(14)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(16)
+        }
+
+        searchTextField.placeholder = "搜索成员"
+        searchTextField.font = ScreenAdapter.font(14)
+        searchTextField.textColor = .label
+        searchTextField.tintColor = .themePrimary
+        searchTextField.returnKeyType = .search
+        searchTextField.clearButtonMode = .whileEditing
+        searchTextField.delegate = self
+        searchTextField.addTarget(self, action: #selector(searchTextDidChange(_:)), for: .editingChanged)
+        searchContainer.addSubview(searchTextField)
+        searchTextField.snp.makeConstraints { make in
+            make.leading.equalTo(searchIconImageView.snp.trailing).offset(8)
+            make.trailing.equalToSuperview().offset(-14)
+            make.centerY.equalToSuperview()
+            make.height.equalToSuperview()
+        }
 
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(GroupMemberCell.self, forCellReuseIdentifier: "MemberCell")
-        tableView.backgroundColor = .themeBackground
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: ScreenAdapter.scaleW(64), bottom: 0, right: 0)
+        tableView.backgroundColor = .white
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 64, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.tableFooterView = UIView()
+        tableView.keyboardDismissMode = .interactive
 
         // 下拉刷新
         tableView.mj_header = MJRefreshNormalHeader(refreshingBlock: { [weak self] in
@@ -57,16 +96,17 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
             self?.loadMembers(refresh: false)
         })
 
-        view.addSubviews(searchBar, tableView)
+        view.addSubviews(searchContainer, tableView)
 
-        searchBar.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide)
-            make.leading.trailing.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(44))
+        searchContainer.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(8)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
         }
 
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(searchBar.snp.bottom)
+            make.top.equalTo(searchContainer.snp.bottom).offset(8)
             make.leading.trailing.bottom.equalToSuperview()
         }
 
@@ -117,7 +157,7 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
             hasMore = true
         }
 
-        let keyword = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let keyword = searchTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let kw = keyword?.isEmpty ?? true ? nil : keyword
 
         Task {
@@ -158,8 +198,9 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
         }
     }
 
-    // MARK: - UISearchBarDelegate
-    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+    // MARK: - UITextFieldDelegate
+    @objc private func searchTextDidChange(_ textField: UITextField) {
+        let searchText = textField.text ?? ""
         if searchText.isEmpty {
             filteredMembers = members
         } else {
@@ -170,9 +211,10 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
         tableView.reloadData()
     }
 
-    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder()
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
         loadMembers(refresh: true)
+        return true
     }
 
     // MARK: - UITableViewDataSource

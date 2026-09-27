@@ -8,7 +8,9 @@ import MapKit
 // MARK: - 收藏列表页
 class FavoriteViewController: UIViewController {
     
-    private let searchBar = UISearchBar()
+    private let searchContainer = UIView()
+    private let searchIconImageView = UIImageView()
+    private let searchTextField = UITextField()
     private let tableView = UITableView(frame: .zero, style: .plain)
     private var favorites: [FavoriteItem] = []
     private var isSearching = false
@@ -28,24 +30,50 @@ class FavoriteViewController: UIViewController {
     
     private func setupUI() {
         title = "收藏"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
         
-        // 搜索栏
-        searchBar.delegate = self
-        searchBar.placeholder = "搜索收藏"
-        searchBar.searchBarStyle = .minimal
-        searchBar.backgroundColor = .themeBackground
-        view.addSubview(searchBar)
-        searchBar.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
-            make.leading.trailing.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(44))
+        // 自定义搜索栏
+        searchContainer.backgroundColor = UIColor(white: 0.92, alpha: 1.0)
+        searchContainer.layer.cornerRadius = 18
+        searchContainer.clipsToBounds = true
+        view.addSubview(searchContainer)
+        searchContainer.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(8)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(36)
+        }
+
+        searchIconImageView.image = UIImage(systemName: "magnifyingglass")
+        searchIconImageView.tintColor = .secondaryLabel
+        searchIconImageView.contentMode = .scaleAspectFit
+        searchContainer.addSubview(searchIconImageView)
+        searchIconImageView.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(14)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(16)
+        }
+
+        searchTextField.placeholder = "搜索收藏"
+        searchTextField.font = ScreenAdapter.font(14)
+        searchTextField.textColor = .label
+        searchTextField.tintColor = .themePrimary
+        searchTextField.returnKeyType = .search
+        searchTextField.clearButtonMode = .whileEditing
+        searchTextField.delegate = self
+        searchTextField.addTarget(self, action: #selector(searchTextDidChange(_:)), for: .editingChanged)
+        searchContainer.addSubview(searchTextField)
+        searchTextField.snp.makeConstraints { make in
+            make.leading.equalTo(searchIconImageView.snp.trailing).offset(8)
+            make.trailing.equalToSuperview().offset(-14)
+            make.centerY.equalToSuperview()
+            make.height.equalToSuperview()
         }
         
         // 表格
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.backgroundColor = .themeBackground
+        tableView.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
         tableView.separatorStyle = .none
         tableView.register(FavoriteTextCell.self, forCellReuseIdentifier: "FavoriteTextCell")
         tableView.register(FavoriteImageCell.self, forCellReuseIdentifier: "FavoriteImageCell")
@@ -56,7 +84,7 @@ class FavoriteViewController: UIViewController {
         tableView.register(FavoriteLinkCell.self, forCellReuseIdentifier: "FavoriteLinkCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
-            make.top.equalTo(searchBar.snp.bottom)
+            make.top.equalTo(searchContainer.snp.bottom).offset(8)
             make.leading.trailing.bottom.equalToSuperview()
         }
         
@@ -74,7 +102,7 @@ class FavoriteViewController: UIViewController {
     }
     
     private func loadData() {
-        if isSearching, let keyword = searchBar.text, !keyword.isEmpty {
+        if isSearching, let keyword = searchTextField.text, !keyword.isEmpty {
             favorites = FavoriteStorageManager.shared.searchFavorites(keyword: keyword)
         } else {
             favorites = FavoriteStorageManager.shared.getAllFavorites()
@@ -256,23 +284,17 @@ class FavoriteViewController: UIViewController {
     }
 }
 
-// MARK: - UISearchBarDelegate
-extension FavoriteViewController: UISearchBarDelegate {
+// MARK: - UITextFieldDelegate
+extension FavoriteViewController: UITextFieldDelegate {
     
-    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        isSearching = !searchText.isEmpty
+    @objc private func searchTextDidChange(_ textField: UITextField) {
+        isSearching = !(textField.text?.isEmpty ?? true)
         loadData()
     }
     
-    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.text = ""
-        searchBar.resignFirstResponder()
-        isSearching = false
-        loadData()
-    }
-    
-    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder()
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
     }
 }
 
