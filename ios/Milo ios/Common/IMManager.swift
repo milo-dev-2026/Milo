@@ -11,6 +11,10 @@ class IMManager: NSObject {
     var onConnectionChanged: ((Bool) -> Void)?
     var onMessageStatusUpdate: ((Message) -> Void)?
     var onChannelInfoUpdate: ((WKChannelInfo) -> Void)?
+    var onConversationUpdate: (([WKConversation]) -> Void)?
+    var onConversationUnreadUpdate: ((WKChannel, Int) -> Void)?
+    var onConversationDelete: ((WKChannel) -> Void)?
+    var onTotalUnreadCountChanged: ((Int) -> Void)?
 
     private var isSetup = false
 
@@ -18,6 +22,10 @@ class IMManager: NSObject {
     static let messageStatusUpdateNotification = NSNotification.Name("IMMessageStatusUpdate")
     static let connectionStatusChangedNotification = NSNotification.Name("IMConnectionStatusChanged")
     static let channelInfoUpdateNotification = NSNotification.Name("IMChannelInfoUpdate")
+    static let conversationUpdateNotification = NSNotification.Name("IMConversationUpdate")
+    static let conversationUnreadUpdateNotification = NSNotification.Name("IMConversationUnreadUpdate")
+    static let conversationDeleteNotification = NSNotification.Name("IMConversationDelete")
+    static let totalUnreadCountChangedNotification = NSNotification.Name("IMTotalUnreadCountChanged")
 
     private override init() {
         super.init()
@@ -42,9 +50,13 @@ class IMManager: NSObject {
         WKSDK.shared().chatManager.add(self)
         WKSDK.shared().connectionManager.add(self)
         WKSDK.shared().channelManager.add(self)
+        WKSDK.shared().conversationManager.add(self)
 
         // 设置频道信息提供者
         setupChannelInfoProvider()
+
+        // 设置会话同步提供者
+        setupConversationProvider()
     }
 
     // MARK: - 设置频道信息提供者
@@ -94,6 +106,79 @@ class IMManager: NSObject {
 
             return nil
         }
+    }
+
+    // MARK: - 设置会话同步提供者
+    private func setupConversationProvider() {
+        // 会话同步提供者
+        WKSDK.shared().conversationManager.setSyncConversationProviderAndAck({ [weak self] version, lastMsgSeqs, callback in
+            guard let self = self else { return }
+
+            Task {
+                do {
+                    let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
+                    let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+
+                    // 构造请求参数
+                    let params: [String: Any] = [
+                        "uid": uid,
+                        "last_msg_seqs": lastMsgSeqs ?? "",
+                        "msg_count": 100,
+                        "version": version,
+                        "device_uuid": deviceUUID
+                    ]
+
+                    let data = try JSONSerialization.data(withJSONObject: params)
+
+                    // 使用 Alamofire 或 URLSession 发送请求
+                    let url = URL(string: APIConfig.apiBaseURL + "/v1/conversation/sync")!
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.httpBody = data
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                    if let token = UserDefaults.standard.string(forKey: "token") {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    }
+
+                    let (responseData, _) = try await URLSession.shared.data(for: request)
+
+                    // 解析为 WKSyncConversationWrapModel
+                    let wrapModel = WKSyncConversationWrapModel()
+                    if let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
+                        if let conversations = json["conversations"] as? [[String: Any]] {
+                            var wkConversations = [WKConversation]()
+                            for convDict in conversations {
+                                let conv = WKConversation()
+                                if let channelId = convDict["channel_id"] as? String,
+                                   let channelType = convDict["channel_type"] as? Int {
+                                    conv.channel = WKChannel.channelID(channelId, channelType: UInt8(channelType))
+                                }
+                                conv.lastMsgTimestamp = convDict["timestamp"] as? Int ?? 0
+                                conv.unreadCount = convDict["unread"] as? Int ?? 0
+                                conv.lastMessageSeq = UInt32(convDict["last_msg_seq"] as? Int ?? 0)
+                                conv.version = convDict["version"] as? Int64 ?? 0
+                                wkConversations.append(conv)
+                            }
+                            wrapModel.conversations = wkConversations
+                        }
+                    }
+
+                    DispatchQueue.main.async {
+                        callback(wrapModel, nil)
+                    }
+                } catch {
+                    print("[IM] 同步会话失败: \(error)")
+                    DispatchQueue.main.async {
+                        callback(nil, error)
+                    }
+                }
+            }
+        }, ack: { cmdVersion, complete in
+            // 同步ACK
+            print("[IM] 会话同步ACK, version: \(cmdVersion)")
+            complete?(nil)
+        })
     }
 
     // MARK: - 连接（动态获取IM服务器地址）
@@ -500,5 +585,144 @@ extension IMManager {
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         WKSDK.shared().channelManager.deleteChannelInfo(channel)
+    }
+}
+
+// MARK: - WKConversationManagerDelegate
+extension IMManager: WKConversationManagerDelegate {
+
+    func onConversationUpdate(_ conversations: [WKConversation]) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onConversationUpdate?(conversations)
+            NotificationCenter.default.post(name: IMManager.conversationUpdateNotification, object: conversations)
+
+            // 通知总未读数变化
+            let totalUnread = WKSDK.shared().conversationManager.getAllConversationUnreadCount()
+            self.onTotalUnreadCountChanged?(totalUnread)
+            NotificationCenter.default.post(name: IMManager.totalUnreadCountChangedNotification, object: NSNumber(value: totalUnread))
+        }
+    }
+
+    func onConversationUnreadCountUpdate(_ channel: WKChannel!, unreadCount: Int) {
+        guard let ch = channel else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onConversationUnreadUpdate?(ch, unreadCount)
+            NotificationCenter.default.post(name: IMManager.conversationUnreadUpdateNotification, object: [
+                "channel": ch,
+                "unreadCount": unreadCount
+            ] as [String: Any])
+
+            // 通知总未读数变化
+            let totalUnread = WKSDK.shared().conversationManager.getAllConversationUnreadCount()
+            self.onTotalUnreadCountChanged?(totalUnread)
+            NotificationCenter.default.post(name: IMManager.totalUnreadCountChangedNotification, object: NSNumber(value: totalUnread))
+        }
+    }
+
+    func onConversationDelete(_ channel: WKChannel!) {
+        guard let ch = channel else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onConversationDelete?(ch)
+            NotificationCenter.default.post(name: IMManager.conversationDeleteNotification, object: ch)
+
+            // 通知总未读数变化
+            let totalUnread = WKSDK.shared().conversationManager.getAllConversationUnreadCount()
+            self.onTotalUnreadCountChanged?(totalUnread)
+            NotificationCenter.default.post(name: IMManager.totalUnreadCountChangedNotification, object: NSNumber(value: totalUnread))
+        }
+    }
+
+    func onConversationAllDelete() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            // 通知总未读数变化
+            let totalUnread = WKSDK.shared().conversationManager.getAllConversationUnreadCount()
+            self.onTotalUnreadCountChanged?(totalUnread)
+            NotificationCenter.default.post(name: IMManager.totalUnreadCountChangedNotification, object: NSNumber(value: totalUnread))
+        }
+    }
+}
+
+// MARK: - 会话管理
+extension IMManager {
+
+    // MARK: 获取会话列表
+    func getConversationList() -> [WKConversation] {
+        return WKSDK.shared().conversationManager.getConversationList()
+    }
+
+    // MARK: 获取指定频道的会话
+    func getConversation(channelId: String, channelType: Int = 1) -> WKConversation? {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        return WKSDK.shared().conversationManager.getConversation(channel)
+    }
+
+    // MARK: 获取所有会话未读数
+    func getAllUnreadCount() -> Int {
+        return WKSDK.shared().conversationManager.getAllConversationUnreadCount()
+    }
+
+    // MARK: 清除指定频道未读数
+    func clearConversationUnread(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().conversationManager.clearConversationUnreadCount(channel)
+    }
+
+    // MARK: 设置未读数
+    func setConversationUnread(channelId: String, channelType: Int = 1, unread: Int) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().conversationManager.setConversationUnreadCount(channel, unread: unread)
+    }
+
+    // MARK: 删除会话
+    func deleteConversation(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().conversationManager.deleteConversation(channel)
+    }
+
+    // MARK: 恢复会话
+    func recoveryConversation(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().conversationManager.recoveryConversation(channel)
+    }
+
+    // MARK: 添加会话
+    func addConversation(_ conversation: WKConversation) {
+        WKSDK.shared().conversationManager.addConversation(conversation)
+    }
+
+    // MARK: 更新或添加会话扩展（草稿等）
+    func updateOrAddConversationExtra(_ extra: WKConversationExtra) {
+        WKSDK.shared().conversationManager.updateOrAddExtra(extra)
+    }
+
+    // MARK: 设置草稿
+    func setDraft(channelId: String, channelType: Int = 1, draft: String) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        let extra = WKConversationExtra()
+        extra.channel = channel
+        extra.draft = draft
+        updateOrAddConversationExtra(extra)
+    }
+
+    // MARK: 获取草稿
+    func getDraft(channelId: String, channelType: Int = 1) -> String? {
+        let conv = getConversation(channelId: channelId, channelType: channelType)
+        return conv?.remoteExtra?.draft
     }
 }
