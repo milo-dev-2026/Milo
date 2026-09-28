@@ -225,8 +225,7 @@ extension IMManager: WKChatManagerDelegate {
         var content = ""
         var type = MessageType.text
 
-        let contentTypeNumber = wkMsg.content.contentType()
-        let contentType = contentTypeNumber.intValue
+        let contentType = type(of: wkMsg.content).contentType().intValue
 
         switch contentType {
         case 1: // 文本
