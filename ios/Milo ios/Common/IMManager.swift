@@ -147,23 +147,25 @@ class IMManager: NSObject {
                     let wrapModel = WKSyncConversationWrapModel()
                     if let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
                         if let conversations = json["conversations"] as? [[String: Any]] {
-                            var wkConversations = [WuKongIMSDK.WKConversation]()
+                            var syncModels = [WKSyncConversationModel]()
                             for convDict in conversations {
-                                let conv = WuKongIMSDK.WKConversation()
+                                let syncModel = WKSyncConversationModel()
                                 if let channelId = convDict["channel_id"] as? String,
                                    let channelType = convDict["channel_type"] as? Int {
                                     let ch = WKChannel()
                                     ch.channelId = channelId
                                     ch.channelType = UInt8(channelType)
-                                    conv.channel = ch
+                                    syncModel.channel = ch
                                 }
-                                conv.lastMsgTimestamp = convDict["timestamp"] as? Int ?? 0
-                                conv.unreadCount = convDict["unread"] as? Int ?? 0
-                                conv.lastMessageSeq = UInt32(convDict["last_msg_seq"] as? Int ?? 0)
-                                conv.version = convDict["version"] as? Int64 ?? 0
-                                wkConversations.append(conv)
+                                syncModel.timestamp = TimeInterval(convDict["timestamp"] as? Int ?? 0)
+                                syncModel.unread = convDict["unread"] as? Int ?? 0
+                                syncModel.lastMsgSeq = UInt32(convDict["last_msg_seq"] as? Int ?? 0)
+                                syncModel.version = convDict["version"] as? Int64 ?? 0
+                                syncModel.mute = (convDict["mute"] as? Int ?? 0) == 1
+                                syncModel.stick = (convDict["stick"] as? Int ?? 0) == 1
+                                syncModels.append(syncModel)
                             }
-                            wrapModel.conversations = wkConversations
+                            wrapModel.conversations = syncModels
                         }
                     }
 
@@ -597,7 +599,7 @@ extension IMManager: WKConversationManagerDelegate {
     func onConversationUpdate(_ conversations: [WKConversation]) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            let sdkConversations = conversations as [WuKongIMSDK.WKConversation]
+            let sdkConversations = conversations.map { $0 as! WuKongIMSDK.WKConversation }
             self.onConversationUpdate?(sdkConversations)
             NotificationCenter.default.post(name: IMManager.conversationUpdateNotification, object: sdkConversations)
 
@@ -705,7 +707,7 @@ extension IMManager {
 
     // MARK: 添加会话
     func addConversation(_ conversation: WuKongIMSDK.WKConversation) {
-        WKSDK.shared().conversationManager.addConversation(conversation)
+        WKSDK.shared().conversationManager.add(conversation)
     }
 
     // MARK: 更新或添加会话扩展（草稿等）
