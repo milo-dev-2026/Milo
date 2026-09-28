@@ -223,57 +223,57 @@ extension IMManager: WKChatManagerDelegate {
     // MARK: - WKMessage 转 业务 Message
     private func convertWKMessageToMessage(_ wkMsg: WKMessage) -> Message {
         var content = ""
-        var type = MessageType.text
+        var msgType = MessageType.text
 
-        let contentType = type(of: wkMsg.content).contentType().intValue
+        let contentType = Int(wkMsg.content.realContentType)
 
         switch contentType {
         case 1: // 文本
             if let textContent = wkMsg.content as? WKTextContent {
                 content = textContent.content ?? ""
             }
-            type = .text
+            msgType = .text
 
         case 2: // 图片
             if let imageContent = wkMsg.content as? WKImageMessageContent {
                 content = imageContent.url
             }
-            type = .image
+            msgType = .image
 
         case 3: // 语音
             if let voiceContent = wkMsg.content as? WKVoiceMessageContent {
                 // 兼容旧格式: "duration|url"
                 content = "\(voiceContent.duration)|\(voiceContent.url)"
             }
-            type = .voice
+            msgType = .voice
 
         case 4: // 视频
             if let videoContent = wkMsg.content as? WKVideoMessageContent {
                 // 兼容旧格式: "thumbURL|videoURL"
                 content = "\(videoContent.thumbURL)|\(videoContent.videoURL)"
             }
-            type = .video
+            msgType = .video
 
         case 5: // 文件
             if let fileContent = wkMsg.content as? WKFileMessageContent {
                 // 兼容旧格式: "fileName|fileSize|url"
                 content = "\(fileContent.fileName)|\(fileContent.fileSize)|\(fileContent.url)"
             }
-            type = .file
+            msgType = .file
 
         case 6: // 位置
             if let locationContent = wkMsg.content as? WKLocationMessageContent {
                 // 兼容旧格式: "name|lat,lng"
                 content = "\(locationContent.name)|\(locationContent.latitude),\(locationContent.longitude)"
             }
-            type = .location
+            msgType = .location
 
         case 7: // 名片
             if let cardContent = wkMsg.content as? WKCardMessageContent {
                 // 兼容旧格式: "uid|name|avatar|vercode"
                 content = "\(cardContent.uid)|\(cardContent.name)|\(cardContent.avatar)|\(cardContent.vercode)"
             }
-            type = .card
+            msgType = .card
 
         case 100: // 笔记
             if let noteContent = wkMsg.content as? WKNoteMessageContent {
@@ -293,13 +293,13 @@ extension IMManager: WKChatManagerDelegate {
                     }
                 }
             }
-            type = .note
+            msgType = .note
 
         default:
             if let textContent = wkMsg.content as? WKTextContent {
                 content = textContent.content ?? ""
             }
-            type = .text
+            msgType = .text
         }
 
         let status: Int
@@ -321,7 +321,7 @@ extension IMManager: WKChatManagerDelegate {
             channelType: chType,
             fromUID: wkMsg.fromUid ?? "",
             content: content,
-            type: type,
+            type: msgType,
             timestamp: Int64(wkMsg.timestamp * 1000),
             status: status
         )
