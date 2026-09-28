@@ -75,7 +75,7 @@ class IMManager: NSObject {
 
                     // 处理 follow 状态
                     if let follow = info.follow {
-                        wkInfo.follow = WKChannelInfoFollow(rawValue: UInt(follow)) ?? .stranger
+                        wkInfo.follow = WKChannelInfoFollow(rawValue: UInt(follow)) ?? .strange
                     }
 
                     // 保存到 SDK
