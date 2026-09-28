@@ -254,12 +254,12 @@ import WuKongIMSDK
 // MARK: - 消息内容类型注册
 class WKMessageContentRegistrar {
     static func registerAll() {
-        WKSDK.shared.registerMessageContent(WKImageMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKVoiceMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKVideoMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKFileMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKLocationMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKCardMessageContent.self)
-        WKSDK.shared.registerMessageContent(WKNoteMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKImageMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKVoiceMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKVideoMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKFileMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKLocationMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKCardMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKNoteMessageContent.self)
     }
 }
