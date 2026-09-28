@@ -31,14 +31,14 @@ class IMManager: NSObject {
         options.port = 5100
         options.heartbeatInterval = 30
 
-        WKSDK.shared.options = options
+        WKSDK.shared().options = options
 
         // 注册自定义消息类型
         WKMessageContentRegistrar.registerAll()
 
         // 设置delegate
-        WKSDK.shared.chatManager.addDelegate(self)
-        WKSDK.shared.connectionManager.addDelegate(self)
+        WKSDK.shared().chatManager.add(self)
+        WKSDK.shared().connectionManager.add(self)
     }
 
     // MARK: - 连接（动态获取IM服务器地址）
@@ -53,7 +53,7 @@ class IMManager: NSObject {
 
         let uidCopy = uid
         let tokenCopy = imToken
-        WKSDK.shared.options.connectInfoCallback = {
+        WKSDK.shared().options.connectInfoCallback = {
             let info = WKConnectInfo()
             info.uid = uidCopy
             info.token = tokenCopy
@@ -68,95 +68,111 @@ class IMManager: NSObject {
                 let port = UInt16(imServer.port ?? 5100)
                 print("[IM] 获取到IM服务器: \(host):\(port)")
                 DispatchQueue.main.async {
-                    WKSDK.shared.options.host = host
-                    WKSDK.shared.options.port = port
-                    WKSDK.shared.connectionManager.connect()
+                    WKSDK.shared().options.host = host
+                    WKSDK.shared().options.port = port
+                    WKSDK.shared().connectionManager.connect()
                 }
             } catch {
                 print("[IM] 获取IM服务器地址失败，使用默认值: \(error)")
                 DispatchQueue.main.async {
-                    WKSDK.shared.options.host = "43.133.39.170"
-                    WKSDK.shared.options.port = 5100
-                    WKSDK.shared.connectionManager.connect()
+                    WKSDK.shared().options.host = "43.133.39.170"
+                    WKSDK.shared().options.port = 5100
+                    WKSDK.shared().connectionManager.connect()
                 }
             }
         }
     }
 
     func disconnect() {
-        WKSDK.shared.connectionManager.disconnect(false)
+        WKSDK.shared().connectionManager.disconnect(false)
     }
 
     // MARK: - 发送文本消息
     func sendTextMessage(channelId: String, content: String, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let textContent = WKTextContent(content: content)
-        _ = WKSDK.shared.chatManager.sendMessage(textContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
 
     // MARK: - 发送图片消息
     func sendImageMessage(channelId: String, imageURL: String, width: CGFloat, height: CGFloat, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let imageContent = WKImageMessageContent()
         imageContent.url = imageURL
         imageContent.width = width
         imageContent.height = height
-        _ = WKSDK.shared.chatManager.sendMessage(imageContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(imageContent, channel: channel)
     }
 
     // MARK: - 发送语音消息
     func sendVoiceMessage(channelId: String, voiceURL: String, duration: Int, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let voiceContent = WKVoiceMessageContent()
         voiceContent.url = voiceURL
         voiceContent.duration = duration
-        _ = WKSDK.shared.chatManager.sendMessage(voiceContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(voiceContent, channel: channel)
     }
 
     // MARK: - 发送视频消息
     func sendVideoMessage(channelId: String, thumbURL: String, videoURL: String, duration: Int, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let videoContent = WKVideoMessageContent()
         videoContent.thumbURL = thumbURL
         videoContent.videoURL = videoURL
         videoContent.duration = duration
-        _ = WKSDK.shared.chatManager.sendMessage(videoContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(videoContent, channel: channel)
     }
 
     // MARK: - 发送文件消息
     func sendFileMessage(channelId: String, fileName: String, fileSize: Int64, fileURL: String, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let fileContent = WKFileMessageContent()
         fileContent.fileName = fileName
         fileContent.fileSize = fileSize
         fileContent.url = fileURL
-        _ = WKSDK.shared.chatManager.sendMessage(fileContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(fileContent, channel: channel)
     }
 
     // MARK: - 发送位置消息
     func sendLocationMessage(channelId: String, name: String, latitude: Double, longitude: Double, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let locationContent = WKLocationMessageContent()
         locationContent.name = name
         locationContent.latitude = latitude
         locationContent.longitude = longitude
-        _ = WKSDK.shared.chatManager.sendMessage(locationContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(locationContent, channel: channel)
     }
 
     // MARK: - 发送名片消息
     func sendCardMessage(channelId: String, uid: String, name: String, avatar: String, vercode: String, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let cardContent = WKCardMessageContent()
         cardContent.uid = uid
         cardContent.name = name
         cardContent.avatar = avatar
         cardContent.vercode = vercode
-        _ = WKSDK.shared.chatManager.sendMessage(cardContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(cardContent, channel: channel)
     }
 
     // MARK: - 发送笔记消息
     func sendNoteMessage(channelId: String, noteJSON: String, channelType: Int = 1) {
-        let channel = WKChannel(channelID: channelId, channelType: UInt8(channelType))
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
         let noteContent = WKNoteMessageContent()
         noteContent.noteJSON = noteJSON
         // 尝试解析标题和内容
@@ -166,7 +182,7 @@ class IMManager: NSObject {
             noteContent.noteContent = json["content"] as? String ?? ""
             noteContent.noteId = json["id"] as? String ?? ""
         }
-        _ = WKSDK.shared.chatManager.sendMessage(noteContent, channel: channel)
+        _ = WKSDK.shared().chatManager.sendMessage(noteContent, channel: channel)
     }
 }
 
@@ -208,7 +224,9 @@ extension IMManager: WKChatManagerDelegate {
     private func convertWKMessageToMessage(_ wkMsg: WKMessage) -> Message {
         var content = ""
         var type = MessageType.text
-        let contentType = wkMsg.content.contentType.intValue
+
+        let contentTypeNumber = wkMsg.content.contentType()
+        let contentType = contentTypeNumber.intValue
 
         switch contentType {
         case 1: // 文本
@@ -295,10 +313,13 @@ extension IMManager: WKChatManagerDelegate {
             status = 1 // 成功
         }
 
+        let chId = wkMsg.channel.channelId ?? ""
+        let chType = Int(wkMsg.channel.channelType)
+
         return Message(
             messageID: String(wkMsg.messageId),
-            channelID: wkMsg.channel.channelID ?? "",
-            channelType: Int(wkMsg.channel.channelType),
+            channelID: chId,
+            channelType: chType,
             fromUID: wkMsg.fromUid ?? "",
             content: content,
             type: type,
