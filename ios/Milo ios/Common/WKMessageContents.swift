@@ -7,7 +7,7 @@ import WuKongIMSDK
     @objc public var width: CGFloat = 0
     @objc public var height: CGFloat = 0
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["url"] = url
         dict["width"] = width
@@ -15,7 +15,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let url = contentDic["url"] as? String {
             self.url = url
         }
@@ -31,7 +31,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 2)
     }
 }
@@ -42,7 +42,7 @@ import WuKongIMSDK
     @objc public var duration: Int = 0
     @objc public var waveform: Data?
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["url"] = url
         dict["duration"] = duration
@@ -52,7 +52,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let url = contentDic["url"] as? String {
             self.url = url
         }
@@ -66,7 +66,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 3)
     }
 }
@@ -78,7 +78,7 @@ import WuKongIMSDK
     @objc public var duration: Int = 0
     @objc public var size: Int64 = 0
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["thumb_url"] = thumbURL
         dict["video_url"] = videoURL
@@ -87,7 +87,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let thumbURL = contentDic["thumb_url"] as? String {
             self.thumbURL = thumbURL
         }
@@ -106,7 +106,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 4)
     }
 }
@@ -117,7 +117,7 @@ import WuKongIMSDK
     @objc public var fileSize: Int64 = 0
     @objc public var url: String = ""
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["file_name"] = fileName
         dict["file_size"] = fileSize
@@ -125,7 +125,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let fileName = contentDic["file_name"] as? String {
             self.fileName = fileName
         }
@@ -139,7 +139,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 5)
     }
 }
@@ -150,7 +150,7 @@ import WuKongIMSDK
     @objc public var latitude: Double = 0
     @objc public var longitude: Double = 0
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["name"] = name
         dict["latitude"] = latitude
@@ -158,7 +158,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let name = contentDic["name"] as? String {
             self.name = name
         }
@@ -174,7 +174,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 6)
     }
 }
@@ -186,7 +186,7 @@ import WuKongIMSDK
     @objc public var avatar: String = ""
     @objc public var vercode: String = ""
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["uid"] = uid
         dict["name"] = name
@@ -195,7 +195,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let uid = contentDic["uid"] as? String {
             self.uid = uid
         }
@@ -210,7 +210,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 7)
     }
 }
@@ -222,7 +222,7 @@ import WuKongIMSDK
     @objc public var noteContent: String = ""
     @objc public var noteJSON: String = ""
     
-    public override func encodeWithJSON() -> [AnyHashable : Any]! {
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
         dict["note_id"] = noteId
         dict["title"] = title
@@ -231,7 +231,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
         if let noteId = contentDic["note_id"] as? String {
             self.noteId = noteId
         }
@@ -246,7 +246,7 @@ import WuKongIMSDK
         }
     }
     
-    public override func contentType() -> NSNumber! {
+    public override class func contentType() -> NSNumber {
         return NSNumber(value: 100)
     }
 }
