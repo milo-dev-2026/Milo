@@ -57,6 +57,9 @@ class IMManager: NSObject {
 
         // 设置会话同步提供者
         setupConversationProvider()
+
+        // 设置消息同步提供者
+        setupMessageSyncProvider()
     }
 
     // MARK: - 设置频道信息提供者
@@ -184,6 +187,77 @@ class IMManager: NSObject {
             print("[IM] 会话同步ACK, version: \(cmdVersion)")
             complete?(nil)
         })
+    }
+
+    // MARK: - 设置消息同步提供者
+    private func setupMessageSyncProvider() {
+        WKSDK.shared().chatManager.syncChannelMessageProvider = { [weak self] channel, startMessageSeq, endMessageSeq, limit, pullMode, callback in
+            guard let self = self else { return }
+
+            let channelId = channel.channelId ?? ""
+            let channelType = Int(channel.channelType)
+
+            Task {
+                do {
+                    let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
+
+                    // 构造请求参数
+                    let params: [String: Any] = [
+                        "channel_id": channelId,
+                        "channel_type": channelType,
+                        "start_message_seq": startMessageSeq,
+                        "end_message_seq": endMessageSeq,
+                        "limit": limit,
+                        "pull_mode": pullMode.rawValue,
+                        "device_uuid": deviceUUID
+                    ]
+
+                    let data = try JSONSerialization.data(withJSONObject: params)
+
+                    let url = URL(string: APIConfig.apiBaseURL + "/v1/message/sync")!
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.httpBody = data
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                    if let token = UserDefaults.standard.string(forKey: "token") {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    }
+
+                    let (responseData, _) = try await URLSession.shared.data(for: request)
+
+                    // 解析为 WKSyncChannelMessageModel
+                    let syncModel = WKSyncChannelMessageModel()
+                    if let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
+                        syncModel.startMessageSeq = UInt32(json["start_message_seq"] as? Int ?? 0)
+                        syncModel.endMessageSeq = UInt32(json["end_message_seq"] as? Int ?? 0)
+
+                        if let messages = json["messages"] as? [[String: Any]] {
+                            var wkMessages = [WKMessage]()
+                            for msgDict in messages {
+                                let msg = WKMessage()
+                                msg.messageId = UInt64(msgDict["message_id"] as? Int ?? 0)
+                                msg.timestamp = TimeInterval(msgDict["timestamp"] as? Int ?? 0)
+                                msg.fromUid = msgDict["from_uid"] as? String
+                                msg.clientMsgNo = msgDict["client_msg_no"] as? String
+                                msg.messageSeq = UInt32(msgDict["seq"] as? Int ?? 0)
+                                wkMessages.append(msg)
+                            }
+                            syncModel.messages = wkMessages
+                        }
+                    }
+
+                    DispatchQueue.main.async {
+                        callback(syncModel, nil)
+                    }
+                } catch {
+                    print("[IM] 同步消息失败: \(error)")
+                    DispatchQueue.main.async {
+                        callback(nil, error)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - 连接（动态获取IM服务器地址）
@@ -731,5 +805,106 @@ extension IMManager {
         // 草稿存储在 WKConversationExtra 中，这里暂时返回 nil
         // 实际项目中可以通过 DB 或 extra 方式获取
         return nil
+    }
+}
+
+// MARK: - 消息历史查询
+extension IMManager {
+
+    // MARK: 获取最新消息（首屏）
+    func pullLastMessages(channelId: String, channelType: Int = 1, limit: Int = 20, completion: @escaping ([WKMessage]?, Error?) -> Void) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().chatManager.pullLastMessages(channel, limit: Int32(limit)) { messages, error in
+            DispatchQueue.main.async {
+                completion(messages, error)
+            }
+        }
+    }
+
+    // MARK: 下拉加载历史消息（加载更旧的消息）
+    func pullDownMessages(channelId: String, channelType: Int = 1, startOrderSeq: UInt32, limit: Int = 20, completion: @escaping ([WKMessage]?, Error?) -> Void) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().chatManager.pullDown(channel, startOrderSeq: startOrderSeq, limit: Int32(limit)) { messages, error in
+            DispatchQueue.main.async {
+                completion(messages, error)
+            }
+        }
+    }
+
+    // MARK: 上拉加载更新消息
+    func pullUpMessages(channelId: String, channelType: Int = 1, startOrderSeq: UInt32, limit: Int = 20, completion: @escaping ([WKMessage]?, Error?) -> Void) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().chatManager.pullUp(channel, startOrderSeq: startOrderSeq, limit: Int32(limit)) { messages, error in
+            DispatchQueue.main.async {
+                completion(messages, error)
+            }
+        }
+    }
+
+    // MARK: 查询指定orderSeq周围的消息（定位消息用）
+    func pullAroundMessages(channelId: String, channelType: Int = 1, orderSeq: UInt32, limit: Int = 20, completion: @escaping ([WKMessage]?, Error?) -> Void) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().chatManager.pullAround(channel, orderSeq: orderSeq, limit: Int32(limit)) { messages, error in
+            DispatchQueue.main.async {
+                completion(messages, error)
+            }
+        }
+    }
+
+    // MARK: 获取最新一条消息
+    func getLastMessage(channelId: String, channelType: Int = 1) -> WKMessage? {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        return WKSDK.shared().chatManager.getLastMessage(channel)
+    }
+
+    // MARK: 删除消息
+    func deleteMessage(_ message: WKMessage) {
+        WKSDK.shared().chatManager.deleteMessage(message)
+    }
+
+    // MARK: 清除指定频道所有消息
+    func clearMessages(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().chatManager.clearMessages(channel)
+    }
+
+    // MARK: 清除所有消息
+    func clearAllMessages() {
+        WKSDK.shared().chatManager.clearAllMessages()
+    }
+
+    // MARK: 撤回消息
+    func revokeMessage(_ message: WKMessage) {
+        WKSDK.shared().chatManager.revokeMessage(message)
+    }
+
+    // MARK: 重发消息
+    func resendMessage(_ message: WKMessage) {
+        WKSDK.shared().chatManager.resendMessage(message)
+    }
+
+    // MARK: 保存消息（不发送，仅本地存储）
+    func saveMessage(content: WKMessageContent, channelId: String, channelType: Int = 1, fromUid: String? = nil) -> WKMessage {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        return WKSDK.shared().chatManager.saveMessage(content, channel: channel, fromUid: fromUid)
+    }
+
+    // MARK: 更新语音消息已读状态
+    func updateVoiceMessageReaded(_ message: WKMessage) {
+        WKSDK.shared().chatManager.updateMessageVoiceReaded(message)
     }
 }
