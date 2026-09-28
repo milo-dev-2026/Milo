@@ -77,6 +77,8 @@ class IMManager: NSObject {
     private func setupChannelInfoProvider() {
         WKSDK.shared().channelInfoUpdate = { [weak self] channel, callback in
             guard let self = self else {
+                callback(nil)
+                return
                 callback(nil, false)
                 return nil
             }

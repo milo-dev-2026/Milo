@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import WuKongIMSDK
 
 // MARK: - 图片消息内容 (type: 2)
