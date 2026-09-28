@@ -1017,3 +1017,119 @@ extension IMManager {
         WKReminderManager.shared().done(ids)
     }
 }
+
+// MARK: - 媒体管理（MediaManager）
+extension IMManager {
+
+    // MARK: 上传消息中的多媒体
+    func uploadMedia(_ message: WKMessage) {
+        WKMediaManager.shared().upload(message)
+    }
+
+    // MARK: 下载消息中的多媒体
+    @discardableResult
+    func downloadMedia(_ message: WKMessage, callback: ((WKMediaDownloadState, CGFloat, Error?) -> Void)? = nil) -> WKMessageFileDownloadTask? {
+        if let callback = callback {
+            return WKMediaManager.shared().download(message, callback: callback)
+        }
+        return WKMediaManager.shared().download(message)
+    }
+
+    // MARK: 设置上传任务提供者
+    func setUploadTaskProvider(_ provider: @escaping (WKMessage) -> WKTaskProto) {
+        WKMediaManager.shared().uploadTaskProvider = { message in
+            return provider(message)
+        }
+    }
+
+    // MARK: 设置下载任务提供者
+    func setDownloadTaskProvider(_ provider: @escaping (WKMessage) -> WKTaskProto) {
+        WKMediaManager.shared().downloadTaskProvider = { message in
+            return provider(message)
+        }
+    }
+
+    // MARK: 语音消息转换为源文件
+    func voiceMessageThumbToSource(_ message: WKMessage) {
+        WKMediaManager.shared().voiceMessageThumb(toSource: message)
+    }
+
+    // MARK: 播放音频
+    func playAudio(_ filePath: String, finish: @escaping (AVAudioPlayer, Bool) -> Void, progress: @escaping (AVAudioPlayer) -> Void) {
+        WKMediaManager.shared().playAudio(filePath, playerDidFinish: finish, progress: progress)
+    }
+
+    // MARK: 停止音频播放
+    func stopAudioPlay() {
+        WKMediaManager.shared().stopAudioPlay()
+    }
+
+    // MARK: 暂停音频播放
+    func pauseAudioPlay() {
+        WKMediaManager.shared().pauseAudioPlay()
+    }
+
+    // MARK: 继续音频播放
+    func continueAudioPlay() {
+        WKMediaManager.shared().continuePlay()
+    }
+
+    // MARK: 是否正在播放音频
+    var isAudioPlaying: Bool {
+        return WKMediaManager.shared().isAudioPlaying()
+    }
+
+    // MARK: 获取消息缓存大小
+    var messageCacheSize: Int64 {
+        return WKMediaManager.shared().messageCacheSize()
+    }
+
+    // MARK: 清理消息缓存
+    func cleanMessageCache() {
+        WKMediaManager.shared().cleanMessageCache()
+    }
+}
+
+// MARK: - 安全加密（SecurityManager）
+extension IMManager {
+
+    // MARK: 设置共享密钥
+    var sharedKey: String? {
+        get {
+            return WKSecurityManager.shared().sharedKey
+        }
+        set {
+            WKSecurityManager.shared().sharedKey = newValue
+        }
+    }
+
+    // MARK: 生成DH密钥对
+    func generateDHPair() {
+        WKSecurityManager.shared().generateDHPair()
+    }
+
+    // MARK: 获取DH公钥
+    func getDHPubKey() -> String? {
+        return WKSecurityManager.shared().getDHPubKey()
+    }
+
+    // MARK: 通过公钥生成AES共享密钥
+    func generateAESKey(pubKey: String, salt: String) {
+        WKSecurityManager.shared().generateAesKey(pubKey, salt: salt)
+    }
+
+    // MARK: 加密数据
+    func encrypt(_ data: String) -> String? {
+        return WKSecurityManager.shared().encryption(data)
+    }
+
+    // MARK: 解密数据
+    func decrypt(_ data: String) -> String? {
+        return WKSecurityManager.shared().decryption(data)
+    }
+
+    // MARK: MD5
+    func md5(_ input: String) -> String? {
+        return WKSecurityManager.shared().md5(input)
+    }
+}
