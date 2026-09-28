@@ -50,7 +50,7 @@ class IMManager: NSObject {
     // MARK: - 设置频道信息提供者
     private func setupChannelInfoProvider() {
         WKSDK.shared().channelInfoUpdate = { [weak self] channel, callback in
-            guard let self = self, let channel = channel else {
+            guard let self = self else {
                 callback(nil, false)
                 return nil
             }
