@@ -41,7 +41,7 @@ class IMManager: NSObject {
         // 设置delegate
         WKSDK.shared().chatManager.add(self)
         WKSDK.shared().connectionManager.add(self)
-        WKSDK.shared().channelManager.addDelegate(self)
+        WKSDK.shared().channelManager.add(self)
 
         // 设置频道信息提供者
         setupChannelInfoProvider()
@@ -51,7 +51,7 @@ class IMManager: NSObject {
     private func setupChannelInfoProvider() {
         WKSDK.shared().channelInfoUpdate = { [weak self] channel, callback in
             guard let self = self, let channel = channel else {
-                callback?(nil, false)
+                callback(nil, false)
                 return nil
             }
 
@@ -79,15 +79,15 @@ class IMManager: NSObject {
                     }
 
                     // 保存到 SDK
-                    WKSDK.shared().channelManager.addOrUpdateChannelInfo(wkInfo)
+                    WKSDK.shared().channelManager.addOrUpdate(wkInfo)
 
                     DispatchQueue.main.async {
-                        callback?(nil, false)
+                        callback(nil, false)
                     }
                 } catch {
                     print("[IM] 获取频道信息失败: \(error)")
                     DispatchQueue.main.async {
-                        callback?(error, false)
+                        callback(error, false)
                     }
                 }
             }
@@ -456,7 +456,7 @@ extension IMManager {
 
     // MARK: 获取用户频道信息
     func getChannelInfoOfUser(uid: String) -> WKChannelInfo? {
-        return WKSDK.shared().channelManager.getChannelInfoOfUser(uid)
+        return WKSDK.shared().channelManager.getChannelInfo(ofUser: uid)
     }
 
     // MARK: 拉取频道信息（从服务器）
@@ -491,7 +491,7 @@ extension IMManager {
 
     // MARK: 添加/更新频道信息
     func addOrUpdateChannelInfo(_ channelInfo: WKChannelInfo) {
-        WKSDK.shared().channelManager.addOrUpdateChannelInfo(channelInfo)
+        WKSDK.shared().channelManager.addOrUpdate(channelInfo)
     }
 
     // MARK: 删除频道信息
