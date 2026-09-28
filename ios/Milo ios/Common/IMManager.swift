@@ -237,7 +237,7 @@ class IMManager: NSObject {
                             for msgDict in messages {
                                 let msg = WKMessage()
                                 msg.messageId = UInt64(msgDict["message_id"] as? Int ?? 0)
-                                msg.timestamp = TimeInterval(msgDict["timestamp"] as? Int ?? 0)
+                                msg.timestamp = msgDict["timestamp"] as? Int ?? 0
                                 msg.fromUid = msgDict["from_uid"] as? String
                                 msg.clientMsgNo = msgDict["client_msg_no"] as? String
                                 msg.messageSeq = UInt32(msgDict["seq"] as? Int ?? 0)
