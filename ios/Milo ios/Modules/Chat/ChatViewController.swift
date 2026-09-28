@@ -44,10 +44,21 @@ class ChatViewController: UIViewController {
             self?.handleIncomingMessage(msg)
         }
 
+        IMManager.shared.onMessageStatusUpdate = { [weak self] msg in
+            self?.handleMessageStatusUpdate(msg)
+        }
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleMessageNotification(_:)),
             name: IMManager.messageReceivedNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMessageStatusNotification(_:)),
+            name: IMManager.messageStatusUpdateNotification,
             object: nil
         )
     }
@@ -55,6 +66,22 @@ class ChatViewController: UIViewController {
     @objc private func handleMessageNotification(_ notification: Notification) {
         guard let msg = notification.object as? Message else { return }
         handleIncomingMessage(msg)
+    }
+
+    @objc private func handleMessageStatusNotification(_ notification: Notification) {
+        guard let msg = notification.object as? Message else { return }
+        handleMessageStatusUpdate(msg)
+    }
+
+    private func handleMessageStatusUpdate(_ msg: Message) {
+        guard msg.channelID == channelId else { return }
+        // 更新消息状态（SDK返回的消息有正确的messageID，通过匹配来更新）
+        if let index = messages.firstIndex(where: { $0.messageID == msg.messageID }) {
+            messages[index].status = msg.status
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+            }
+        }
     }
 
     private func handleIncomingMessage(_ msg: Message) {
@@ -619,7 +646,7 @@ extension ChatViewController: ChatInputBarDelegate {
             content: text,
             type: .text,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 1
+            status: 0 // 发送中
         )
         messages.append(msg)
         DispatchQueue.main.async {
@@ -746,31 +773,28 @@ extension ChatViewController: ChatInputBarDelegate {
                 guard let self = self else { return }
                 switch result {
                 case .success(let cdnURL):
-                    Task {
-                        do {
-                            let response = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: self.channelId, content: cdnURL, type: 2, channelType: self.channelType)
-                            )
-                            if response["status"] as? Int == 200 {
-                                let msg = Message(
-                                    messageID: UUID().uuidString,
-                                    channelID: self.channelId,
-                                    channelType: self.channelType,
-                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                                    content: cdnURL,
-                                    type: .image,
-                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                                    status: 1
-                                )
-                                self.messages.append(msg)
-                                DispatchQueue.main.async {
-                                    self.tableView.reloadData()
-                                    self.scrollToBottom()
-                                }
-                            }
-                        } catch {
-                            AppUtility.showToast("发送图片失败")
-                        }
+                    // 先走SDK发送
+                    IMManager.shared.sendImageMessage(
+                        channelId: self.channelId,
+                        imageURL: cdnURL,
+                        width: image.size.width,
+                        height: image.size.height,
+                        channelType: self.channelType
+                    )
+                    let msg = Message(
+                        messageID: UUID().uuidString,
+                        channelID: self.channelId,
+                        channelType: self.channelType,
+                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                        content: cdnURL,
+                        type: .image,
+                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                        status: 0 // 发送中
+                    )
+                    self.messages.append(msg)
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
+                        self.scrollToBottom()
                     }
                 case .failure(let error):
                     print("图片上传失败: \(error.localizedDescription)")
@@ -800,32 +824,29 @@ extension ChatViewController: ChatInputBarDelegate {
                             guard let self = self else { return }
                             switch thumbResult {
                             case .success(let thumbCDNURL):
+                                // 通过SDK发送视频消息
+                                IMManager.shared.sendVideoMessage(
+                                    channelId: self.channelId,
+                                    thumbURL: thumbCDNURL,
+                                    videoURL: videoCDNURL,
+                                    duration: 0,
+                                    channelType: self.channelType
+                                )
                                 let content = "\(thumbCDNURL)|\(videoCDNURL)"
-                                Task {
-                                    do {
-                                        let response = try await APIClient.shared.requestRaw(
-                                            .sendMessage(channelId: self.channelId, content: content, type: 4, channelType: self.channelType)
-                                        )
-                                        if response["status"] as? Int == 200 {
-                                            let msg = Message(
-                                                messageID: UUID().uuidString,
-                                                channelID: self.channelId,
-                                                channelType: self.channelType,
-                                                fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                                                content: content,
-                                                type: .video,
-                                                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                                                status: 1
-                                            )
-                                            self.messages.append(msg)
-                                            DispatchQueue.main.async {
-                                                self.tableView.reloadData()
-                                                self.scrollToBottom()
-                                            }
-                                        }
-                                    } catch {
-                                        AppUtility.showToast("发送视频失败")
-                                    }
+                                let msg = Message(
+                                    messageID: UUID().uuidString,
+                                    channelID: self.channelId,
+                                    channelType: self.channelType,
+                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                                    content: content,
+                                    type: .video,
+                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                                    status: 0 // 发送中
+                                )
+                                self.messages.append(msg)
+                                DispatchQueue.main.async {
+                                    self.tableView.reloadData()
+                                    self.scrollToBottom()
                                 }
                             case .failure(let error):
                                 print("缩略图上传失败: \(error.localizedDescription)")
@@ -855,40 +876,36 @@ extension ChatViewController: ChatInputBarDelegate {
                 switch result {
                 case .success(let cdnURL):
                     // 读取文件大小
-                    let fileSize: Int
+                    let fileSize: Int64
                     do {
                         let resources = try url.resourceValues(forKeys: [.fileSizeKey])
-                        fileSize = resources.fileSize ?? 0
+                        fileSize = Int64(resources.fileSize ?? 0)
                     } catch {
                         fileSize = 0
                     }
-                    // content 格式: fileName|fileSize|cdnURL
+                    // 通过SDK发送文件消息
+                    IMManager.shared.sendFileMessage(
+                        channelId: self.channelId,
+                        fileName: fileName,
+                        fileSize: fileSize,
+                        fileURL: cdnURL,
+                        channelType: self.channelType
+                    )
                     let content = "\(fileName)|\(fileSize)|\(cdnURL)"
-                    Task {
-                        do {
-                            let response = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: self.channelId, content: content, type: 5, channelType: self.channelType)
-                            )
-                            if response["status"] as? Int == 200 {
-                                let msg = Message(
-                                    messageID: UUID().uuidString,
-                                    channelID: self.channelId,
-                                    channelType: self.channelType,
-                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                                    content: content,
-                                    type: .file,
-                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                                    status: 1
-                                )
-                                self.messages.append(msg)
-                                DispatchQueue.main.async {
-                                    self.tableView.reloadData()
-                                    self.scrollToBottom()
-                                }
-                            }
-                        } catch {
-                            AppUtility.showToast("发送文件失败")
-                        }
+                    let msg = Message(
+                        messageID: UUID().uuidString,
+                        channelID: self.channelId,
+                        channelType: self.channelType,
+                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                        content: content,
+                        type: .file,
+                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                        status: 0 // 发送中
+                    )
+                    messages.append(msg)
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
+                        self.scrollToBottom()
                     }
                 case .failure(let error):
                     print("文件上传失败: \(error.localizedDescription)")
@@ -899,60 +916,59 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     private func sendLocationMessage(_ location: PickedLocation) {
+        // 通过SDK发送位置消息
+        IMManager.shared.sendLocationMessage(
+            channelId: channelId,
+            name: location.name,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            channelType: channelType
+        )
         let content = "\(location.name)|\(location.latitude),\(location.longitude)"
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 6, channelType: channelType))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: self.channelType,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: "[位置] \(location.name)",
-                        type: .location,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                }
-            } catch {
-                AppUtility.showToast("发送位置失败")
-            }
+        let msg = Message(
+            messageID: UUID().uuidString,
+            channelID: channelId,
+            channelType: self.channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: "[位置] \(location.name)",
+            type: .location,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0 // 发送中
+        )
+        messages.append(msg)
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+            self.scrollToBottom()
         }
     }
     
     // MARK: - 发送名片消息
     private func sendCardMessage(uid: String, name: String, avatar: String, vercode: String) {
+        // 通过SDK发送名片消息
+        IMManager.shared.sendCardMessage(
+            channelId: channelId,
+            uid: uid,
+            name: name,
+            avatar: avatar,
+            vercode: vercode,
+            channelType: channelType
+        )
         let cardInfo = CardMessageInfo(uid: uid, name: name, avatar: avatar, vercode: vercode)
         let content = cardInfo.toString()
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: content, type: 7, channelType: channelType))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: self.channelType,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: content,
-                        type: .card,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                }
-            } catch {
-                AppUtility.showToast("发送名片失败")
-            }
+        let msg = Message(
+            messageID: UUID().uuidString,
+            channelID: channelId,
+            channelType: self.channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: content,
+            type: .card,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0 // 发送中
+        )
+        messages.append(msg)
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+            self.scrollToBottom()
         }
     }
     
@@ -964,29 +980,26 @@ extension ChatViewController: ChatInputBarDelegate {
             AppUtility.showToast("笔记格式错误")
             return
         }
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.sendMessage(channelId: channelId, content: noteString, type: 100, channelType: channelType))
-                if response["status"] as? Int == 200 {
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: channelId,
-                        channelType: self.channelType,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: noteString,
-                        type: .note,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 1
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                }
-            } catch {
-                AppUtility.showToast("发送笔记失败")
-            }
+        // 通过SDK发送笔记消息
+        IMManager.shared.sendNoteMessage(
+            channelId: channelId,
+            noteJSON: noteString,
+            channelType: channelType
+        )
+        let msg = Message(
+            messageID: UUID().uuidString,
+            channelID: channelId,
+            channelType: self.channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: noteString,
+            type: .note,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0 // 发送中
+        )
+        messages.append(msg)
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+            self.scrollToBottom()
         }
     }
     
