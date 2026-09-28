@@ -15,6 +15,9 @@ class IMManager: NSObject {
     var onConversationUnreadUpdate: ((WKChannel, Int) -> Void)?
     var onConversationDelete: ((WKChannel) -> Void)?
     var onTotalUnreadCountChanged: ((Int) -> Void)?
+    var onCMDReceived: ((WKCMDModel) -> Void)?
+    var onReactionChanged: (([WKReaction], WKChannel) -> Void)?
+    var onReminderChanged: ((WKChannel, [WKReminder]) -> Void)?
 
     private var isSetup = false
 
@@ -26,6 +29,9 @@ class IMManager: NSObject {
     static let conversationUnreadUpdateNotification = NSNotification.Name("IMConversationUnreadUpdate")
     static let conversationDeleteNotification = NSNotification.Name("IMConversationDelete")
     static let totalUnreadCountChangedNotification = NSNotification.Name("IMTotalUnreadCountChanged")
+    static let cmdReceivedNotification = NSNotification.Name("IMCMDReceived")
+    static let reactionChangedNotification = NSNotification.Name("IMReactionChanged")
+    static let reminderChangedNotification = NSNotification.Name("IMReminderChanged")
 
     private override init() {
         super.init()
@@ -60,6 +66,11 @@ class IMManager: NSObject {
 
         // 设置消息同步提供者
         setupMessageSyncProvider()
+
+        // 设置 CMD/Reaction/Receipt/Reminder delegate
+        WKSDK.shared().cmdManager.add(self)
+        WKReactionManager.shared().add(self)
+        WKReminderManager.shared().add(self)
     }
 
     // MARK: - 设置频道信息提供者
@@ -906,5 +917,103 @@ extension IMManager {
     // MARK: 更新语音消息已读状态
     func updateVoiceMessageReaded(_ message: WKMessage) {
         WKSDK.shared().chatManager.updateMessageVoiceReaded(message)
+    }
+}
+
+// MARK: - WKCMDManagerDelegate
+extension IMManager: WKCMDManagerDelegate {
+
+    func cmdManager(_ manager: WKCMDManager, onCMD model: WKCMDModel) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onCMDReceived?(model)
+            NotificationCenter.default.post(name: IMManager.cmdReceivedNotification, object: model)
+        }
+    }
+}
+
+// MARK: - WKReactionManagerDelegate
+extension IMManager: WKReactionManagerDelegate {
+
+    func reactionManagerChange(_ reactionManager: WKReactionManager, reactions: [WKReaction], channel: WKChannel) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onReactionChanged?(reactions, channel)
+            NotificationCenter.default.post(name: IMManager.reactionChangedNotification, object: [
+                "reactions": reactions,
+                "channel": channel
+            ] as [String: Any])
+        }
+    }
+}
+
+// MARK: - WKReminderManagerDelegate
+extension IMManager: WKReminderManagerDelegate {
+
+    func reminderManager(_ manager: WKReminderManager, didChange channel: WKChannel, reminders: [WKReminder]) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onReminderChanged?(channel, reminders)
+            NotificationCenter.default.post(name: IMManager.reminderChangedNotification, object: [
+                "channel": channel,
+                "reminders": reminders
+            ] as [String: Any])
+        }
+    }
+}
+
+// MARK: - CMD消息
+extension IMManager {
+
+    // MARK: 拉取CMD消息
+    func pullCMDMessages() {
+        WKSDK.shared().cmdManager.pullCMDMessages()
+    }
+}
+
+// MARK: - 消息回应（Reaction）
+extension IMManager {
+
+    // MARK: 添加或取消回应
+    func addOrCancelReaction(reactionName: String, messageID: UInt64, completion: ((Error?) -> Void)? = nil) {
+        WKReactionManager.shared().addOrCancelReaction(reactionName, messageID: messageID) { error in
+            DispatchQueue.main.async {
+                completion?(error)
+            }
+        }
+    }
+
+    // MARK: 同步回应
+    func syncReactions(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKReactionManager.shared().sync(channel)
+    }
+}
+
+// MARK: - 消息已读回执
+extension IMManager {
+
+    // MARK: 添加已读回执消息
+    func addReceiptMessages(channelId: String, channelType: Int = 1, messages: [WKMessage]) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKReceiptManager.shared().addReceiptMessages(channel, messages: messages)
+    }
+}
+
+// MARK: - 消息提醒（Reminder）
+extension IMManager {
+
+    // MARK: 同步提醒
+    func syncReminders() {
+        WKReminderManager.shared().sync()
+    }
+
+    // MARK: 标记提醒为已完成
+    func doneReminders(ids: [NSNumber]) {
+        WKReminderManager.shared().done(ids)
     }
 }
