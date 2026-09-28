@@ -10,12 +10,14 @@ class IMManager: NSObject {
     var onMessageReceived: ((Message) -> Void)?
     var onConnectionChanged: ((Bool) -> Void)?
     var onMessageStatusUpdate: ((Message) -> Void)?
+    var onChannelInfoUpdate: ((WKChannelInfo) -> Void)?
 
     private var isSetup = false
 
     static let messageReceivedNotification = NSNotification.Name("IMMessageReceived")
     static let messageStatusUpdateNotification = NSNotification.Name("IMMessageStatusUpdate")
     static let connectionStatusChangedNotification = NSNotification.Name("IMConnectionStatusChanged")
+    static let channelInfoUpdateNotification = NSNotification.Name("IMChannelInfoUpdate")
 
     private override init() {
         super.init()
@@ -39,6 +41,59 @@ class IMManager: NSObject {
         // 设置delegate
         WKSDK.shared().chatManager.add(self)
         WKSDK.shared().connectionManager.add(self)
+        WKSDK.shared().channelManager.addDelegate(self)
+
+        // 设置频道信息提供者
+        setupChannelInfoProvider()
+    }
+
+    // MARK: - 设置频道信息提供者
+    private func setupChannelInfoProvider() {
+        WKSDK.shared().channelInfoUpdate = { [weak self] channel, callback in
+            guard let self = self, let channel = channel else {
+                callback?(nil, false)
+                return nil
+            }
+
+            let channelId = channel.channelId ?? ""
+            let channelType = Int(channel.channelType)
+
+            Task {
+                do {
+                    let info: ChannelInfo = try await APIClient.shared.requestFlexible(
+                        .getChannelInfo(channelId: channelId, channelType: channelType)
+                    )
+
+                    // 转换为 WKChannelInfo
+                    let wkInfo = WKChannelInfo()
+                    wkInfo.channel = channel
+                    wkInfo.name = info.name ?? ""
+                    wkInfo.logo = info.logo ?? info.avatar ?? ""
+                    wkInfo.remark = info.remark ?? ""
+                    wkInfo.status = info.status ?? 0
+                    wkInfo.online = (info.online ?? 0) == 1
+
+                    // 处理 follow 状态
+                    if let follow = info.follow {
+                        wkInfo.follow = WKChannelInfoFollow(rawValue: UInt(follow)) ?? .stranger
+                    }
+
+                    // 保存到 SDK
+                    WKSDK.shared().channelManager.addOrUpdateChannelInfo(wkInfo)
+
+                    DispatchQueue.main.async {
+                        callback?(nil, false)
+                    }
+                } catch {
+                    print("[IM] 获取频道信息失败: \(error)")
+                    DispatchQueue.main.async {
+                        callback?(error, false)
+                    }
+                }
+            }
+
+            return nil
+        }
     }
 
     // MARK: - 连接（动态获取IM服务器地址）
@@ -365,5 +420,85 @@ extension IMManager: WKConnectionManagerDelegate {
             self.onConnectionChanged?(false)
             NotificationCenter.default.post(name: IMManager.connectionStatusChangedNotification, object: NSNumber(value: false))
         }
+    }
+}
+
+// MARK: - WKChannelManagerDelegate
+extension IMManager: WKChannelManagerDelegate {
+
+    func channelInfoUpdate(_ channelInfo: WKChannelInfo!) {
+        guard let info = channelInfo else { return }
+        DispatchQueue.main.async {
+            self.onChannelInfoUpdate?(info)
+            NotificationCenter.default.post(name: IMManager.channelInfoUpdateNotification, object: info)
+        }
+    }
+
+    func channelInfoUpdate(_ channelInfo: WKChannelInfo!, oldChannelInfo: WKChannelInfo?) {
+        guard let info = channelInfo else { return }
+        DispatchQueue.main.async {
+            self.onChannelInfoUpdate?(info)
+            NotificationCenter.default.post(name: IMManager.channelInfoUpdateNotification, object: info)
+        }
+    }
+}
+
+// MARK: - 频道管理
+extension IMManager {
+
+    // MARK: 获取频道信息
+    func getChannelInfo(channelId: String, channelType: Int = 1) -> WKChannelInfo? {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        return WKSDK.shared().channelManager.getChannelInfo(channel)
+    }
+
+    // MARK: 获取用户频道信息
+    func getChannelInfoOfUser(uid: String) -> WKChannelInfo? {
+        return WKSDK.shared().channelManager.getChannelInfoOfUser(uid)
+    }
+
+    // MARK: 拉取频道信息（从服务器）
+    func fetchChannelInfo(channelId: String, channelType: Int = 1, completion: ((WKChannelInfo?) -> Void)? = nil) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().channelManager.fetchChannelInfo(channel) { channelInfo in
+            DispatchQueue.main.async {
+                completion?(channelInfo)
+            }
+        }
+    }
+
+    // MARK: 更新频道设置（置顶/免打扰）
+    func updateChannelSetting(channelId: String, channelType: Int = 1, setting: [String: Any]) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().channelManager.updateChannelSetting(channel, setting: setting)
+    }
+
+    // MARK: 设置置顶
+    func setChannelStick(channelId: String, channelType: Int = 1, stick: Bool) {
+        updateChannelSetting(channelId: channelId, channelType: channelType, setting: ["stick": stick])
+    }
+
+    // MARK: 设置免打扰
+    func setChannelMute(channelId: String, channelType: Int = 1, mute: Bool) {
+        updateChannelSetting(channelId: channelId, channelType: channelType, setting: ["mute": mute])
+    }
+
+    // MARK: 添加/更新频道信息
+    func addOrUpdateChannelInfo(_ channelInfo: WKChannelInfo) {
+        WKSDK.shared().channelManager.addOrUpdateChannelInfo(channelInfo)
+    }
+
+    // MARK: 删除频道信息
+    func deleteChannelInfo(channelId: String, channelType: Int = 1) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        WKSDK.shared().channelManager.deleteChannelInfo(channel)
     }
 }
