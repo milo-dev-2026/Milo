@@ -208,7 +208,7 @@ class IMManager: NSObject {
                         "start_message_seq": startMessageSeq,
                         "end_message_seq": endMessageSeq,
                         "limit": limit,
-                        "pull_mode": pullMode.rawValue,
+                        "pull_mode": Int(pullMode.rawValue),
                         "device_uuid": deviceUUID
                     ]
 
@@ -869,7 +869,7 @@ extension IMManager {
 
     // MARK: 删除消息
     func deleteMessage(_ message: WKMessage) {
-        WKSDK.shared().chatManager.deleteMessage(message)
+        WKSDK.shared().chatManager.delete(message)
     }
 
     // MARK: 清除指定频道所有消息
@@ -892,7 +892,7 @@ extension IMManager {
 
     // MARK: 重发消息
     func resendMessage(_ message: WKMessage) {
-        WKSDK.shared().chatManager.resendMessage(message)
+        WKSDK.shared().chatManager.resend(message)
     }
 
     // MARK: 保存消息（不发送，仅本地存储）
