@@ -15,7 +15,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let url = contentDic["url"] as? String {
             self.url = url
         }
@@ -52,7 +52,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let url = contentDic["url"] as? String {
             self.url = url
         }
@@ -87,7 +87,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let thumbURL = contentDic["thumb_url"] as? String {
             self.thumbURL = thumbURL
         }
@@ -125,7 +125,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let fileName = contentDic["file_name"] as? String {
             self.fileName = fileName
         }
@@ -158,7 +158,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let name = contentDic["name"] as? String {
             self.name = name
         }
@@ -195,7 +195,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let uid = contentDic["uid"] as? String {
             self.uid = uid
         }
@@ -231,7 +231,7 @@ import WuKongIMSDK
         return dict
     }
     
-    public override func decodeMsg(_ contentDic: [AnyHashable : Any]) {
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         if let noteId = contentDic["note_id"] as? String {
             self.noteId = noteId
         }
