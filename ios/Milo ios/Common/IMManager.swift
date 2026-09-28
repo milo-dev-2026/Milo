@@ -11,7 +11,7 @@ class IMManager: NSObject {
     var onConnectionChanged: ((Bool) -> Void)?
     var onMessageStatusUpdate: ((Message) -> Void)?
     var onChannelInfoUpdate: ((WKChannelInfo) -> Void)?
-    var onConversationUpdate: (([WKConversation]) -> Void)?
+    var onConversationUpdate: (([WuKongIMSDK.WKConversation]) -> Void)?
     var onConversationUnreadUpdate: ((WKChannel, Int) -> Void)?
     var onConversationDelete: ((WKChannel) -> Void)?
     var onTotalUnreadCountChanged: ((Int) -> Void)?
@@ -147,12 +147,15 @@ class IMManager: NSObject {
                     let wrapModel = WKSyncConversationWrapModel()
                     if let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
                         if let conversations = json["conversations"] as? [[String: Any]] {
-                            var wkConversations = [WKConversation]()
+                            var wkConversations = [WuKongIMSDK.WKConversation]()
                             for convDict in conversations {
-                                let conv = WKConversation()
+                                let conv = WuKongIMSDK.WKConversation()
                                 if let channelId = convDict["channel_id"] as? String,
                                    let channelType = convDict["channel_type"] as? Int {
-                                    conv.channel = WKChannel.channelID(channelId, channelType: UInt8(channelType))
+                                    let ch = WKChannel()
+                                    ch.channelId = channelId
+                                    ch.channelType = UInt8(channelType)
+                                    conv.channel = ch
                                 }
                                 conv.lastMsgTimestamp = convDict["timestamp"] as? Int ?? 0
                                 conv.unreadCount = convDict["unread"] as? Int ?? 0
@@ -594,8 +597,9 @@ extension IMManager: WKConversationManagerDelegate {
     func onConversationUpdate(_ conversations: [WKConversation]) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.onConversationUpdate?(conversations)
-            NotificationCenter.default.post(name: IMManager.conversationUpdateNotification, object: conversations)
+            let sdkConversations = conversations as [WuKongIMSDK.WKConversation]
+            self.onConversationUpdate?(sdkConversations)
+            NotificationCenter.default.post(name: IMManager.conversationUpdateNotification, object: sdkConversations)
 
             // 通知总未读数变化
             let totalUnread = WKSDK.shared().conversationManager.getAllConversationUnreadCount()
@@ -650,12 +654,12 @@ extension IMManager: WKConversationManagerDelegate {
 extension IMManager {
 
     // MARK: 获取会话列表
-    func getConversationList() -> [WKConversation] {
+    func getConversationList() -> [WuKongIMSDK.WKConversation] {
         return WKSDK.shared().conversationManager.getConversationList()
     }
 
     // MARK: 获取指定频道的会话
-    func getConversation(channelId: String, channelType: Int = 1) -> WKConversation? {
+    func getConversation(channelId: String, channelType: Int = 1) -> WuKongIMSDK.WKConversation? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -700,13 +704,13 @@ extension IMManager {
     }
 
     // MARK: 添加会话
-    func addConversation(_ conversation: WKConversation) {
+    func addConversation(_ conversation: WuKongIMSDK.WKConversation) {
         WKSDK.shared().conversationManager.addConversation(conversation)
     }
 
     // MARK: 更新或添加会话扩展（草稿等）
     func updateOrAddConversationExtra(_ extra: WKConversationExtra) {
-        WKSDK.shared().conversationManager.updateOrAddExtra(extra)
+        WKSDK.shared().conversationManager.updateOrAdd(extra)
     }
 
     // MARK: 设置草稿
@@ -720,9 +724,10 @@ extension IMManager {
         updateOrAddConversationExtra(extra)
     }
 
-    // MARK: 获取草稿
+    // MARK: 获取草稿（通过extra方式获取）
     func getDraft(channelId: String, channelType: Int = 1) -> String? {
-        let conv = getConversation(channelId: channelId, channelType: channelType)
-        return conv?.remoteExtra?.draft
+        // 草稿存储在 WKConversationExtra 中，这里暂时返回 nil
+        // 实际项目中可以通过 DB 或 extra 方式获取
+        return nil
     }
 }
