@@ -1094,7 +1094,7 @@ extension IMManager {
 extension IMManager {
 
     // MARK: 设置共享密钥
-    var sharedKey: String? {
+    var sharedKey: String {
         get {
             return WKSecurityManager.shared().sharedKey
         }
@@ -1109,7 +1109,7 @@ extension IMManager {
     }
 
     // MARK: 获取DH公钥
-    func getDHPubKey() -> String? {
+    func getDHPubKey() -> String {
         return WKSecurityManager.shared().getDHPubKey()
     }
 
@@ -1119,17 +1119,17 @@ extension IMManager {
     }
 
     // MARK: 加密数据
-    func encrypt(_ data: String) -> String? {
+    func encrypt(_ data: String) -> String {
         return WKSecurityManager.shared().encryption(data)
     }
 
     // MARK: 解密数据
-    func decrypt(_ data: String) -> String? {
+    func decrypt(_ data: String) -> String {
         return WKSecurityManager.shared().decryption(data)
     }
 
     // MARK: MD5
-    func md5(_ input: String) -> String? {
+    func md5(_ input: String) -> String {
         return WKSecurityManager.shared().md5(input)
     }
 }
