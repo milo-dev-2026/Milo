@@ -449,7 +449,7 @@ class ScreenshotMessageCell: UITableViewCell {
     }
 
     @objc private func handleBubbleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard AnimationIntegration.shared.config.enableButtonPressAnimation else return
+        guard AnimationIntegration.shared.config.enableButtonPressAnimation else { return }
 
         switch gesture.state {
         case .began:
