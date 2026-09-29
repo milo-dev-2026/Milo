@@ -34,9 +34,41 @@ struct NoteBlock: Codable {
         self.videoURL = videoURL
         self.location = location
     }
-}
 
-// MARK: - 笔记实体
+    func toDict() -> [String: Any] {
+        var dict: [String: Any] = [
+            "id": id,
+            "type": type.rawValue,
+            "content": content
+        ]
+        if let imageURL = imageURL { dict["imageURL"] = imageURL }
+        if let videoURL = videoURL { dict["videoURL"] = videoURL }
+        if let location = location {
+            dict["location"] = [
+                "latitude": location.latitude,
+                "longitude": location.longitude,
+                "address": location.address
+            ]
+        }
+        return dict
+    }
+
+    static func fromDict(_ dict: [String: Any]) -> NoteBlock? {
+        guard let id = dict["id"] as? String,
+              let typeStr = dict["type"] as? String,
+              let type = NoteBlockType(rawValue: typeStr) else { return nil }
+        let content = dict["content"] as? String ?? ""
+        let imageURL = dict["imageURL"] as? String
+        let videoURL = dict["videoURL"] as? String
+        var location: NoteLocation?
+        if let locDict = dict["location"] as? [String: Any],
+           let lat = locDict["latitude"] as? Double,
+           let lng = locDict["longitude"] as? Double {
+            location = NoteLocation(latitude: lat, longitude: lng, address: locDict["address"] as? String ?? "")
+        }
+        return NoteBlock(id: id, type: type, content: content, imageURL: imageURL, videoURL: videoURL, location: location)
+    }
+}
 struct NoteEntity: Codable {
     var id: String
     var title: String
@@ -105,5 +137,22 @@ struct NoteEntity: Codable {
             formatter.dateFormat = "yyyy/MM/dd"
         }
         return formatter.string(from: date)
+    }
+
+    static func fromDict(_ dict: [String: Any]) -> NoteEntity? {
+        guard let id = dict["id"] as? String else { return nil }
+        let title = dict["title"] as? String ?? ""
+        var blocks: [NoteBlock] = []
+        if let blocksArray = dict["blocks"] as? [[String: Any]] {
+            blocks = blocksArray.compactMap { NoteBlock.fromDict($0) }
+        }
+        let createTime = Int64(dict["createTime"] as? Int ?? 0)
+        let updateTime = Int64(dict["updateTime"] as? Int ?? 0)
+        let isSticky = dict["isSticky"] as? Bool ?? false
+        let remark = dict["remark"] as? String ?? ""
+        let group = dict["group"] as? String ?? "普通笔记"
+        return NoteEntity(id: id, title: title, blocks: blocks,
+                          createTime: createTime, updateTime: updateTime,
+                          isSticky: isSticky, remark: remark, group: group)
     }
 }

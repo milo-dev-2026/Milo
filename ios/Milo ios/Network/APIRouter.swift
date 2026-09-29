@@ -89,6 +89,16 @@ enum APIRouter: URLRequestConvertible {
     case kickDevice(deviceId: String)
     // IM server info
     case getIMServer(uid: String)
+    // Notes sync
+    case syncNotes
+    case upsertNote(id: String, title: String, blocks: [Any], createTime: Int64, updateTime: Int64, isSticky: Bool, remark: String, group: String)
+    case deleteNote(noteId: String)
+    case addNoteGroup(name: String)
+    case deleteNoteGroup(name: String)
+    // Tags sync
+    case syncTags
+    case upsertTag(id: String, name: String, colorRawValue: Int, members: [Any], updateTime: Int64)
+    case deleteTag(tagId: String)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -318,6 +328,19 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email])
         case let .destroyAccount(account, code, type, zone):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["account": account, "code": code, "type": type, "zone": zone])
+        case let .upsertNote(id, title, blocks, createTime, updateTime, isSticky, remark, group):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "id": id, "title": title, "blocks": blocks,
+                "createTime": createTime, "updateTime": updateTime,
+                "isSticky": isSticky, "remark": remark, "group": group
+            ])
+        case let .addNoteGroup(name):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["name": name])
+        case let .upsertTag(id, name, colorRawValue, members, updateTime):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "id": id, "name": name, "colorRawValue": colorRawValue,
+                "members": members, "updateTime": updateTime
+            ])
         default:
             break
         }
@@ -408,6 +431,14 @@ enum APIRouter: URLRequestConvertible {
         case .getDeviceList: return "/v1/user/devices"
         case .kickDevice(let deviceId): return "/v1/user/devices/\(deviceId)"
         case .getIMServer(let uid): return "/v1/users/\(uid)/im"
+        case .syncNotes: return "/v1/notes/sync"
+        case .upsertNote: return "/v1/notes"
+        case .deleteNote(let noteId): return "/v1/notes/\(noteId)"
+        case .addNoteGroup: return "/v1/notes/groups"
+        case .deleteNoteGroup(let name): return "/v1/notes/groups/\(name)"
+        case .syncTags: return "/v1/tags/sync"
+        case .upsertTag: return "/v1/tags"
+        case .deleteTag(let tagId): return "/v1/tags/\(tagId)"
         }
     }
 
@@ -418,7 +449,7 @@ enum APIRouter: URLRequestConvertible {
              .getFavorites, .getGroupAnnouncement, .getDeviceList,
              .getGroupMembers, .getGroupAdmins, .getMutedMembers,
              .getGroupBlackList, .getLeftGroupMembers,
-             .getIMServer:
+             .getIMServer, .syncNotes, .syncTags:
             return .get
         case .updateGroupAnnouncement, .updateLockAfterMinute,
              .updateGroupInfo, .setJoinApproval, .setGroupMuteAll,
@@ -427,7 +458,7 @@ enum APIRouter: URLRequestConvertible {
              .saveToContacts, .setShowGroupNickname:
             return .put
         case .deleteFavorite, .deleteLockScreenPwd, .kickDevice,
-             .dismissGroup:
+             .dismissGroup, .deleteNote, .deleteNoteGroup, .deleteTag:
             return .delete
         default:
             return .post

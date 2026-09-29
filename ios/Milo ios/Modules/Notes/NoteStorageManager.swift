@@ -140,4 +140,85 @@ class NoteStorageManager {
         }
         saveNotesToStorage(notes)
     }
+
+    // MARK: - 云端同步
+
+    func syncFromCloud(completion: @escaping (Bool) -> Void) {
+        Task {
+            do {
+                let resp = try await APIClient.shared.requestRaw(.syncNotes)
+                guard let data = resp["data"] as? [String: Any] else {
+                    DispatchQueue.main.async { completion(false) }
+                    return
+                }
+                let notesArray = data["notes"] as? [[String: Any]] ?? []
+                let groupsArray = data["groups"] as? [String] ?? []
+                var cloudNotes: [NoteEntity] = []
+                for dict in notesArray {
+                    if let note = NoteEntity.fromDict(dict) {
+                        cloudNotes.append(note)
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.saveNotesToStorage(cloudNotes)
+                    if !groupsArray.isEmpty {
+                        UserDefaults.standard.set(groupsArray, forKey: self.groupsKey)
+                    }
+                    completion(true)
+                }
+            } catch {
+                print("[Notes] 云端同步失败: \(error)")
+                DispatchQueue.main.async { completion(false) }
+            }
+        }
+    }
+
+    func upsertToCloud(_ note: NoteEntity, completion: ((Bool) -> Void)? = nil) {
+        let blocksArrays = note.blocks.map { $0.toDict() }
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.upsertNote(
+                    id: note.id, title: note.title, blocks: blocksArrays,
+                    createTime: note.createTime, updateTime: note.updateTime,
+                    isSticky: note.isSticky, remark: note.remark, group: note.group
+                ))
+                completion?(true)
+            } catch {
+                print("[Notes] 上传笔记失败: \(error)")
+                completion?(false)
+            }
+        }
+    }
+
+    func deleteFromCloud(noteId: String, completion: ((Bool) -> Void)? = nil) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.deleteNote(noteId: noteId))
+                completion?(true)
+            } catch {
+                print("[Notes] 云端删除笔记失败: \(error)")
+                completion?(false)
+            }
+        }
+    }
+
+    func addGroupToCloud(_ name: String) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.addNoteGroup(name: name))
+            } catch {
+                print("[Notes] 上传分组失败: \(error)")
+            }
+        }
+    }
+
+    func deleteGroupFromCloud(_ name: String) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.deleteNoteGroup(name: name))
+            } catch {
+                print("[Notes] 云端删除分组失败: \(error)")
+            }
+        }
+    }
 }

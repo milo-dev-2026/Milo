@@ -43,8 +43,8 @@ class IMManager: NSObject {
         isSetup = true
 
         let options = WKOptions()
-        options.host = "43.133.39.170"
-        options.port = 5100
+        options.host = APIConfig.imTcpHost
+        options.port = APIConfig.imTcpPort
         options.heartbeatInterval = 30
 
         WKSDK.shared().options = options
@@ -77,8 +77,6 @@ class IMManager: NSObject {
     private func setupChannelInfoProvider() {
         WKSDK.shared().channelInfoUpdate = { [weak self] channel, callback in
             guard let self = self else {
-                callback(nil)
-                return
                 callback(nil, false)
                 return nil
             }
@@ -154,7 +152,7 @@ class IMManager: NSObject {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
                     if let token = UserDefaults.standard.string(forKey: "token") {
-                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        request.setValue(token, forHTTPHeaderField: "token")
                     }
 
                     let (responseData, _) = try await URLSession.shared.data(for: request)
@@ -227,14 +225,14 @@ class IMManager: NSObject {
 
                     let data = try JSONSerialization.data(withJSONObject: params)
 
-                    let url = URL(string: APIConfig.apiBaseURL + "/v1/message/sync")!
+                    let url = URL(string: APIConfig.apiBaseURL + "/v1/message/channel/sync")!
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
                     request.httpBody = data
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
                     if let token = UserDefaults.standard.string(forKey: "token") {
-                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        request.setValue(token, forHTTPHeaderField: "token")
                     }
 
                     let (responseData, _) = try await URLSession.shared.data(for: request)
@@ -296,8 +294,8 @@ class IMManager: NSObject {
         Task {
             do {
                 let imServer: IMServerResponse = try await APIClient.shared.requestFlexible(.getIMServer(uid: uid))
-                let host = imServer.ip ?? "43.133.39.170"
-                let port = UInt16(imServer.port ?? 5100)
+                let host = imServer.ip ?? APIConfig.imTcpHost
+                let port = UInt16(imServer.port ?? Int(APIConfig.imTcpPort))
                 print("[IM] 获取到IM服务器: \(host):\(port)")
                 DispatchQueue.main.async {
                     WKSDK.shared().options.host = host
@@ -307,8 +305,8 @@ class IMManager: NSObject {
             } catch {
                 print("[IM] 获取IM服务器地址失败，使用默认值: \(error)")
                 DispatchQueue.main.async {
-                    WKSDK.shared().options.host = "43.133.39.170"
-                    WKSDK.shared().options.port = 5100
+                    WKSDK.shared().options.host = APIConfig.imTcpHost
+                    WKSDK.shared().options.port = APIConfig.imTcpPort
                     WKSDK.shared().connectionManager.connect()
                 }
             }

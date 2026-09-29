@@ -17,6 +17,17 @@ class GlassSegmentedControl: UIView {
     private var buttons: [UIButton] = []
     private let stackView = UIStackView()
 
+    // 液态玻璃背景（iOS 15+）
+    @available(iOS 15.0, *)
+    private lazy var liquidGlassView: LiquidGlassView? = {
+        let glass = LiquidGlassView()
+        glass.cornerRadius = ScreenAdapter.scaleH(22)
+        glass.glassOpacity = 0.5
+        glass.borderWidth = 0.5
+        glass.highlightOpacity = 0.15
+        return glass
+    }()
+
     init(items: [String]) {
         self.items = items
         super.init(frame: .zero)
@@ -31,17 +42,30 @@ class GlassSegmentedControl: UIView {
         layer.cornerRadius = ScreenAdapter.scaleH(22)
         layer.masksToBounds = true
 
-        addSubview(blurView)
-        blurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        if #available(iOS 15.0, *) {
+            // 液态玻璃背景
+            guard let glassView = liquidGlassView else { return }
+            addSubview(glassView)
+            sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        } else {
+            // 降级：普通毛玻璃
+            addSubview(blurView)
+            sendSubviewToBack(blurView)
+            blurView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
 
-        // 白色半透明背景叠加，增加玻璃质感
-        let overlayView = UIView()
-        overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
-        addSubview(overlayView)
-        overlayView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            // 白色半透明背景叠加，增加玻璃质感
+            let overlayView = UIView()
+            overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+            addSubview(overlayView)
+            sendSubviewToBack(overlayView)
+            overlayView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
         }
 
         // 选中滑块
@@ -78,6 +102,16 @@ class GlassSegmentedControl: UIView {
         }
 
         updateSelection(animated: false)
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if #available(iOS 15.0, *),
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            liquidGlassView?.blurStyle = isDark ? .systemMaterialDark : .systemMaterialLight
+            liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.2 : 0.3)
+        }
     }
 
     @objc private func buttonTapped(_ sender: UIButton) {
@@ -125,6 +159,17 @@ class GlassCardView: UIView {
 
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterialLight))
 
+    // 液态玻璃背景（iOS 15+）
+    @available(iOS 15.0, *)
+    private lazy var liquidGlassView: LiquidGlassCard? = {
+        let glass = LiquidGlassCard(cornerRadius: ScreenAdapter.scaleW(28))
+        glass.glassOpacity = 0.7
+        glass.borderWidth = 0.5
+        glass.highlightOpacity = 0.2
+        glass.enableTapAnimation = false
+        return glass
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -135,7 +180,7 @@ class GlassCardView: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor.white.withAlphaComponent(0.6)
+        backgroundColor = .clear
         layer.cornerRadius = ScreenAdapter.scaleW(28)
         layer.masksToBounds = false
         layer.shadowColor = UIColor.black.cgColor
@@ -143,13 +188,35 @@ class GlassCardView: UIView {
         layer.shadowRadius = 24
         layer.shadowOpacity = 0.08
 
-        addSubview(blurView)
-        sendSubviewToBack(blurView)
-        blurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+        if #available(iOS 15.0, *) {
+            // 使用液态玻璃效果
+            guard let glassView = liquidGlassView else { return }
+            addSubview(glassView)
+            sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        } else {
+            // 降级：普通毛玻璃
+            backgroundColor = UIColor.white.withAlphaComponent(0.6)
+            addSubview(blurView)
+            sendSubviewToBack(blurView)
+            blurView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+            blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
+            blurView.layer.masksToBounds = true
         }
-        blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
-        blurView.layer.masksToBounds = true
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if #available(iOS 15.0, *),
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            liquidGlassView?.blurStyle = isDark ? .systemMaterialDark : .systemUltraThinMaterialLight
+            liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.2 : 0.3)
+        }
     }
 }
 
@@ -162,6 +229,17 @@ class CapsuleTextField: UIView {
         didSet { updatePlaceholder() }
     }
 
+    // 液态玻璃背景（iOS 15+）
+    @available(iOS 15.0, *)
+    private lazy var liquidGlassView: LiquidGlassView? = {
+        let glass = LiquidGlassView()
+        glass.cornerRadius = ScreenAdapter.scaleH(24)
+        glass.glassOpacity = 0.4
+        glass.borderWidth = 0.8
+        glass.highlightOpacity = 0.1
+        return glass
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -172,26 +250,95 @@ class CapsuleTextField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor.white
+        if #available(iOS 15.0, *) {
+            // 液态玻璃背景
+            backgroundColor = .clear
+            guard let glassView = liquidGlassView else { return }
+            addSubview(glassView)
+            sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        } else {
+            // 降级：普通白色背景
+            backgroundColor = UIColor.white
+            layer.borderWidth = 1
+            layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+        }
+
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
-        layer.borderWidth = 1
-        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
         textField.textColor = .label
         textField.backgroundColor = .clear
+        textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
+        textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
         textField.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.centerY.equalToSuperview()
+            make.centerY.equalToSuper()
         }
 
         snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if #available(iOS 15.0, *),
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            liquidGlassView?.blurStyle = isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight
+            liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25)
+        }
+    }
+
+    @objc private func editingDidBegin() {
+        if #available(iOS 15.0, *) {
+            // 液态玻璃聚焦效果
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderWidth = 1.2
+            }
+        } else {
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.layer.borderColor = UIColor.themePrimary.cgColor
+                self.layer.borderWidth = 1.5
+            }
+        }
+
+        // 轻微缩放弹跳
+        transform = CGAffineTransform(scaleX: 1.02, y: 1.03)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.playCustomPattern(intensity: 0.25, sharpness: 0.2)
+        }
+    }
+
+    @objc private func editingDidEnd() {
+        if #available(iOS 15.0, *) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderWidth = 0.8
+            }
+        } else {
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+                self.layer.borderWidth = 1
+            }
         }
     }
 
@@ -251,6 +398,8 @@ class CapsulePhoneField: UIView {
         textField.textColor = .label
         textField.keyboardType = .numberPad
         textField.backgroundColor = .clear
+        textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
+        textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
         countryCodeButton.snp.makeConstraints { make in
@@ -299,6 +448,17 @@ class CapsuleCodeField: UIView {
         didSet { updatePlaceholder() }
     }
 
+    // 液态玻璃背景（iOS 15+）
+    @available(iOS 15.0, *)
+    private lazy var liquidGlassView: LiquidGlassView? = {
+        let glass = LiquidGlassView()
+        glass.cornerRadius = ScreenAdapter.scaleH(24)
+        glass.glassOpacity = 0.4
+        glass.borderWidth = 0.8
+        glass.highlightOpacity = 0.1
+        return glass
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -309,17 +469,32 @@ class CapsuleCodeField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor.white
+        if #available(iOS 15.0, *) {
+            // 液态玻璃背景
+            backgroundColor = .clear
+            guard let glassView = liquidGlassView else { return }
+            addSubview(glassView)
+            sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        } else {
+            // 降级：普通白色背景
+            backgroundColor = UIColor.white
+            layer.borderWidth = 1
+            layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+        }
+
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
-        layer.borderWidth = 1
-        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
         textField.textColor = .label
         textField.keyboardType = .numberPad
         textField.backgroundColor = .clear
+        textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
+        textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
         sendCodeButton.setTitle("获取验证码", for: .normal)
@@ -341,6 +516,59 @@ class CapsuleCodeField: UIView {
 
         snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if #available(iOS 15.0, *),
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            liquidGlassView?.blurStyle = isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight
+            liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25)
+        }
+    }
+
+    @objc private func editingDidBegin() {
+        if #available(iOS 15.0, *) {
+            // 液态玻璃聚焦效果
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderWidth = 1.2
+            }
+        } else {
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.layer.borderColor = UIColor.themePrimary.cgColor
+                self.layer.borderWidth = 1.5
+            }
+        }
+
+        transform = CGAffineTransform(scaleX: 1.02, y: 1.03)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.playCustomPattern(intensity: 0.25, sharpness: 0.2)
+        }
+    }
+
+    @objc private func editingDidEnd() {
+        if #available(iOS 15.0, *) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderWidth = 0.8
+            }
+        } else {
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+                self.layer.borderWidth = 1
+            }
         }
     }
 
@@ -366,6 +594,17 @@ class CapsulePasswordField: UIView {
         didSet { updatePlaceholder() }
     }
 
+    // 液态玻璃背景（iOS 15+）
+    @available(iOS 15.0, *)
+    private lazy var liquidGlassView: LiquidGlassView? = {
+        let glass = LiquidGlassView()
+        glass.cornerRadius = ScreenAdapter.scaleH(24)
+        glass.glassOpacity = 0.4
+        glass.borderWidth = 0.8
+        glass.highlightOpacity = 0.1
+        return glass
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -376,17 +615,32 @@ class CapsulePasswordField: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = UIColor.white
+        if #available(iOS 15.0, *) {
+            // 液态玻璃背景
+            backgroundColor = .clear
+            guard let glassView = liquidGlassView else { return }
+            addSubview(glassView)
+            sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        } else {
+            // 降级：普通白色背景
+            backgroundColor = UIColor.white
+            layer.borderWidth = 1
+            layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+        }
+
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
-        layer.borderWidth = 1
-        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
 
         textField.borderStyle = .none
         textField.font = ScreenAdapter.font(16)
         textField.textColor = .label
         textField.isSecureTextEntry = true
         textField.backgroundColor = .clear
+        textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
+        textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
         toggleButton.setImage(UIImage(systemName: "eye.slash"), for: .normal)
@@ -412,9 +666,82 @@ class CapsulePasswordField: UIView {
         }
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if #available(iOS 15.0, *),
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            liquidGlassView?.blurStyle = isDark ? .systemUltraThinMaterialDark : .systemUltraThinMaterialLight
+            liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25)
+        }
+    }
+
     @objc private func togglePassword() {
         textField.isSecureTextEntry.toggle()
         toggleButton.isSelected = !textField.isSecureTextEntry
+
+        // 眼睛按钮缩放弹跳动画
+        toggleButton.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        UIView.animate(withDuration: 0.3,
+                       delay: 0,
+                       usingSpringWithDamping: 0.5,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseInOut) {
+            self.toggleButton.transform = .identity
+        }
+
+        // 图标翻转过渡
+        UIView.transition(with: toggleButton,
+                          duration: 0.2,
+                          options: .transitionFlipFromLeft) {
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+    }
+
+    @objc private func editingDidBegin() {
+        if #available(iOS 15.0, *) {
+            // 液态玻璃聚焦效果
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderWidth = 1.2
+            }
+        } else {
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                self.layer.borderColor = UIColor.themePrimary.cgColor
+                self.layer.borderWidth = 1.5
+            }
+        }
+
+        transform = CGAffineTransform(scaleX: 1.02, y: 1.03)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.playCustomPattern(intensity: 0.25, sharpness: 0.2)
+        }
+    }
+
+    @objc private func editingDidEnd() {
+        if #available(iOS 15.0, *) {
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderWidth = 0.8
+            }
+        } else {
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+                self.layer.borderWidth = 1
+            }
+        }
     }
 
     private func updatePlaceholder() {
@@ -819,16 +1146,57 @@ class PasswordFloatingLabelField: UIView {
     @objc private func togglePassword() {
         textField.isSecureTextEntry.toggle()
         toggleButton.isSelected = !textField.isSecureTextEntry
+
+        // 眼睛按钮缩放弹跳动画
+        toggleButton.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        UIView.animate(withDuration: 0.3,
+                       delay: 0,
+                       usingSpringWithDamping: 0.5,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseInOut) {
+            self.toggleButton.transform = .identity
+        }
+
+        // 图标切换过渡动画
+        UIView.transition(with: toggleButton,
+                          duration: 0.2,
+                          options: .transitionFlipFromLeft) {
+            // 触发图片切换
+        }
+
+        // 触觉反馈
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
     }
 
     @objc private func editingDidBegin() {
-        borderView.layer.borderColor = UIColor.themePrimary.cgColor
-        floatingLabel.textColor = .themePrimary
+        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+            self.borderView.layer.borderColor = UIColor.themePrimary.cgColor
+            self.borderView.layer.borderWidth = 1.5
+            self.floatingLabel.textColor = .themePrimary
+        }
+
+        // 轻微缩放效果
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+            self.borderView.transform = CGAffineTransform(scaleX: 1.01, y: 1.02)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.15) {
+                self.borderView.transform = .identity
+            }
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.playCustomPattern(intensity: 0.3, sharpness: 0.2)
+        }
     }
 
     @objc private func editingDidEnd() {
-        borderView.layer.borderColor = UIColor.themeSeparator.cgColor
-        floatingLabel.textColor = .secondaryLabel
+        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn) {
+            self.borderView.layer.borderColor = UIColor.themeSeparator.cgColor
+            self.borderView.layer.borderWidth = 1
+            self.floatingLabel.textColor = .secondaryLabel
+        }
     }
 
     override var intrinsicContentSize: CGSize {
@@ -869,6 +1237,85 @@ class EntryLoginViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playEntranceAnimation()
+    }
+
+    private func playEntranceAnimation() {
+        // 初始状态
+        logoView.alpha = 0
+        logoView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+
+        titleLabel.alpha = 0
+        titleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        subtitleLabel.alpha = 0
+        subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        glassCard.alpha = 0
+        glassCard.transform = CGAffineTransform(translationX: 0, y: 30)
+
+        nextButton.alpha = 0
+        nextButton.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        agreementCheckBox.alpha = 0
+        agreementLabel.alpha = 0
+        userAgreementButton.alpha = 0
+        privacyPolicyButton.alpha = 0
+
+        bottomAgreementLabel.alpha = 0
+
+        // 顺序播放
+        UIView.animate(withDuration: 0.6,
+                       delay: 0,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.logoView.alpha = 1
+            self.logoView.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.1, options: .curveEaseOut) {
+            self.titleLabel.alpha = 1
+            self.titleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.15, options: .curveEaseOut) {
+            self.subtitleLabel.alpha = 1
+            self.subtitleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.2,
+                       usingSpringWithDamping: 0.8,
+                       initialSpringVelocity: 0.3,
+                       options: .curveEaseOut) {
+            self.glassCard.alpha = 1
+            self.glassCard.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.35, options: .curveEaseOut) {
+            self.agreementCheckBox.alpha = 1
+            self.agreementLabel.alpha = 1
+            self.userAgreementButton.alpha = 1
+            self.privacyPolicyButton.alpha = 1
+        }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.45,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.nextButton.alpha = 1
+            self.nextButton.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.55, options: .curveEaseOut) {
+            self.bottomAgreementLabel.alpha = 1
+        }
     }
 
     private func setupUI() {
@@ -1076,6 +1523,27 @@ class EntryLoginViewController: UIViewController {
     @objc private func toggleAgreement() {
         isAgreed.toggle()
         agreementCheckBox.isSelected = isAgreed
+
+        // 勾选框弹跳动画
+        let scale: CGFloat = isAgreed ? 1.3 : 0.8
+        agreementCheckBox.transform = CGAffineTransform(scaleX: scale, y: scale)
+        UIView.animate(withDuration: 0.35,
+                       delay: 0,
+                       usingSpringWithDamping: 0.4,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseInOut) {
+            self.agreementCheckBox.transform = .identity
+        }
+
+        // 触觉反馈
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            if isAgreed {
+                HapticManager.shared.impactMedium()
+            } else {
+                HapticManager.shared.impactLight()
+            }
+        }
+
         updateLoginButtonState()
     }
 
@@ -1193,7 +1661,7 @@ class EntryLoginViewController: UIViewController {
 }
 
 // MARK: - 页面2：登录页
-class LoginViewController: UIViewController {
+class LoginViewController: UIViewController, AliyunAuthDelegate {
 
     private let account: String
     private let isEmail: Bool
@@ -1205,6 +1673,11 @@ class LoginViewController: UIViewController {
     private let logoView = UIImageView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+
+    // 一键登录按钮
+    private let oneClickLoginButton = UIButton(type: .system)
+    private let oneClickDividerLabel = UILabel()
+    private var hasPreChecked = false
 
     // 玻璃卡片
     private let glassCard = GlassCardView()
@@ -1244,6 +1717,63 @@ class LoginViewController: UIViewController {
         super.viewDidLoad()
         print("[\(type(of: self))] viewDidLoad")
         setupUI()
+
+        // 初始化阿里云一键登录
+        AliyunAuthManager.shared.delegate = self
+        AliyunAuthManager.shared.setupSDK()
+
+        // 预取号（仅手机号登录时）
+        if !isEmail {
+            AliyunAuthManager.shared.preGetToken { [weak self] success, _ in
+                DispatchQueue.main.async {
+                    self?.hasPreChecked = success
+                    self?.oneClickLoginButton.isEnabled = success
+                    self?.oneClickLoginButton.alpha = success ? 1.0 : 0.4
+                }
+            }
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        animateEntrance()
+    }
+
+    private func animateEntrance() {
+        // Logo 缩放弹入
+        logoView.alpha = 0
+        logoView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+
+        // 标题从下往上淡入
+        titleLabel.alpha = 0
+        titleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        subtitleLabel.alpha = 0
+        subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        // 输入框和按钮稍后淡入
+        UIView.animate(withDuration: 0.5,
+                       delay: 0,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.logoView.alpha = 1
+            self.logoView.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4,
+                       delay: 0.15,
+                       options: .curveEaseOut) {
+            self.titleLabel.alpha = 1
+            self.titleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4,
+                       delay: 0.2,
+                       options: .curveEaseOut) {
+            self.subtitleLabel.alpha = 1
+            self.subtitleLabel.transform = .identity
+        }
     }
 
     deinit { countdownTimer?.invalidate() }
@@ -1385,6 +1915,7 @@ class LoginViewController: UIViewController {
         loginButton.alpha = 0.5
         loginButton.isEnabled = false
         loginButton.addTarget(self, action: #selector(doLogin), for: .touchUpInside)
+        loginButton.addPressScaleEffect()
 
         // 底部注册提示
         registerTipLabel.text = "还没有账号？去注册"
@@ -1394,6 +1925,25 @@ class LoginViewController: UIViewController {
         registerTipLabel.isUserInteractionEnabled = true
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goRegister))
         registerTipLabel.addGestureRecognizer(tapGesture)
+
+        // 一键登录分割线
+        oneClickDividerLabel.text = "—— 其他登录方式 ——"
+        oneClickDividerLabel.font = ScreenAdapter.font(13)
+        oneClickDividerLabel.textColor = .tertiaryLabel
+        oneClickDividerLabel.textAlignment = .center
+
+        // 一键登录按钮（仅手机号登录时显示）
+        oneClickLoginButton.setTitle("本机号码一键登录", for: .normal)
+        oneClickLoginButton.setTitleColor(.themePrimary, for: .normal)
+        oneClickLoginButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
+        oneClickLoginButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
+        oneClickLoginButton.layer.borderWidth = 1
+        oneClickLoginButton.layer.borderColor = UIColor.themePrimary.cgColor
+        oneClickLoginButton.alpha = 0.4
+        oneClickLoginButton.isEnabled = false
+        oneClickLoginButton.addTarget(self, action: #selector(doOneClickLogin), for: .touchUpInside)
+        oneClickLoginButton.addPressScaleEffect()
+        oneClickLoginButton.isHidden = isEmail
 
         // 整体布局
         let scrollView = UIScrollView()
@@ -1411,6 +1961,8 @@ class LoginViewController: UIViewController {
         mainStack.spacing = ScreenAdapter.scaleH(20)
         mainStack.alignment = .fill
         contentView.addSubview(mainStack)
+        contentView.addSubview(oneClickDividerLabel)
+        contentView.addSubview(oneClickLoginButton)
         contentView.addSubview(registerTipLabel)
 
         scrollView.snp.makeConstraints { make in
@@ -1426,11 +1978,22 @@ class LoginViewController: UIViewController {
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
         }
+        oneClickDividerLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+        }
+        oneClickLoginButton.snp.makeConstraints { make in
+            make.top.equalTo(oneClickDividerLabel.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
         loginButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
         }
         registerTipLabel.snp.makeConstraints { make in
-            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.top.equalTo(oneClickLoginButton.snp.bottom).offset(ScreenAdapter.scaleH(20))
             make.centerX.equalToSuperview()
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
@@ -1467,18 +2030,56 @@ class LoginViewController: UIViewController {
     }
 
     private func switchLoginMode(_ index: Int) {
-        if index == 1 {
-            loginMode = .code
-            passwordField.isHidden = true
-            codeField.isHidden = false
-            forgotPwdButton.isHidden = true
-        } else {
-            loginMode = .password
-            passwordField.isHidden = false
-            codeField.isHidden = true
-            forgotPwdButton.isHidden = false
+        let toCodeMode = index == 1
+
+        // 触觉反馈
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.selectionChanged()
         }
-        updateLoginButtonState()
+
+        // 淡入淡出 + 上下位移切换动画
+        let fromView = toCodeMode ? passwordField : codeField
+        let toView = toCodeMode ? codeField : passwordField
+        let fromForgotPwd = toCodeMode ? forgotPwdButton : nil
+        let toForgotPwd = toCodeMode ? nil : forgotPwdButton
+
+        // 先隐藏旧的（向上淡出）
+        UIView.animate(withDuration: 0.15,
+                       delay: 0,
+                       options: .curveEaseIn) {
+            fromView.alpha = 0
+            fromView.transform = CGAffineTransform(translationX: 0, y: -8)
+            fromForgotPwd?.alpha = 0
+            fromForgotPwd?.transform = CGAffineTransform(translationX: 0, y: -8)
+        } completion: { _ in
+            fromView.isHidden = true
+            fromView.transform = .identity
+            fromForgotPwd?.isHidden = true
+            fromForgotPwd?.transform = .identity
+
+            // 显示新的（从下方淡入）
+            toView.alpha = 0
+            toView.transform = CGAffineTransform(translationX: 0, y: 8)
+            toView.isHidden = false
+
+            toForgotPwd?.alpha = 0
+            toForgotPwd?.transform = CGAffineTransform(translationX: 0, y: 8)
+            toForgotPwd?.isHidden = false
+
+            UIView.animate(withDuration: 0.2,
+                           delay: 0,
+                           usingSpringWithDamping: 0.8,
+                           initialSpringVelocity: 0.5,
+                           options: .curveEaseOut) {
+                toView.alpha = 1
+                toView.transform = .identity
+                toForgotPwd?.alpha = 1
+                toForgotPwd?.transform = .identity
+            } completion: { _ in
+                self.loginMode = toCodeMode ? .code : .password
+                self.updateLoginButtonState()
+            }
+        }
     }
 
     @objc private func goForgotPassword() {
@@ -1536,9 +2137,9 @@ class LoginViewController: UIViewController {
     // MARK: - 登录
     @objc private func doLogin() {
         view.endEditing(true)
-        isLoading = true
-        loginButton.isEnabled = false
-        loginButton.setTitle("登录中...", for: .normal)
+
+        // 按钮加载动画
+        startButtonLoading(loginButton, originalTitle: "登录")
 
         let phone = account
         let email = emailInputField.textField.text ?? ""
@@ -1547,6 +2148,10 @@ class LoginViewController: UIViewController {
         case .password:
             let password = passwordField.textField.text ?? ""
             guard password.count >= 6 else {
+                passwordField.shakeWithError()
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationError()
+                }
                 AppUtility.showToast("请输入密码")
                 resetButton()
                 return
@@ -1569,6 +2174,10 @@ class LoginViewController: UIViewController {
         case .code:
             let code = codeField.textField.text ?? ""
             guard code.count >= 4 else {
+                codeField.shakeWithError()
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationError()
+                }
                 AppUtility.showToast("请输入验证码")
                 resetButton()
                 return
@@ -1587,6 +2196,10 @@ class LoginViewController: UIViewController {
                     } catch {
                         DispatchQueue.main.async {
                             self.resetButton()
+                            self.loginButton.shake()
+                            if AnimationIntegration.shared.config.enableHapticFeedback {
+                                HapticManager.shared.notificationError()
+                            }
                             AppUtility.showToast("登录失败: \(error.localizedDescription)")
                         }
                     }
@@ -1594,6 +2207,10 @@ class LoginViewController: UIViewController {
             } else {
                 guard AppUtility.isValidPhone(phone) else {
                     AppUtility.showToast("请输入正确的手机号")
+                    self.loginButton.shake()
+                    if AnimationIntegration.shared.config.enableHapticFeedback {
+                        HapticManager.shared.notificationError()
+                    }
                     resetButton()
                     return
                 }
@@ -1606,6 +2223,10 @@ class LoginViewController: UIViewController {
                     } catch {
                         DispatchQueue.main.async {
                             self.resetButton()
+                            self.loginButton.shake()
+                            if AnimationIntegration.shared.config.enableHapticFeedback {
+                                HapticManager.shared.notificationError()
+                            }
                             AppUtility.showToast("登录失败: \(error.localizedDescription)")
                         }
                     }
@@ -1630,6 +2251,10 @@ class LoginViewController: UIViewController {
     private func handleLoginSuccess(_ resp: LoginResponse) {
         guard let uid = resp.uid, let token = resp.token else {
             resetButton()
+            loginButton.shakeWithError()
+            if AnimationIntegration.shared.config.enableHapticFeedback {
+                HapticManager.shared.notificationError()
+            }
             AppUtility.showToast("登录失败")
             return
         }
@@ -1647,29 +2272,163 @@ class LoginViewController: UIViewController {
 
         IMManager.shared.connect()
         DataSyncManager.shared.syncAll()
+
+        // 成功触觉反馈
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.notificationSuccess()
+            HapticManager.shared.playHeartbeat(intensity: 0.6, count: 2)
+        }
+
         showMainScreen()
     }
 
     private func resetButton() {
-        isLoading = false
-        loginButton.isEnabled = true
-        loginButton.setTitle("登录", for: .normal)
+        stopButtonLoading(loginButton, originalTitle: "登录")
         updateLoginButtonState()
+    }
+
+    // MARK: - 一键登录
+    @objc private func doOneClickLogin() {
+        guard hasPreChecked else {
+            AppUtility.showToast("一键登录准备中，请稍候")
+            // 重新预取号
+            AliyunAuthManager.shared.preGetToken { [weak self] success, _ in
+                DispatchQueue.main.async {
+                    self?.hasPreChecked = success
+                    if success {
+                        AliyunAuthManager.shared.oneClickLogin(
+                            navigationController: self?.navigationController ?? UINavigationController()
+                        )
+                    } else {
+                        AppUtility.showToast("一键登录不可用，请使用验证码登录")
+                    }
+                }
+            }
+            return
+        }
+        AliyunAuthManager.shared.oneClickLogin(
+            navigationController: navigationController ?? UINavigationController()
+        )
+    }
+
+    // MARK: - AliyunAuthDelegate
+    func aliyunAuth(didGetToken token: String) {
+        // 后端已返回 uid 和 token 并保存到 UserDefaults，直接连接 IM
+        IMManager.shared.connect()
+        DataSyncManager.shared.syncAll()
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.notificationSuccess()
+        }
+        showMainScreen()
+    }
+
+    func aliyunAuth(didFailWithError error: Error) {
+        DispatchQueue.main.async {
+            AppUtility.showToast("一键登录失败: \(error.localizedDescription)")
+        }
+    }
+
+    func aliyunAuth(didCancel page: UIViewController) {
+        print("[Login] 用户取消一键登录")
+    }
+
+    // MARK: - 按钮加载动画辅助
+    private var loadingIndicatorTag = 9999
+
+    private func startButtonLoading(_ button: UIButton, originalTitle: String) {
+        isLoading = true
+        button.isEnabled = false
+
+        // 保存原始标题
+        button.setTitle("", for: .normal)
+
+        // 添加加载指示器
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.color = .white
+        indicator.tag = loadingIndicatorTag
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(indicator)
+
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: button.centerYAnchor)
+        ])
+
+        indicator.startAnimating()
+
+        // 按钮轻微缩放
+        button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            button.transform = .identity
+        }
+    }
+
+    private func stopButtonLoading(_ button: UIButton, originalTitle: String) {
+        isLoading = false
+
+        // 移除加载指示器
+        if let indicator = button.viewWithTag(loadingIndicatorTag) as? UIActivityIndicatorView {
+            indicator.stopAnimating()
+            indicator.removeFromSuperview()
+        }
+
+        // 恢复标题
+        button.setTitle(originalTitle, for: .normal)
+        button.isEnabled = true
     }
 
     // MARK: - 倒计时
     private func startCountdown() {
         countdown = 60
         codeField.sendCodeButton.isEnabled = false
+
+        // 开始倒计时的按钮动画
+        codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.codeField.sendCodeButton.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if self.countdown <= 0 {
-                self.codeField.sendCodeButton.setTitle("获取验证码", for: .normal)
+                self.codeField.sendCodeButton.setTitle("重新获取", for: .normal)
                 self.codeField.sendCodeButton.isEnabled = true
                 self.countdownTimer?.invalidate()
+
+                // 倒计时结束弹跳动画
+                self.codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 1.15, y: 1.15)
+                UIView.animate(withDuration: 0.4,
+                               delay: 0,
+                               usingSpringWithDamping: 0.4,
+                               initialSpringVelocity: 0.8,
+                               options: .curveEaseInOut) {
+                    self.codeField.sendCodeButton.transform = .identity
+                }
+
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationSuccess()
+                }
             } else {
-                self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                // 数字变化时的缩放动画
+                UIView.transition(with: self.codeField.sendCodeButton,
+                                  duration: 0.2,
+                                  options: .transitionCrossDissolve) {
+                    self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                }
                 self.countdown -= 1
             }
         }
@@ -1677,7 +2436,35 @@ class LoginViewController: UIViewController {
 
     private func showMainScreen() {
         let vc = MainTabBarController()
-        view.window?.rootViewController = vc
+
+        guard let window = view.window else {
+            view.window?.rootViewController = vc
+            return
+        }
+
+        // 截图做缩放淡出过渡
+        UIGraphicsBeginImageContextWithOptions(window.bounds.size, true, UIScreen.main.scale)
+        window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+        let snapshotImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+
+        let overlayView = UIImageView(image: snapshotImage)
+        overlayView.frame = window.bounds
+        window.addSubview(overlayView)
+
+        window.rootViewController = vc
+
+        // 缩放 + 淡出过渡
+        UIView.animate(withDuration: 0.5,
+                       delay: 0,
+                       usingSpringWithDamping: 0.85,
+                       initialSpringVelocity: 0.2,
+                       options: .curveEaseInOut) {
+            overlayView.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
+            overlayView.alpha = 0
+        } completion: { _ in
+            overlayView.removeFromSuperview()
+        }
     }
 }
 
@@ -1719,6 +2506,8 @@ class RegisterViewController: UIViewController {
     private var countdown = 0
     private var countdownTimer: Timer?
 
+    private var hasAnimatedEntrance = false
+
     init(phone: String? = nil, email: String? = nil, isEmail: Bool) {
         self.phone = phone
         self.email = email
@@ -1734,6 +2523,75 @@ class RegisterViewController: UIViewController {
         super.viewDidLoad()
         print("[\(type(of: self))] viewDidLoad")
         setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !hasAnimatedEntrance else { return }
+        hasAnimatedEntrance = true
+        playEntranceAnimation()
+    }
+
+    private func playEntranceAnimation() {
+        // 初始状态
+        logoView.alpha = 0
+        logoView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+
+        titleLabel.alpha = 0
+        titleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        subtitleLabel.alpha = 0
+        subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        glassCard.alpha = 0
+        glassCard.transform = CGAffineTransform(translationX: 0, y: 30)
+
+        registerButton.alpha = 0
+        registerButton.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        loginTipLabel.alpha = 0
+
+        // 顺序播放
+        UIView.animate(withDuration: 0.6,
+                       delay: 0,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.logoView.alpha = 1
+            self.logoView.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.1, options: .curveEaseOut) {
+            self.titleLabel.alpha = 1
+            self.titleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.15, options: .curveEaseOut) {
+            self.subtitleLabel.alpha = 1
+            self.subtitleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.25,
+                       usingSpringWithDamping: 0.8,
+                       initialSpringVelocity: 0.3,
+                       options: .curveEaseOut) {
+            self.glassCard.alpha = 1
+            self.glassCard.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.4,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.registerButton.alpha = 1
+            self.registerButton.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.5, options: .curveEaseOut) {
+            self.loginTipLabel.alpha = 1
+        }
     }
 
     deinit { countdownTimer?.invalidate() }
@@ -1932,6 +2790,27 @@ class RegisterViewController: UIViewController {
     @objc private func toggleAgreement() {
         isAgreed.toggle()
         agreementCheckBox.isSelected = isAgreed
+
+        // 勾选框弹跳动画
+        let scale: CGFloat = isAgreed ? 1.3 : 0.8
+        agreementCheckBox.transform = CGAffineTransform(scaleX: scale, y: scale)
+        UIView.animate(withDuration: 0.35,
+                       delay: 0,
+                       usingSpringWithDamping: 0.4,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseInOut) {
+            self.agreementCheckBox.transform = .identity
+        }
+
+        // 触觉反馈
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            if isAgreed {
+                HapticManager.shared.impactMedium()
+            } else {
+                HapticManager.shared.impactLight()
+            }
+        }
+
         updateRegisterButtonState()
     }
 
@@ -2094,15 +2973,49 @@ class RegisterViewController: UIViewController {
     private func startCountdown() {
         countdown = 60
         codeField.sendCodeButton.isEnabled = false
+
+        // 开始倒计时的按钮动画
+        codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.codeField.sendCodeButton.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if self.countdown <= 0 {
-                self.codeField.sendCodeButton.setTitle("获取验证码", for: .normal)
+                self.codeField.sendCodeButton.setTitle("重新获取", for: .normal)
                 self.codeField.sendCodeButton.isEnabled = true
                 self.countdownTimer?.invalidate()
+
+                // 倒计时结束弹跳动画
+                self.codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 1.15, y: 1.15)
+                UIView.animate(withDuration: 0.4,
+                               delay: 0,
+                               usingSpringWithDamping: 0.4,
+                               initialSpringVelocity: 0.8,
+                               options: .curveEaseInOut) {
+                    self.codeField.sendCodeButton.transform = .identity
+                }
+
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationSuccess()
+                }
             } else {
-                self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                // 数字变化时的淡入淡出动画
+                UIView.transition(with: self.codeField.sendCodeButton,
+                                  duration: 0.2,
+                                  options: .transitionCrossDissolve) {
+                    self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                }
                 self.countdown -= 1
             }
         }
@@ -2118,12 +3031,60 @@ class ForgotPasswordViewController: UIViewController {
     private let resetButton = UIButton(type: .system)
     private var isLoading = false
 
+    private let logoView = UIImageView()
+    private let subtitleLabel = UILabel()
+
     private var countdown = 0
     private var countdownTimer: Timer?
+
+    private var hasAnimatedEntrance = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !hasAnimatedEntrance else { return }
+        hasAnimatedEntrance = true
+        playEntranceAnimation()
+    }
+
+    private func playEntranceAnimation() {
+        // 初始状态
+        logoView.alpha = 0
+        logoView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+
+        subtitleLabel.alpha = 0
+        subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        resetButton.alpha = 0
+        resetButton.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        // 顺序播放
+        UIView.animate(withDuration: 0.6,
+                       delay: 0,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.logoView.alpha = 1
+            self.logoView.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.4, delay: 0.15, options: .curveEaseOut) {
+            self.subtitleLabel.alpha = 1
+            self.subtitleLabel.transform = .identity
+        }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.4,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.resetButton.alpha = 1
+            self.resetButton.transform = .identity
+        }
     }
 
     deinit { countdownTimer?.invalidate() }
@@ -2133,12 +3094,10 @@ class ForgotPasswordViewController: UIViewController {
         view.backgroundColor = .themeBackground
 
         // Logo
-        let logoView = UIImageView()
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
         // 副标题
-        let subtitleLabel = UILabel()
         subtitleLabel.text = "重置您的账号密码"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
@@ -2290,15 +3249,49 @@ class ForgotPasswordViewController: UIViewController {
     private func startCountdown() {
         countdown = 60
         codeField.sendCodeButton.isEnabled = false
+
+        // 开始倒计时的按钮动画
+        codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.codeField.sendCodeButton.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if self.countdown <= 0 {
-                self.codeField.sendCodeButton.setTitle("获取验证码", for: .normal)
+                self.codeField.sendCodeButton.setTitle("重新获取", for: .normal)
                 self.codeField.sendCodeButton.isEnabled = true
                 self.countdownTimer?.invalidate()
+
+                // 倒计时结束弹跳动画
+                self.codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 1.15, y: 1.15)
+                UIView.animate(withDuration: 0.4,
+                               delay: 0,
+                               usingSpringWithDamping: 0.4,
+                               initialSpringVelocity: 0.8,
+                               options: .curveEaseInOut) {
+                    self.codeField.sendCodeButton.transform = .identity
+                }
+
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationSuccess()
+                }
             } else {
-                self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                // 数字变化时的淡入淡出动画
+                UIView.transition(with: self.codeField.sendCodeButton,
+                                  duration: 0.2,
+                                  options: .transitionCrossDissolve) {
+                    self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
+                }
                 self.countdown -= 1
             }
         }
@@ -2310,14 +3303,25 @@ class ProfileEditViewController: UIViewController, UIImagePickerControllerDelega
 
     var hidesBackButton: Bool = false
 
+    private var hasAnimatedEntrance = false
+
     private let avatarView = UIImageView()
     private let avatarAddIcon = UIImageView()
+    private let nameContainer = UIView()
     private let nameField = UITextField()
     private let submitButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !hasAnimatedEntrance {
+            hasAnimatedEntrance = true
+            playEntranceAnimation()
+        }
     }
 
     private func setupUI() {
@@ -2359,7 +3363,6 @@ class ProfileEditViewController: UIViewController, UIImagePickerControllerDelega
         avatarContainer.addGestureRecognizer(tap)
 
         // 昵称输入框
-        let nameContainer = UIView()
         nameContainer.backgroundColor = .white
         nameContainer.layer.cornerRadius = ScreenAdapter.scaleW(8)
         nameContainer.layer.borderWidth = 1
@@ -2385,6 +3388,7 @@ class ProfileEditViewController: UIViewController, UIImagePickerControllerDelega
         submitButton.setTitleColor(.white, for: .normal)
         submitButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
         submitButton.addTarget(self, action: #selector(submit), for: .touchUpInside)
+        submitButton.addPressScaleEffect()
 
         // 整体布局
         let scrollView = UIScrollView()
@@ -2425,7 +3429,89 @@ class ProfileEditViewController: UIViewController, UIImagePickerControllerDelega
         }
     }
 
+    // MARK: - 入场动画
+
+    private func playEntranceAnimation() {
+        guard AnimationIntegration.shared.config.enablePageTransition else { return }
+
+        // 初始状态
+        avatarView.alpha = 0
+        avatarView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+
+        avatarAddIcon.alpha = 0
+        avatarAddIcon.transform = CGAffineTransform(scaleX: 0, y: 0).rotated(by: -CGFloat.pi / 4)
+
+        nameContainer.alpha = 0
+        nameContainer.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        submitButton.alpha = 0
+        submitButton.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        // avatarView 弹簧弹出
+        UIView.animate(withDuration: 0.6,
+                       delay: 0.1,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.avatarView.alpha = 1
+            self.avatarView.transform = .identity
+        }
+
+        // avatarAddIcon 弹簧弹出 + 旋转
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.4,
+                       usingSpringWithDamping: 0.5,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.avatarAddIcon.alpha = 1
+            self.avatarAddIcon.transform = .identity
+        }
+
+        // nameContainer 淡入上移
+        UIView.animate(withDuration: 0.4,
+                       delay: 0.3,
+                       usingSpringWithDamping: 0.8,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.nameContainer.alpha = 1
+            self.nameContainer.transform = .identity
+        }
+
+        // submitButton 淡入上移
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.45,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.submitButton.alpha = 1
+            self.submitButton.transform = .identity
+        } completion: { _ in
+            if AnimationIntegration.shared.config.enableHapticFeedback {
+                HapticManager.shared.impactSoft()
+            }
+        }
+    }
+
     @objc private func pickAvatar() {
+        // 头像点击缩放弹跳效果
+        UIView.animate(withDuration: 0.1,
+                       delay: 0,
+                       options: .curveEaseIn) {
+            self.avatarView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.25,
+                           delay: 0,
+                           usingSpringWithDamping: 0.5,
+                           initialSpringVelocity: 0.8,
+                           options: .curveEaseOut) {
+                self.avatarView.transform = .identity
+            }
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+
         let picker = UIImagePickerController()
         picker.delegate = self
         picker.sourceType = .photoLibrary

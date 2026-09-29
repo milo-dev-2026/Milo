@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 // MARK: - 设置主页面
@@ -15,6 +15,11 @@ class SettingMainViewController: UIViewController {
             ("gearshape.fill", "通用设置", UIColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0)),
         ],
         [
+            ("arrow.triangle.2.circlepath.circle.fill", AppStrings.Backup.title, UIColor(red: 0.20, green: 0.65, blue: 0.42, alpha: 1.0)),
+            ("globe", "多语言", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0)),
+        ],
+        [
+            ("questionmark.circle.fill", "帮助与反馈", UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0)),
             ("info.circle.fill", "关于我们", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0)),
         ]
     ]
@@ -24,9 +29,17 @@ class SettingMainViewController: UIViewController {
         setupUI()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 列表入场动画
+        if AnimationIntegration.shared.config.enableListEntranceAnimation {
+            tableView.animateCellsFadeInUp(delayPerItem: 0.03)
+        }
+    }
+
     private func setupUI() {
         title = "设置"
-        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
+        view.backgroundColor = .themeBgGrouped
 
         // 导航栏
         let appearance = UINavigationBarAppearance()
@@ -40,7 +53,7 @@ class SettingMainViewController: UIViewController {
         tableView.delegate = self
         tableView.register(SettingCell.self, forCellReuseIdentifier: "SettingCell")
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorColor = .themeSeparator
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -52,8 +65,18 @@ class SettingMainViewController: UIViewController {
         let alert = UIAlertController(title: "退出登录", message: "确定要退出当前账号吗？", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "确定", style: .destructive) { _ in
-            LocalStore.shared.clearAll()
-            NotificationCenter.default.post(name: NSNotification.Name("UserDidLogout"), object: nil)
+            IMManager.shared.disconnect()
+            Task {
+                do {
+                    _ = try await APIClient.shared.requestRaw(.logout)
+                } catch {
+                    print("[Setting] 通知服务器退出失败: \(error)")
+                }
+                DispatchQueue.main.async {
+                    LocalStore.shared.clearAll()
+                    NotificationCenter.default.post(name: NSNotification.Name("UserDidLogout"), object: nil)
+                }
+            }
         })
         present(alert, animated: true)
     }
@@ -117,10 +140,20 @@ extension SettingMainViewController: UITableViewDataSource, UITableViewDelegate 
         } else if indexPath.section == 1 {
             switch indexPath.row {
             case 0:
-                navigationController?.pushViewController(AboutViewController(), animated: true)
+                navigationController?.pushViewController(BackupRestoreViewController(), animated: true)
+            case 1:
+                navigationController?.pushViewController(LanguageSettingViewController(), animated: true)
             default: break
             }
         } else if indexPath.section == 2 {
+            switch indexPath.row {
+            case 0:
+                navigationController?.pushViewController(FaqViewController(), animated: true)
+            case 1:
+                navigationController?.pushViewController(AboutViewController(), animated: true)
+            default: break
+            }
+        } else if indexPath.section == 3 {
             logout()
         }
     }
@@ -145,8 +178,8 @@ class SettingCell: UITableViewCell {
     }
 
     private func setupUI() {
-        backgroundColor = .white
-        contentView.backgroundColor = .white
+        backgroundColor = .themeBgCard
+        contentView.backgroundColor = .themeBgCard
 
         let iconSize: CGFloat = 28
 
@@ -269,7 +302,7 @@ class MsgNoticesSettingViewController: UIViewController {
         tableView.delegate = self
         tableView.register(SettingCell.self, forCellReuseIdentifier: "NotifCell")
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorColor = .themeSeparator
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -396,13 +429,13 @@ class GeneralSettingViewController: UIViewController {
 
     private func setupUI() {
         title = "通用设置"
-        view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
+        view.backgroundColor = .themeBgGrouped
 
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(SettingCell.self, forCellReuseIdentifier: "GeneralCell")
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorColor = .themeSeparator
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -455,41 +488,31 @@ class GeneralSettingViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    // MARK: - 选择器弹窗
+    // MARK: - 外观选择器（深色模式）
     private func showAppearancePicker() {
-        let alert = UIAlertController(title: "深色模式", message: nil, preferredStyle: .actionSheet)
-        let modes = ["跟随系统", "浅色", "深色"]
-        for (index, mode) in modes.enumerated() {
-            let action = UIAlertAction(title: mode, style: .default) { [weak self] _ in
-                LocalStore.shared.appearanceMode = index
-                self?.applyAppearanceMode(index)
+        let alert = UIAlertController(title: "深色模式", message: "选择您喜欢的显示模式", preferredStyle: .actionSheet)
+        let modes: [ThemeMode] = [.system, .light, .dark]
+        let currentMode = ThemeManager.shared.currentMode
+
+        for mode in modes {
+            let action = UIAlertAction(title: mode.displayName, style: .default) { [weak self] _ in
+                ThemeManager.shared.setThemeMode(mode, animated: true)
                 self?.tableView.reloadData()
             }
-            if LocalStore.shared.appearanceMode == index {
+            // 当前选中的模式显示勾选标记
+            if mode == currentMode {
                 action.setValue(true, forKey: "checked")
             }
             alert.addAction(action)
         }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+
+        // iPad 适配
         if let popover = alert.popoverPresentationController {
             popover.sourceView = view
             popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
         }
         present(alert, animated: true)
-    }
-
-    private func applyAppearanceMode(_ mode: Int) {
-        guard let window = view.window else { return }
-        switch mode {
-        case 0:
-            window.overrideUserInterfaceStyle = .unspecified
-        case 1:
-            window.overrideUserInterfaceStyle = .light
-        case 2:
-            window.overrideUserInterfaceStyle = .dark
-        default:
-            break
-        }
     }
 
     private func showFontSizePicker() {
@@ -570,9 +593,7 @@ extension GeneralSettingViewController: UITableViewDataSource, UITableViewDelega
 
         switch (indexPath.section, indexPath.row) {
         case (0, 0):
-            let mode = LocalStore.shared.appearanceMode
-            let modeTexts = ["跟随系统", "浅色", "深色"]
-            cell.setDetailText(modeTexts[mode])
+            cell.setDetailText(ThemeManager.shared.currentMode.displayName)
         case (1, 0):
             let level = LocalStore.shared.fontSizeLevel
             let levelTexts = ["小", "标准", "大", "超大"]
@@ -641,7 +662,7 @@ class AboutViewController: UIViewController {
         tableView.delegate = self
         tableView.register(SettingCell.self, forCellReuseIdentifier: "AboutCell")
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorColor = .themeSeparator
 
         // 顶部 Logo Header
         let headerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 180))
@@ -851,7 +872,7 @@ class SecuritySettingViewController: UIViewController {
         tableView.delegate = self
         tableView.register(SettingCell.self, forCellReuseIdentifier: "SecurityCell")
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.separatorColor = .themeSeparator
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in

@@ -11,9 +11,10 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
 
     private enum Section: Int, CaseIterable {
         case groupSettings = 0  // 群设置：入群审核、全员禁言、禁止加好友、禁止临时会话、禁止新成员看历史
-        case adminManage = 1    // 管理员管理
-        case memberManage = 2   // 成员管理：群黑名单、已退群成员
-        case ownerTransfer = 3  // 群主转让
+        case muteManage = 1     // 禁言管理：禁言成员、禁言关键词
+        case adminManage = 2    // 管理员管理
+        case memberManage = 3   // 成员管理：群黑名单、已退群成员
+        case ownerTransfer = 4  // 群主转让
     }
 
     init(groupId: String) {
@@ -73,6 +74,7 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
         case .groupSettings: return 5
+        case .muteManage: return 2
         case .adminManage: return 1
         case .memberManage: return 2
         case .ownerTransfer: return 1
@@ -83,6 +85,7 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
         guard let sec = Section(rawValue: section) else { return nil }
         switch sec {
         case .groupSettings: return "群设置"
+        case .muteManage: return "禁言管理"
         case .adminManage: return "管理员管理"
         case .memberManage: return "成员管理"
         case .ownerTransfer: return "群主权限"
@@ -113,9 +116,18 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                 cell.switchControl.tag = 102
                 cell.switchControl.addTarget(self, action: #selector(toggleGroupSetting(_:)), for: .valueChanged)
             case 3:
+                // 联动逻辑：禁止添加好友开启时，禁止临时会话自动开启且不可操作
+                let forbidAddFriend = group?.forbidAddFriend ?? false
                 cell.configure(title: "禁止临时会话", icon: "message.slash", isOn: group?.forbidTempChat ?? false)
                 cell.switchControl.tag = 103
                 cell.switchControl.addTarget(self, action: #selector(toggleGroupSetting(_:)), for: .valueChanged)
+                cell.switchControl.isEnabled = !forbidAddFriend
+                cell.switchControl.alpha = forbidAddFriend ? 0.5 : 1.0
+                if forbidAddFriend {
+                    cell.textLabel?.textColor = .secondaryLabel
+                } else {
+                    cell.textLabel?.textColor = .label
+                }
             case 4:
                 cell.configure(title: "禁止新成员查看历史消息", icon: "clock.badge.xmark", isOn: group?.forbidNewViewHistory ?? false)
                 cell.switchControl.tag = 104
@@ -124,12 +136,29 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
             }
             return cell
 
+        case .muteManage:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "ManageCell", for: indexPath)
+            cell.textLabel?.font = ScreenAdapter.font(16)
+            cell.imageView?.tintColor = .themePrimary
+            cell.accessoryType = .disclosureIndicator
+
+            switch indexPath.row {
+            case 0:
+                cell.textLabel?.text = "禁言成员"
+                cell.imageView?.image = UIImage(systemName: "speaker.slash.fill")
+            case 1:
+                cell.textLabel?.text = "禁言关键词"
+                cell.imageView?.image = UIImage(systemName: "text.badge.xmark")
+            default: break
+            }
+            return cell
+
         case .adminManage:
             let cell = tableView.dequeueReusableCell(withIdentifier: "ManageCell", for: indexPath)
-            cell.textLabel?.text = "管理员列表"
+            cell.textLabel?.text = "管理员设置"
             cell.textLabel?.font = ScreenAdapter.font(16)
             cell.imageView?.image = UIImage(systemName: "person.badge.shield.checkmark")
-            cell.imageView?.tintColor = .themePrimary
+            cell.imageView?.tintColor = .themeColorPrimary
             cell.accessoryType = .disclosureIndicator
             return cell
 
@@ -170,6 +199,17 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
         case .groupSettings:
             break // 开关操作
 
+        case .muteManage:
+            switch indexPath.row {
+            case 0:
+                let vc = ForbiddenGroupMembersViewController(groupId: groupId)
+                navigationController?.pushViewController(vc, animated: true)
+            case 1:
+                let vc = GroupForbiddenWordViewController(groupId: groupId)
+                navigationController?.pushViewController(vc, animated: true)
+            default: break
+            }
+
         case .adminManage:
             let vc = GroupAdminsViewController(groupId: groupId)
             navigationController?.pushViewController(vc, animated: true)
@@ -199,6 +239,12 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
         let tag = sender.tag
         let isOn = sender.isOn
 
+        // 禁止临时会话被禁用时（禁止添加好友开启），不响应用户操作
+        if tag == 103 && group?.forbidAddFriend ?? false {
+            sender.isOn = true
+            return
+        }
+
         Task {
             do {
                 var success = false
@@ -211,10 +257,16 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                     _ = try await APIClient.shared.requestRaw(.setGroupMuteAll(groupId: groupId, muted: isOn))
                     success = true
                     group?.muteAll = isOn
-                case 102: // 禁止添加好友
+                case 102: // 禁止添加好友（联动禁止临时会话）
                     _ = try await APIClient.shared.requestRaw(.setForbidAddFriend(groupId: groupId, forbidden: isOn))
                     success = true
                     group?.forbidAddFriend = isOn
+
+                    // 联动逻辑：开启禁止添加好友时，自动开启禁止临时会话并禁用开关
+                    if isOn {
+                        _ = try await APIClient.shared.requestRaw(.setForbidTempChat(groupId: groupId, forbidden: true))
+                        group?.forbidTempChat = true
+                    }
                 case 103: // 禁止临时会话
                     _ = try await APIClient.shared.requestRaw(.setForbidTempChat(groupId: groupId, forbidden: isOn))
                     success = true
@@ -229,6 +281,10 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                 DispatchQueue.main.async {
                     if success {
                         AppUtility.showToast(isOn ? "已开启" : "已关闭")
+                        // 禁止添加好友变化时刷新禁止临时会话的开关状态
+                        if tag == 102 {
+                            self.tableView.reloadData()
+                        }
                     } else {
                         sender.isOn = !isOn
                         AppUtility.showToast("设置失败")
@@ -238,6 +294,10 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                 DispatchQueue.main.async {
                     sender.isOn = !isOn
                     AppUtility.showToast("设置失败")
+                    // 失败时也刷新列表以恢复联动状态
+                    if tag == 102 {
+                        self.tableView.reloadData()
+                    }
                 }
             }
         }
