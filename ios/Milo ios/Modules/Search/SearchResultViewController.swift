@@ -1221,7 +1221,7 @@ class ChatHistorySearchViewController: UIViewController {
         if results.count < 20 {
             IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 100) { [weak self] wkMessages, _ in
                 guard let self = self else { return }
-                let remote = (wkMessages ?? []).map { Message(from: $0) }
+                let remote = (wkMessages ?? []).map { Message(from: $0 as! WKMessageData) }
                 // 合并去重
                 var seen = Set(self.results.map { $0.messageID })
                 for m in remote {
