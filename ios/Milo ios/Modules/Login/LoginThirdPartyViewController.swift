@@ -194,7 +194,7 @@ class ThirdLoginViewController: UIViewController {
     }
 
     @objc private func phoneLoginTapped() {
-        let loginVC = LoginViewController()
+        let loginVC = LoginViewController(account: "", isEmail: false)
         navigationController?.pushViewController(loginVC, animated: true)
     }
 }

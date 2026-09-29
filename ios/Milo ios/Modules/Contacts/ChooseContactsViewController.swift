@@ -10,7 +10,7 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
     private var filteredContacts: [(uid: String, name: String, avatar: String?)] = []
     private var selectedUids: Set<String> = []
     private var maxSelection: Int
-    private var onSelected: (([(uid: String, name: String)]) -> Void)?
+    var onSelected: (([(uid: String, name: String)]) -> Void)?
     var onContactsSelected: (([String]) -> Void)?
 
     init(maxSelection: Int = 9, onSelected: (([(uid: String, name: String)]) -> Void)? = nil) {

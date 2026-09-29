@@ -250,9 +250,9 @@ class LiquidGlassView: UIView {
         animation.toValue = radius
         animation.duration = duration
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer.addAnimation(animation, forKey: "cornerRadius")
-        blurEffectView.layer.addAnimation(animation, forKey: "cornerRadius")
-        tintOverlayView.layer.addAnimation(animation, forKey: "cornerRadius")
+        layer.add(animation, forKey: "cornerRadius")
+        blurEffectView.layer.add(animation, forKey: "cornerRadius")
+        tintOverlayView.layer.add(animation, forKey: "cornerRadius")
 
         cornerRadius = radius
         updateCornerRadius()
@@ -266,7 +266,7 @@ class LiquidGlassView: UIView {
 
     // MARK: - 私有方法
 
-    private func updateCornerRadius() {
+    func updateCornerRadius() {
         layer.cornerRadius = cornerRadius
         blurEffectView.layer.cornerRadius = cornerRadius
         blurEffectView.clipsToBounds = true
@@ -849,34 +849,5 @@ enum LiquidGlassStyle {
     /// TabBar 样式
     static var tabBar: UIBlurEffect.Style {
         UITraitCollection.current.userInterfaceStyle == .dark ? .systemMaterialDark : .systemMaterial
-    }
-}
-
-// MARK: - UIColor 液态玻璃扩展
-@available(iOS 15.0, *)
-extension UIColor {
-
-    /// 液态玻璃边框颜色（自动深色模式适配）
-    /// 浅色: 白色 30% alpha  深色: 白色 15% alpha
-    static var liquidGlassBorder: UIColor {
-        UITraitCollection.current.userInterfaceStyle == .dark
-            ? UIColor.white.withAlphaComponent(0.15)
-            : UIColor.white.withAlphaComponent(0.3)
-    }
-
-    /// 液态玻璃高光颜色
-    /// 浅色: 白色 15% alpha  深色: 白色 8% alpha
-    static var liquidGlassHighlight: UIColor {
-        UITraitCollection.current.userInterfaceStyle == .dark
-            ? UIColor.white.withAlphaComponent(0.08)
-            : UIColor.white.withAlphaComponent(0.15)
-    }
-
-    /// 液态玻璃色调叠加层颜色
-    /// 浅色: 白色 18% alpha（提亮）  深色: 黑色 10% alpha（加深层次感）
-    static var liquidGlassTint: UIColor {
-        UITraitCollection.current.userInterfaceStyle == .dark
-            ? UIColor.black.withAlphaComponent(0.1)
-            : UIColor.white.withAlphaComponent(0.18)
     }
 }

@@ -455,13 +455,13 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
 }
 
 // MARK: - UIGestureRecognizerDelegate
-extension MultiForwardMessageCell: UIGestureRecognizerDelegate {
+extension MultiForwardMessageCell {
 
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
     }
 
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
     }
 }

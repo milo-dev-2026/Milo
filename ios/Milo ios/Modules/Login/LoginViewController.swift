@@ -280,7 +280,7 @@ class CapsuleTextField: UIView {
         textField.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.centerY.equalToSuper()
+            make.centerY.equalToSuperview()
         }
 
         snp.makeConstraints { make in
@@ -302,7 +302,7 @@ class CapsuleTextField: UIView {
         if #available(iOS 15.0, *) {
             // 液态玻璃聚焦效果
             UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
-                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.themePrimary.withAlphaComponent(0.6).cgColor)
                 self.liquidGlassView?.borderWidth = 1.2
             }
         } else {
@@ -331,7 +331,7 @@ class CapsuleTextField: UIView {
         if #available(iOS 15.0, *) {
             let isDark = traitCollection.userInterfaceStyle == .dark
             UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
-                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor)
                 self.liquidGlassView?.borderWidth = 0.8
             }
         } else {
@@ -436,6 +436,14 @@ class CapsulePhoneField: UIView {
             attributes: [.foregroundColor: UIColor.secondaryLabel]
         )
     }
+
+    @objc private func editingDidBegin() {
+        layer.borderColor = UIColor.themePrimary.cgColor
+    }
+
+    @objc private func editingDidEnd() {
+        layer.borderColor = UIColor(red: 0.88, green: 0.90, blue: 0.94, alpha: 1.0).cgColor
+    }
 }
 
 // MARK: - 带获取验证码按钮的胶囊输入框
@@ -533,7 +541,7 @@ class CapsuleCodeField: UIView {
         if #available(iOS 15.0, *) {
             // 液态玻璃聚焦效果
             UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
-                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.themePrimary.withAlphaComponent(0.6).cgColor)
                 self.liquidGlassView?.borderWidth = 1.2
             }
         } else {
@@ -561,7 +569,7 @@ class CapsuleCodeField: UIView {
         if #available(iOS 15.0, *) {
             let isDark = traitCollection.userInterfaceStyle == .dark
             UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
-                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor)
                 self.liquidGlassView?.borderWidth = 0.8
             }
         } else {
@@ -705,7 +713,7 @@ class CapsulePasswordField: UIView {
         if #available(iOS 15.0, *) {
             // 液态玻璃聚焦效果
             UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
-                self.liquidGlassView?.borderColor = UIColor.themePrimary.withAlphaComponent(0.6).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.themePrimary.withAlphaComponent(0.6).cgColor)
                 self.liquidGlassView?.borderWidth = 1.2
             }
         } else {
@@ -733,7 +741,7 @@ class CapsulePasswordField: UIView {
         if #available(iOS 15.0, *) {
             let isDark = traitCollection.userInterfaceStyle == .dark
             UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
-                self.liquidGlassView?.borderColor = UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor
+                self.liquidGlassView?.borderColor = UIColor(cgColor: UIColor.white.withAlphaComponent(isDark ? 0.15 : 0.25).cgColor)
                 self.liquidGlassView?.borderWidth = 0.8
             }
         } else {
@@ -2276,7 +2284,7 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
         // 成功触觉反馈
         if AnimationIntegration.shared.config.enableHapticFeedback {
             HapticManager.shared.notificationSuccess()
-            HapticManager.shared.playHeartbeat(intensity: 0.6, count: 2)
+            HapticManager.shared.playHeartbeat()
         }
 
         showMainScreen()

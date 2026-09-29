@@ -238,6 +238,8 @@ enum MessageType: Int, Codable {
     case card = 7
     case note = 100
     case system = 99
+    case call = 8
+    case multiForward = 9
 }
 
 struct Message: Codable {
