@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(ATAuthSDK)
 import ATAuthSDK
+#endif
 
 ///
 /// 阿里云号码认证管理器
@@ -38,7 +40,7 @@ class AliyunAuthManager: NSObject {
             print("[AliyunAuth] SDK Info 未配置，请在 APIConfig.swift 中设置 aliyunAuthSDKInfo")
             return
         }
-
+        #if canImport(ATAuthSDK)
         PNSSdkManager.instance().setAuthSDKInfo(APIConfig.aliyunAuthSDKInfo) { success, result in
             if success {
                 print("[AliyunAuth] SDK 初始化成功")
@@ -46,11 +48,15 @@ class AliyunAuthManager: NSObject {
                 print("[AliyunAuth] SDK 初始化失败: \(String(describing: result))")
             }
         }
+        #else
+        print("[AliyunAuth] ATAuthSDK 未集成，一键登录不可用")
+        #endif
     }
 
     // MARK: - 预取号
 
     func preGetToken(completion: @escaping (Bool, String?) -> Void) {
+        #if canImport(ATAuthSDK)
         PNSPreCheckModel().carrierTimeout = 5000
 
         PNSSdkManager.instance().getCellInfo { [weak self] model in
@@ -65,6 +71,10 @@ class AliyunAuthManager: NSObject {
                 completion(false, nil)
             }
         }
+        #else
+        print("[AliyunAuth] ATAuthSDK 未集成，预取号不可用")
+        completion(false, nil)
+        #endif
     }
 
     // MARK: - 拉起授权页 (一键登录)
@@ -74,7 +84,7 @@ class AliyunAuthManager: NSObject {
             print("[AliyunAuth] 请先调用 preGetToken 进行预取号")
             return
         }
-
+        #if canImport(ATAuthSDK)
         let model = PNSAuthModel()
         model.controllerPresentType = .present
 
@@ -129,10 +139,8 @@ class AliyunAuthManager: NSObject {
             DispatchQueue.main.async {
                 if success, let result = result as? PNSResultModel {
                     if result.resultCode == "600001" {
-                        // 用户取消
                         print("[AliyunAuth] 用户取消授权")
                     } else if result.resultCode == "600000" {
-                        // 授权成功，获取到 token
                         print("[AliyunAuth] 授权成功，token: \(result.token ?? "")")
                         self.sendTokenToBackend(result.token ?? "")
                     } else {
@@ -145,6 +153,10 @@ class AliyunAuthManager: NSObject {
                 }
             }
         }
+        #else
+        print("[AliyunAuth] ATAuthSDK 未集成，一键登录不可用")
+        delegate?.aliyunAuth(didFailWithError: AliyunAuthError.unknown)
+        #endif
     }
 
     // MARK: - 发送 token 到后端验证
@@ -182,7 +194,6 @@ class AliyunAuthManager: NSObject {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let status = json["status"] as? Int {
                     if status == 200 {
-                        // 登录成功，保存用户信息
                         if let token = json["token"] as? String {
                             UserDefaults.standard.set(token, forKey: "token")
                             let imToken = json["im_token"] as? String ?? token
@@ -221,7 +232,6 @@ class AliyunAuthManager: NSObject {
     // MARK: - 其他手机号登录 (非本机号码)
 
     func loginWithOtherPhone(on navigationController: UINavigationController) {
-        // 预取号失败时，回退到短信验证码登录
         print("[AliyunAuth] 回退到短信验证码登录方式")
     }
 }
