@@ -368,7 +368,7 @@ final class VoiceWaveformView: UIView {
         heightAnim.duration = 0.5
         heightAnim.autoreverses = true
         heightAnim.beginTime = delay
-        heightAnim.timingFunction = CAMediaTimingFunction(name: .easeInOut)
+        heightAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
 
         // Y 位置变化（保持底部对齐）
         let yAnim = CABasicAnimation(keyPath: "position.y")
@@ -377,7 +377,7 @@ final class VoiceWaveformView: UIView {
         yAnim.duration = 0.5
         yAnim.autoreverses = true
         yAnim.beginTime = delay
-        yAnim.timingFunction = CAMediaTimingFunction(name: .easeInOut)
+        yAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
 
         let group = CAAnimationGroup()
         group.animations = [heightAnim, yAnim]

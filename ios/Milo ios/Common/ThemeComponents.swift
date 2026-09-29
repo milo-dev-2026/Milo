@@ -549,6 +549,13 @@ class StateView: UIView {
             emptyMessageLabel.isHidden = message == nil
             emptyIconView.image = icon ?? UIImage(systemName: "tray")
             emptyIconView.isHidden = icon == nil && emptyIconView.image == nil
+
+        case .error(let title, let message, let retryTitle):
+            contentView.isHidden = true
+            loadingContainer.isHidden = true
+            emptyContainer.isHidden = true
+            errorContainer.isHidden = false
+            activityIndicator.stopAnimating()
         }
     }
 

@@ -269,7 +269,7 @@ final class FadeTransition: NSObject, UIViewControllerAnimatedTransitioning {
             toVC.view.frame = container.bounds
             toVC.view.alpha = 0
 
-            UIView.animate(withDuration: duration, options: .curveEaseInOut) {
+            UIView.animate(withDuration: duration, delay: 0, options: .curveEaseInOut) {
                 fromVC.view.alpha = 0
                 toVC.view.alpha = 1
             } completion: { _ in
@@ -281,7 +281,7 @@ final class FadeTransition: NSObject, UIViewControllerAnimatedTransitioning {
             toVC.view.frame = container.bounds
             toVC.view.alpha = 0
 
-            UIView.animate(withDuration: duration, options: .curveEaseInOut) {
+            UIView.animate(withDuration: duration, delay: 0, options: .curveEaseInOut) {
                 toVC.view.alpha = 1
             } completion: { _ in
                 transitionContext.completeTransition(!transitionContext.transitionWasCancelled)

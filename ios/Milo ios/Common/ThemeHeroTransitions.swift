@@ -332,7 +332,7 @@ final class SearchResultAnimator {
         label.alpha = 0.5
         UIView.animate(withDuration: 0.3,
                        delay: 0,
-                       options: [.curveEaseInOut, .autorepeat]) {
+                       options: [.curveEaseInOut, .autoreverse]) {
             label.alpha = 1
         }
     }

@@ -341,7 +341,7 @@ class AnimatedCollectionViewController: UICollectionViewController {
 // MARK: - 带下拉刷新的 TableViewController
 class RefreshableTableViewController: AnimatedTableViewController {
 
-    let refreshControl = PullToRefreshControl()
+    let pullToRefresh = PullToRefreshControl()
     let loadMoreFooter = LoadMoreFooterView()
 
     var isLoadingMore = false
@@ -354,8 +354,8 @@ class RefreshableTableViewController: AnimatedTableViewController {
 
     private func setupRefresh() {
         // 下拉刷新
-        refreshControl.attach(to: tableView)
-        refreshControl.onRefresh = { [weak self] in
+        pullToRefresh.attach(to: tableView)
+        pullToRefresh.onRefresh = { [weak self] in
             self?.handleRefresh()
         }
 
@@ -368,7 +368,7 @@ class RefreshableTableViewController: AnimatedTableViewController {
     @objc func handleRefresh() {
         // 子类重写
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.refreshControl.endRefreshing()
+            self?.pullToRefresh.endRefreshing()
         }
     }
 

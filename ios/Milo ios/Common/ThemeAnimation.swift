@@ -225,7 +225,7 @@ class SlideFromRightTransition: NSObject, UIViewControllerAnimatedTransitioning 
         if isDismissing {
             guard let fromView = transitionContext.view(forKey: .from) else { return }
 
-            UIView.animate(withDuration: duration, options: .curveEaseIn) {
+            UIView.animate(withDuration: duration, delay: 0, options: .curveEaseIn) {
                 fromView.transform = CGAffineTransform(translationX: fromView.bounds.width, y: 0)
             } completion: { _ in
                 transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
@@ -236,7 +236,7 @@ class SlideFromRightTransition: NSObject, UIViewControllerAnimatedTransitioning 
             containerView.addSubview(toView)
             toView.transform = CGAffineTransform(translationX: toView.bounds.width, y: 0)
 
-            UIView.animate(withDuration: duration, options: .curveEaseOut) {
+            UIView.animate(withDuration: duration, delay: 0, options: .curveEaseOut) {
                 toView.transform = .identity
             } completion: { _ in
                 transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
