@@ -3,7 +3,7 @@ import SnapKit
 import Kingfisher
 
 // MARK: - 笔记消息Cell
-class NoteMessageCell: UITableViewCell {
+class NoteListCell: UITableViewCell {
     
     private let bubbleView = UIView()
     private let titleLabel = UILabel()
