@@ -472,7 +472,7 @@ extension FeedbackViewController: UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) {
         placeholderLabel.isHidden = !textView.text.isEmpty
         let count = textView.text.count
-        if let label = viewWithTag(100) as? UILabel {
+        if let label = view.viewWithTag(100) as? UILabel {
             label.text = "\(count)/500"
         }
     }
@@ -681,7 +681,7 @@ class RegionSelectViewController: UIViewController {
     private let tableView = UITableView()
     private let searchBar = UISearchBar()
 
-    private let regions = [
+    private let regions: [(code: String, name: String, dial: String)] = [
         ("86", "中国大陆", "+86"),
         ("852", "中国香港", "+852"),
         ("853", "中国澳门", "+853"),

@@ -52,6 +52,7 @@ class SystemMessageCell: UITableViewCell, TimeHeaderConfigurable {
     // MARK: - UI 元素
     private let containerView = UIView()
     private let messageLabel = UILabel()
+    let timeLabel = UILabel()
 
     // MARK: - 时间分隔头
     let timeHeaderLabel = UILabel()

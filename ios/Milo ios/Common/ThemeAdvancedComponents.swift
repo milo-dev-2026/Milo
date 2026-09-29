@@ -164,7 +164,7 @@ class BottomSheetViewController: UIViewController {
             self.dimView.alpha = 0
             self.containerBottomConstraint.update(offset: self.containerView.bounds.height)
             self.view.layoutIfNeeded()
-        } { _ in
+        } completion: { _ in
             self.dismiss(animated: false) {
                 completion?()
             }
@@ -400,7 +400,7 @@ class AlertDialog: UIViewController {
             self.dimView.alpha = 0
             self.containerView.alpha = 0
             self.containerView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-        } { _ in
+        } completion: { _ in
             self.dismiss(animated: false) {
                 completion?()
             }

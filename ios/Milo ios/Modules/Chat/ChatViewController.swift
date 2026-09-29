@@ -728,7 +728,7 @@ extension ChatViewController: ChatInputBarDelegate {
             self?.sendNoteMessage(note)
         }
         let nav = UINavigationController(rootViewController: noteSelectVC)
-        nav.modalPresentationStyle = .pageSheet
+        nav.modalPresentationStyle = UIModalPresentationStyle.pageSheet
         present(nav, animated: true)
     }
     

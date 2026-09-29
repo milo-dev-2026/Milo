@@ -47,7 +47,7 @@ extension UIView {
         self.alpha = 0
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseOut) {
             self.alpha = 1
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -57,7 +57,7 @@ extension UIView {
         self.alpha = 1
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseIn) {
             self.alpha = 0
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -71,7 +71,7 @@ extension UIView {
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseOut) {
             self.transform = .identity
             self.alpha = 1
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -81,7 +81,7 @@ extension UIView {
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseIn) {
             self.transform = CGAffineTransform(scaleX: toScale, y: toScale)
             self.alpha = 0
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -94,7 +94,7 @@ extension UIView {
         self.transform = CGAffineTransform(translationX: 0, y: offset)
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseOut) {
             self.transform = .identity
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -104,7 +104,7 @@ extension UIView {
         let offset = offset ?? bounds.height
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseIn) {
             self.transform = CGAffineTransform(translationX: 0, y: offset)
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -116,7 +116,7 @@ extension UIView {
         UIView.animate(withDuration: duration, delay: delay, options: .curveEaseOut) {
             self.transform = .identity
             self.alpha = 1
-        } { _ in
+        } completion: { _ in
             completion?()
         }
     }
@@ -238,39 +238,6 @@ class SlideFromRightTransition: NSObject, UIViewControllerAnimatedTransitioning 
 
             UIView.animate(withDuration: duration, options: .curveEaseOut) {
                 toView.transform = .identity
-            } completion: { _ in
-                transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
-            }
-        }
-    }
-}
-
-// MARK: - 自定义转场 - 淡入淡出
-class FadeTransition: NSObject, UIViewControllerAnimatedTransitioning {
-
-    var isDismissing: Bool = false
-    var duration: TimeInterval = AnimationDuration.normal
-
-    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        return duration
-    }
-
-    func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
-        let containerView = transitionContext.containerView
-
-        if isDismissing {
-            guard let fromView = transitionContext.view(forKey: .from) else { return }
-            UIView.animate(withDuration: duration, options: .curveEaseInOut) {
-                fromView.alpha = 0
-            } completion: { _ in
-                transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
-            }
-        } else {
-            guard let toView = transitionContext.view(forKey: .to) else { return }
-            containerView.addSubview(toView)
-            toView.alpha = 0
-            UIView.animate(withDuration: duration, options: .curveEaseInOut) {
-                toView.alpha = 1
             } completion: { _ in
                 transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
             }
