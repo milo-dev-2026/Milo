@@ -33,15 +33,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         mainWindow.makeKeyAndVisible()
 
-        // 3. 后台初始化 SDK（避免阻塞启动）
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.setupAMapPrivacy()
-            COSUploadManager.shared.setup()
-        }
-        DispatchQueue.main.async {
+        // 3. 延迟初始化 SDK（避免阻塞启动，确保首屏先显示）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.setupKeyboardManager()
             self.registerPushNotification(application)
             self.setupAppLockCheck()
+            self.setupAMapPrivacy()
+            COSUploadManager.shared.setup()
         }
 
         return true
