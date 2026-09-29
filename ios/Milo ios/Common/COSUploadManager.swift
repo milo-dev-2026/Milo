@@ -254,7 +254,7 @@ class COSUploadManager: NSObject {
     /// - Parameter objectKey: COS 对象键（完整路径）
     /// - Returns: 完整的 CDN 访问 URL
     private static func buildCDNURL(objectKey: String) -> String {
-        let domain = APIConfig.cosCDNDomain
+        let domain = APIConfig.cosCDN
         // 确保 domain 不以 / 结尾，objectKey 不以 / 开头
         var baseURL = domain
         if baseURL.hasSuffix("/") {
@@ -283,7 +283,7 @@ extension COSUploadManager: QCloudSignatureProvider {
 
         let credential = QCloudCredential()
         // 永久密钥 SecretID
-        credential.secretID = APIConfig.cosSecretID
+        credential.secretID = APIConfig.cosSecretId
         // 永久密钥 SecretKey
         credential.secretKey = APIConfig.cosSecretKey
         // 永久密钥不需要 token
