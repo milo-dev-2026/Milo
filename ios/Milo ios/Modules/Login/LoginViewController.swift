@@ -1669,7 +1669,7 @@ class EntryLoginViewController: UIViewController {
 }
 
 // MARK: - 页面2：登录页
-class LoginViewController: UIViewController, AliyunAuthDelegate {
+class LoginViewController: UIViewController {
 
     private let account: String
     private let isEmail: Bool
@@ -1681,11 +1681,6 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
     private let logoView = UIImageView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
-
-    // 一键登录按钮
-    private let oneClickLoginButton = UIButton(type: .system)
-    private let oneClickDividerLabel = UILabel()
-    private var hasPreChecked = false
 
     // 玻璃卡片
     private let glassCard = GlassCardView()
@@ -1725,21 +1720,6 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
         super.viewDidLoad()
         print("[\(type(of: self))] viewDidLoad")
         setupUI()
-
-        // 初始化阿里云一键登录
-        AliyunAuthManager.shared.delegate = self
-        AliyunAuthManager.shared.setupSDK()
-
-        // 预取号（仅手机号登录时）
-        if !isEmail {
-            AliyunAuthManager.shared.preGetToken { [weak self] success, _ in
-                DispatchQueue.main.async {
-                    self?.hasPreChecked = success
-                    self?.oneClickLoginButton.isEnabled = success
-                    self?.oneClickLoginButton.alpha = success ? 1.0 : 0.4
-                }
-            }
-        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -1934,25 +1914,6 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goRegister))
         registerTipLabel.addGestureRecognizer(tapGesture)
 
-        // 一键登录分割线
-        oneClickDividerLabel.text = "—— 其他登录方式 ——"
-        oneClickDividerLabel.font = ScreenAdapter.font(13)
-        oneClickDividerLabel.textColor = .tertiaryLabel
-        oneClickDividerLabel.textAlignment = .center
-
-        // 一键登录按钮（仅手机号登录时显示）
-        oneClickLoginButton.setTitle("本机号码一键登录", for: .normal)
-        oneClickLoginButton.setTitleColor(.themePrimary, for: .normal)
-        oneClickLoginButton.titleLabel?.font = ScreenAdapter.mediumFont(16)
-        oneClickLoginButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
-        oneClickLoginButton.layer.borderWidth = 1
-        oneClickLoginButton.layer.borderColor = UIColor.themePrimary.cgColor
-        oneClickLoginButton.alpha = 0.4
-        oneClickLoginButton.isEnabled = false
-        oneClickLoginButton.addTarget(self, action: #selector(doOneClickLogin), for: .touchUpInside)
-        oneClickLoginButton.addPressScaleEffect()
-        oneClickLoginButton.isHidden = isEmail
-
         // 整体布局
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
@@ -1969,8 +1930,6 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
         mainStack.spacing = ScreenAdapter.scaleH(20)
         mainStack.alignment = .fill
         contentView.addSubview(mainStack)
-        contentView.addSubview(oneClickDividerLabel)
-        contentView.addSubview(oneClickLoginButton)
         contentView.addSubview(registerTipLabel)
 
         scrollView.snp.makeConstraints { make in
@@ -1986,22 +1945,11 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
         }
-        oneClickDividerLabel.snp.makeConstraints { make in
-            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-        }
-        oneClickLoginButton.snp.makeConstraints { make in
-            make.top.equalTo(oneClickDividerLabel.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
         loginButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
         }
         registerTipLabel.snp.makeConstraints { make in
-            make.top.equalTo(oneClickLoginButton.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
             make.centerX.equalToSuperview()
             make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
         }
@@ -2145,6 +2093,7 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
     // MARK: - 登录
     @objc private func doLogin() {
         view.endEditing(true)
+        CrashLogger.shared.log("doLogin: started, mode=\(loginMode), isEmail=\(isEmail)")
 
         // 按钮加载动画
         startButtonLoading(loginButton, originalTitle: "登录")
@@ -2166,13 +2115,17 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
             }
             // username = "0086{phone}" 或 邮箱
             let username = isEmail ? email : "0086\(phone)"
+            CrashLogger.shared.log("doLogin: password mode, username=\(username)")
             Task {
                 do {
+                    CrashLogger.shared.log("doLogin: sending login request")
                     let resp: LoginResponse = try await APIClient.shared.request(.login(username: username, password: password, device: nil))
+                    CrashLogger.shared.log("doLogin: login response received, uid=\(resp.uid ?? "nil")")
                     DispatchQueue.main.async {
                         self.handleLoginSuccess(resp)
                     }
                 } catch {
+                    CrashLogger.shared.log("doLogin: login error: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         self.resetButton()
                         AppUtility.showToast("登录失败: \(error.localizedDescription)")
@@ -2190,18 +2143,21 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
                 resetButton()
                 return
             }
+            CrashLogger.shared.log("doLogin: code mode, isEmail=\(isEmail)")
             // 验证码登录：先发送 registercode 获取验证码（已在 sendCode 完成），
             // 然后用验证码注册（后端已存在用户会用相同密码登录）
             if isEmail {
                 Task {
                     do {
-                        // 用验证码做注册操作，后端对已存在用户走登录逻辑
+                        CrashLogger.shared.log("doLogin: sending email code login")
                         let resp: LoginResponse = try await APIClient.shared.requestRawLogin(.register(zone: "0086", phone: "", code: code, password: ""))
+                        CrashLogger.shared.log("doLogin: email code response received, uid=\(resp.uid ?? "nil")")
                         DispatchQueue.main.async {
                             // 邮箱验证码登录降级处理
                             self.handleCodeLoginFallback(resp, phone: "", email: email)
                         }
                     } catch {
+                        CrashLogger.shared.log("doLogin: email code error: \(error.localizedDescription)")
                         DispatchQueue.main.async {
                             self.resetButton()
                             self.loginButton.shake()
@@ -2224,11 +2180,14 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
                 }
                 Task {
                     do {
+                        CrashLogger.shared.log("doLogin: sending phone code login, phone=\(phone)")
                         let resp: LoginResponse = try await APIClient.shared.requestRawLogin(.register(zone: "0086", phone: phone, code: code, password: ""))
+                        CrashLogger.shared.log("doLogin: phone code response received, uid=\(resp.uid ?? "nil")")
                         DispatchQueue.main.async {
                             self.handleCodeLoginFallback(resp, phone: phone, email: "")
                         }
                     } catch {
+                        CrashLogger.shared.log("doLogin: phone code error: \(error.localizedDescription)")
                         DispatchQueue.main.async {
                             self.resetButton()
                             self.loginButton.shake()
@@ -2257,7 +2216,9 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
     }
 
     private func handleLoginSuccess(_ resp: LoginResponse) {
+        CrashLogger.shared.log("handleLoginSuccess: uid=\(resp.uid ?? "nil"), hasToken=\(resp.token != nil)")
         guard let uid = resp.uid, let token = resp.token else {
+            CrashLogger.shared.log("handleLoginSuccess: missing uid or token")
             resetButton()
             loginButton.shakeWithError()
             if AnimationIntegration.shared.config.enableHapticFeedback {
@@ -2267,6 +2228,7 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
             return
         }
 
+        CrashLogger.shared.log("handleLoginSuccess: saving UserDefaults")
         UserDefaults.standard.set(uid, forKey: "uid")
         UserDefaults.standard.set(token, forKey: "token")
         let imToken = resp.im_token ?? token
@@ -2278,67 +2240,26 @@ class LoginViewController: UIViewController, AliyunAuthDelegate {
         if let shortNo = resp.short_no { UserDefaults.standard.set(shortNo, forKey: "short_no") }
         if let zone = resp.zone { UserDefaults.standard.set(zone, forKey: "zone") }
 
+        CrashLogger.shared.log("handleLoginSuccess: connecting IM")
         IMManager.shared.connect()
+        CrashLogger.shared.log("handleLoginSuccess: syncing data")
         DataSyncManager.shared.syncAll()
 
         // 成功触觉反馈
+        CrashLogger.shared.log("handleLoginSuccess: haptic feedback")
         if AnimationIntegration.shared.config.enableHapticFeedback {
             HapticManager.shared.notificationSuccess()
             HapticManager.shared.playHeartbeat()
         }
 
+        CrashLogger.shared.log("handleLoginSuccess: showing main screen")
         showMainScreen()
+        CrashLogger.shared.log("handleLoginSuccess: done")
     }
 
     private func resetButton() {
         stopButtonLoading(loginButton, originalTitle: "登录")
         updateLoginButtonState()
-    }
-
-    // MARK: - 一键登录
-    @objc private func doOneClickLogin() {
-        guard hasPreChecked else {
-            AppUtility.showToast("一键登录准备中，请稍候")
-            // 重新预取号
-            AliyunAuthManager.shared.preGetToken { [weak self] success, _ in
-                DispatchQueue.main.async {
-                    self?.hasPreChecked = success
-                    if success {
-                        AliyunAuthManager.shared.oneClickLogin(
-                            navigationController: self?.navigationController ?? UINavigationController()
-                        )
-                    } else {
-                        AppUtility.showToast("一键登录不可用，请使用验证码登录")
-                    }
-                }
-            }
-            return
-        }
-        AliyunAuthManager.shared.oneClickLogin(
-            navigationController: navigationController ?? UINavigationController()
-        )
-    }
-
-    // MARK: - AliyunAuthDelegate
-    func aliyunAuth(didGetToken token: String) {
-        // 后端已返回 uid 和 token 并保存到 UserDefaults，直接连接 IM
-        IMManager.shared.connect()
-        DataSyncManager.shared.syncAll()
-
-        if AnimationIntegration.shared.config.enableHapticFeedback {
-            HapticManager.shared.notificationSuccess()
-        }
-        showMainScreen()
-    }
-
-    func aliyunAuth(didFailWithError error: Error) {
-        DispatchQueue.main.async {
-            AppUtility.showToast("一键登录失败: \(error.localizedDescription)")
-        }
-    }
-
-    func aliyunAuth(didCancel page: UIViewController) {
-        print("[Login] 用户取消一键登录")
     }
 
     // MARK: - 按钮加载动画辅助
