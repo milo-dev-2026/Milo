@@ -18,7 +18,6 @@
     <array>
         <string>audio</string>
         <string>remote-notification</string>
-        <string>voip</string>
     </array>
     <key>NSAppTransportSecurity</key>
     <dict>
