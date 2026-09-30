@@ -41,31 +41,44 @@ class GlassSegmentedControl: UIView {
     private func setupUI() {
         layer.cornerRadius = ScreenAdapter.scaleH(22)
         layer.masksToBounds = true
+        translatesAutoresizingMaskIntoConstraints = false
 
         if #available(iOS 15.0, *) {
             // 液态玻璃背景
             guard let glassView = liquidGlassView else { return }
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            glassView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                glassView.topAnchor.constraint(equalTo: topAnchor),
+                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
         } else {
             // 降级：普通毛玻璃
             addSubview(blurView)
             sendSubviewToBack(blurView)
-            blurView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            blurView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                blurView.topAnchor.constraint(equalTo: topAnchor),
+                blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
 
             // 白色半透明背景叠加，增加玻璃质感
             let overlayView = UIView()
             overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
             addSubview(overlayView)
             sendSubviewToBack(overlayView)
-            overlayView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            overlayView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                overlayView.topAnchor.constraint(equalTo: topAnchor),
+                overlayView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                overlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                overlayView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
         }
 
         // 选中滑块
@@ -93,14 +106,19 @@ class GlassSegmentedControl: UIView {
             stackView.addArrangedSubview(btn)
         }
 
-        stackView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(44)).isActive = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         updateSelection(animated: false)
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(44))
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -186,23 +204,32 @@ class GlassCardView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 8)
         layer.shadowRadius = 24
         layer.shadowOpacity = 0.08
+        translatesAutoresizingMaskIntoConstraints = false
 
         if #available(iOS 15.0, *) {
             // 使用液态玻璃效果
             guard let glassView = liquidGlassView else { return }
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            glassView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                glassView.topAnchor.constraint(equalTo: topAnchor),
+                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
         } else {
             // 降级：普通毛玻璃
             backgroundColor = UIColor.white.withAlphaComponent(0.6)
             addSubview(blurView)
             sendSubviewToBack(blurView)
-            blurView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            blurView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                blurView.topAnchor.constraint(equalTo: topAnchor),
+                blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
             blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
             blurView.layer.masksToBounds = true
         }
@@ -249,15 +276,21 @@ class CapsuleTextField: UIView {
     }
 
     private func setupUI() {
+        translatesAutoresizingMaskIntoConstraints = false
+
         if #available(iOS 15.0, *) {
             // 液态玻璃背景
             backgroundColor = .clear
             guard let glassView = liquidGlassView else { return }
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.snp.makeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            glassView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                glassView.topAnchor.constraint(equalTo: topAnchor),
+                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
         } else {
             // 降级：普通白色背景
             backgroundColor = UIColor.white
@@ -276,14 +309,12 @@ class CapsuleTextField: UIView {
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
-        textField.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.centerY.equalToSuperview()
-        }
-
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            textField.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
     }
 
     override var intrinsicContentSize: CGSize {
@@ -381,6 +412,7 @@ class CapsulePhoneField: UIView {
     }
 
     private func setupUI() {
+        translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
@@ -404,27 +436,21 @@ class CapsulePhoneField: UIView {
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
 
-        countryCodeButton.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.centerY.equalToSuperview()
-            make.width.equalTo(ScreenAdapter.scaleW(50))
-        }
-
-        dividerView.snp.makeConstraints { make in
-            make.leading.equalTo(countryCodeButton.snp.trailing).offset(ScreenAdapter.scaleW(8))
-            make.centerY.equalToSuperview()
-            make.width.equalTo(1)
-            make.height.equalTo(ScreenAdapter.scaleH(20))
-        }
-
-        textField.snp.makeConstraints { make in
-            make.leading.equalTo(dividerView.snp.trailing).offset(ScreenAdapter.scaleW(12))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.centerY.equalToSuperview()
-        }
-
-        translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+        countryCodeButton.translatesAutoresizingMaskIntoConstraints = false
+        dividerView.translatesAutoresizingMaskIntoConstraints = false
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            countryCodeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ScreenAdapter.scaleW(16)),
+            countryCodeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            countryCodeButton.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(50)),
+            dividerView.leadingAnchor.constraint(equalTo: countryCodeButton.trailingAnchor, constant: ScreenAdapter.scaleW(8)),
+            dividerView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            dividerView.widthAnchor.constraint(equalToConstant: 1),
+            dividerView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(20)),
+            textField.leadingAnchor.constraint(equalTo: dividerView.trailingAnchor, constant: ScreenAdapter.scaleW(12)),
+            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            textField.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
     }
 
     override var intrinsicContentSize: CGSize {
@@ -1354,11 +1380,14 @@ class EntryLoginViewController: UIViewController {
         gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
         let gradientView = UIView()
         gradientView.layer.addSublayer(gradientLayer)
+        gradientView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(gradientView)
-        gradientView.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(300))
-        }
+        NSLayoutConstraint.activate([
+            gradientView.topAnchor.constraint(equalTo: view.topAnchor),
+            gradientView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            gradientView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            gradientView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(300))
+        ])
         DispatchQueue.main.async {
             gradientLayer.frame = gradientView.bounds
         }
@@ -1389,13 +1418,19 @@ class EntryLoginViewController: UIViewController {
 
         let headerContainer = UIView()
         headerContainer.addSubview(headerStack)
-        headerStack.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            headerStack.topAnchor.constraint(equalTo: headerContainer.topAnchor),
+            headerStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor),
+            headerStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor),
+            headerStack.bottomAnchor.constraint(equalTo: headerContainer.bottomAnchor)
+        ])
 
-        logoView.snp.makeConstraints { make in
-            make.width.height.equalTo(ScreenAdapter.scaleH(48))
-        }
+        logoView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            logoView.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48)),
+            logoView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48))
+        ])
 
         // 玻璃卡片
         view.addSubview(glassCard)
@@ -1420,23 +1455,22 @@ class EntryLoginViewController: UIViewController {
         glassCard.addSubview(emailField)
 
         // 卡片内布局
-        segmentedControl.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        phoneField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
-        emailField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        phoneField.translatesAutoresizingMaskIntoConstraints = false
+        emailField.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            segmentedControl.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: ScreenAdapter.scaleH(20)),
+            segmentedControl.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+            segmentedControl.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            phoneField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
+            phoneField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+            phoneField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            phoneField.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20)),
+            emailField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
+            emailField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+            emailField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            emailField.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
+        ])
 
         // 协议勾选行（卡片外）
         agreementCheckBox.setImage(UIImage(systemName: "circle"), for: .normal)
@@ -1465,9 +1499,11 @@ class EntryLoginViewController: UIViewController {
         agreementStack.spacing = ScreenAdapter.scaleW(3)
         agreementStack.alignment = .center
 
-        agreementCheckBox.snp.makeConstraints { make in
-            make.width.height.equalTo(ScreenAdapter.scaleW(18))
-        }
+        agreementCheckBox.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            agreementCheckBox.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(18)),
+            agreementCheckBox.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(18))
+        ])
 
         // 下一步按钮
         nextButton.setTitle("下一步", for: .normal)
@@ -1490,9 +1526,11 @@ class EntryLoginViewController: UIViewController {
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
         scrollView.keyboardDismissMode = .interactive
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
         let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
 
         let mainStack = UIStackView(arrangedSubviews: [
@@ -1504,28 +1542,37 @@ class EntryLoginViewController: UIViewController {
         contentView.addSubview(mainStack)
         contentView.addSubview(bottomAgreementLabel)
 
-        scrollView.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
-            make.leading.trailing.bottom.equalToSuperview()
-        }
-        contentView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-            make.width.equalTo(scrollView)
-        }
-        mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-        }
-        nextButton.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
-        bottomAgreementLabel.snp.makeConstraints { make in
-            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
+        // ScrollView 约束
+        let guide = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: ScreenAdapter.scaleH(16)),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+
+        // ContentView 约束 (使用 contentLayoutGuide 确定内容尺寸，frameLayoutGuide 确定宽度)
+        NSLayoutConstraint.activate([
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
+
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        nextButton.translatesAutoresizingMaskIntoConstraints = false
+        bottomAgreementLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: ScreenAdapter.scaleH(20)),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
+            nextButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)),
+            bottomAgreementLabel.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: ScreenAdapter.scaleH(20)),
+            bottomAgreementLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
+            bottomAgreementLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
+            bottomAgreementLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
+        ])
     }
 
     // MARK: - 交互
