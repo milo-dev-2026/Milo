@@ -97,9 +97,8 @@ class GlassSegmentedControl: UIView {
             make.edges.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(44))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(44)).isActive = true
 
         updateSelection(animated: false)
     }
@@ -283,9 +282,12 @@ class CapsuleTextField: UIView {
             make.centerY.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(52))
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -421,9 +423,12 @@ class CapsulePhoneField: UIView {
             make.centerY.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(52))
     }
 
     private func updatePlaceholder() {
@@ -522,9 +527,12 @@ class CapsuleCodeField: UIView {
             make.centerY.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(52))
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -669,9 +677,12 @@ class CapsulePasswordField: UIView {
             make.centerY.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(52))
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -797,9 +808,12 @@ class CapsuleDisplayField: UIView {
             make.centerY.equalToSuperview()
         }
 
-        snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(52))
     }
 }
 
