@@ -1,5 +1,5 @@
 platform :ios, '15.0'
-use_frameworks!
+use_frameworks! :linkage => :static
 
 target 'Milo' do
 
