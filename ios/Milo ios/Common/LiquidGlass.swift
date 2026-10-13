@@ -118,27 +118,39 @@ class LiquidGlassView: UIView {
 
         // 1. 毛玻璃层
         blurEffectView.effect = UIBlurEffect(style: blurStyle)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(blurEffectView)
-        blurEffectView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            blurEffectView.topAnchor.constraint(equalTo: topAnchor),
+            blurEffectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         // 2. 活力效果层（嵌套在毛玻璃内）
         let vibrancyEffect = UIVibrancyEffect(blurEffect: UIBlurEffect(style: blurStyle), style: .label)
         vibrancyEffectView.effect = vibrancyEffect
+        vibrancyEffectView.translatesAutoresizingMaskIntoConstraints = false
         blurEffectView.contentView.addSubview(vibrancyEffectView)
-        vibrancyEffectView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            vibrancyEffectView.topAnchor.constraint(equalTo: blurEffectView.contentView.topAnchor),
+            vibrancyEffectView.leadingAnchor.constraint(equalTo: blurEffectView.contentView.leadingAnchor),
+            vibrancyEffectView.trailingAnchor.constraint(equalTo: blurEffectView.contentView.trailingAnchor),
+            vibrancyEffectView.bottomAnchor.constraint(equalTo: blurEffectView.contentView.bottomAnchor)
+        ])
 
         // 3. 半透明色调叠加
         tintOverlayView.backgroundColor = tintColorForGlass
+        tintOverlayView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(tintOverlayView)
         sendSubviewToBack(tintOverlayView)
         insertSubview(tintOverlayView, aboveSubview: blurEffectView)
-        tintOverlayView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            tintOverlayView.topAnchor.constraint(equalTo: topAnchor),
+            tintOverlayView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            tintOverlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            tintOverlayView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         // 4. 顶部高光渐变
         highlightLayer.colors = [
@@ -159,11 +171,15 @@ class LiquidGlassView: UIView {
 
         // 6. 内容容器
         contentContainer.backgroundColor = .clear
+        contentContainer.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentContainer)
         bringSubviewToFront(contentContainer)
-        contentContainer.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            contentContainer.topAnchor.constraint(equalTo: topAnchor),
+            contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         // 初始设置
         updateCornerRadius()
@@ -410,23 +426,33 @@ class LiquidGlassButton: UIControl {
         // 玻璃背景
         glassView.cornerRadius = cornerRadius
         glassView.glassOpacity = 0.5
+        glassView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(glassView)
-        glassView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            glassView.topAnchor.constraint(equalTo: topAnchor),
+            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         // 内容栈
         contentStack.axis = .horizontal
         contentStack.alignment = .center
         contentStack.spacing = 6
         contentStack.isUserInteractionEnabled = false
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
         glassView.addContent(contentStack)
 
         // 图标
         iconView.contentMode = .scaleAspectFit
         iconView.tintColor = iconTintColor
         iconView.isHidden = true
+        iconView.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.widthAnchor.constraint(equalToConstant: 20),
+            iconView.heightAnchor.constraint(equalToConstant: 20)
+        ])
 
         // 标题
         titleLabel.text = title
@@ -436,15 +462,12 @@ class LiquidGlassButton: UIControl {
         titleLabel.isUserInteractionEnabled = false
         contentStack.addArrangedSubview(titleLabel)
 
-        contentStack.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.leading.greaterThanOrEqualToSuperview().offset(12)
-            make.trailing.lessThanOrEqualToSuperview().offset(-12)
-        }
-
-        iconView.snp.makeConstraints { make in
-            make.width.height.equalTo(20)
-        }
+        NSLayoutConstraint.activate([
+            contentStack.centerXAnchor.constraint(equalTo: glassView.contentContainer.centerXAnchor),
+            contentStack.centerYAnchor.constraint(equalTo: glassView.contentContainer.centerYAnchor),
+            contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: glassView.contentContainer.leadingAnchor, constant: 12),
+            contentStack.trailingAnchor.constraint(lessThanOrEqualTo: glassView.contentContainer.trailingAnchor, constant: -12)
+        ])
 
         // 阴影
         layer.shadowColor = UIColor.black.cgColor
@@ -714,10 +737,14 @@ extension UIView {
 
         let glassView = LiquidGlassView(style: blurStyle, cornerRadius: cornerRadius)
         glassView.isUserInteractionEnabled = false
+        glassView.translatesAutoresizingMaskIntoConstraints = false
         insertSubview(glassView, at: 0)
-        glassView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            glassView.topAnchor.constraint(equalTo: topAnchor),
+            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         lg_glassView = glassView
 
