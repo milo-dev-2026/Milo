@@ -41,29 +41,31 @@ class GlassSegmentedControl: UIView {
     private func setupUI() {
         layer.cornerRadius = ScreenAdapter.scaleH(22)
         layer.masksToBounds = true
-        translatesAutoresizingMaskIntoConstraints = true
 
         if #available(iOS 15.0, *) {
-            // 液态玻璃背景 - autoresizing充满
+            // 液态玻璃背景
             guard let glassView = liquidGlassView else { return }
-            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
         } else {
-            // 降级：普通毛玻璃 - autoresizing充满
-            blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            blurView.frame = bounds
+            // 降级：普通毛玻璃
             addSubview(blurView)
             sendSubviewToBack(blurView)
+            blurView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
 
             // 白色半透明背景叠加，增加玻璃质感
             let overlayView = UIView()
             overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
-            overlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            overlayView.frame = bounds
             addSubview(overlayView)
             sendSubviewToBack(overlayView)
+            overlayView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
         }
 
         // 选中滑块
@@ -79,8 +81,6 @@ class GlassSegmentedControl: UIView {
         stackView.axis = .horizontal
         stackView.distribution = .fillEqually
         stackView.alignment = .fill
-        stackView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        stackView.frame = bounds
         addSubview(stackView)
 
         for (index, title) in items.enumerated() {
@@ -93,11 +93,14 @@ class GlassSegmentedControl: UIView {
             stackView.addArrangedSubview(btn)
         }
 
-        updateSelection(animated: false)
-    }
+        stackView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
 
-    override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: ScreenAdapter.scaleH(44))
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(44)).isActive = true
+
+        updateSelection(animated: false)
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -183,22 +186,23 @@ class GlassCardView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 8)
         layer.shadowRadius = 24
         layer.shadowOpacity = 0.08
-        translatesAutoresizingMaskIntoConstraints = true
 
         if #available(iOS 15.0, *) {
-            // 使用液态玻璃效果 - autoresizing充满
+            // 使用液态玻璃效果
             guard let glassView = liquidGlassView else { return }
-            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
         } else {
             // 降级：普通毛玻璃
             backgroundColor = UIColor.white.withAlphaComponent(0.6)
-            blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            blurView.frame = bounds
             addSubview(blurView)
             sendSubviewToBack(blurView)
+            blurView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
             blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
             blurView.layer.masksToBounds = true
         }
@@ -245,16 +249,15 @@ class CapsuleTextField: UIView {
     }
 
     private func setupUI() {
-        translatesAutoresizingMaskIntoConstraints = true
-
         if #available(iOS 15.0, *) {
-            // 液态玻璃背景 - autoresizing充满
+            // 液态玻璃背景
             backgroundColor = .clear
             guard let glassView = liquidGlassView else { return }
-            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
+            glassView.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
         } else {
             // 降级：普通白色背景
             backgroundColor = UIColor.white
@@ -269,20 +272,18 @@ class CapsuleTextField: UIView {
         textField.font = ScreenAdapter.font(16)
         textField.textColor = .label
         textField.backgroundColor = .clear
-        textField.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        textField.frame = CGRect(x: ScreenAdapter.scaleW(20), y: 0,
-                                 width: max(0, bounds.width - ScreenAdapter.scaleW(40)),
-                                 height: bounds.height)
         textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
-    }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        textField.frame = CGRect(x: ScreenAdapter.scaleW(20), y: 0,
-                                 width: max(0, bounds.width - ScreenAdapter.scaleW(40)),
-                                 height: bounds.height)
+        textField.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.centerY.equalToSuperview()
+        }
+
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
     }
 
     override var intrinsicContentSize: CGSize {
@@ -380,7 +381,6 @@ class CapsulePhoneField: UIView {
     }
 
     private func setupUI() {
-        translatesAutoresizingMaskIntoConstraints = true
         backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
@@ -390,16 +390,9 @@ class CapsulePhoneField: UIView {
         countryCodeButton.setTitle("+86", for: .normal)
         countryCodeButton.setTitleColor(.label, for: .normal)
         countryCodeButton.titleLabel?.font = ScreenAdapter.font(16)
-        countryCodeButton.frame = CGRect(x: ScreenAdapter.scaleW(16), y: 0,
-                                          width: ScreenAdapter.scaleW(50),
-                                          height: ScreenAdapter.scaleH(52))
         addSubview(countryCodeButton)
 
         dividerView.backgroundColor = UIColor(red: 0.85, green: 0.86, blue: 0.88, alpha: 1.0)
-        dividerView.frame = CGRect(x: countryCodeButton.frame.maxX + ScreenAdapter.scaleW(8),
-                                    y: (ScreenAdapter.scaleH(52) - ScreenAdapter.scaleH(20)) / 2,
-                                    width: 1,
-                                    height: ScreenAdapter.scaleH(20))
         addSubview(dividerView)
 
         textField.borderStyle = .none
@@ -407,27 +400,31 @@ class CapsulePhoneField: UIView {
         textField.textColor = .label
         textField.keyboardType = .numberPad
         textField.backgroundColor = .clear
-        textField.frame = CGRect(x: dividerView.frame.maxX + ScreenAdapter.scaleW(12),
-                                  y: 0,
-                                  width: max(0, 300 - ScreenAdapter.scaleW(20) - dividerView.frame.maxX - ScreenAdapter.scaleW(12)),
-                                  height: ScreenAdapter.scaleH(52))
         textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
-    }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let h = bounds.height
-        countryCodeButton.frame = CGRect(x: ScreenAdapter.scaleW(16), y: 0,
-                                          width: ScreenAdapter.scaleW(50), height: h)
-        dividerView.frame = CGRect(x: countryCodeButton.frame.maxX + ScreenAdapter.scaleW(8),
-                                    y: (h - ScreenAdapter.scaleH(20)) / 2,
-                                    width: 1, height: ScreenAdapter.scaleH(20))
-        textField.frame = CGRect(x: dividerView.frame.maxX + ScreenAdapter.scaleW(12),
-                                  y: 0,
-                                  width: bounds.width - ScreenAdapter.scaleW(20) - dividerView.frame.maxX - ScreenAdapter.scaleW(12),
-                                  height: h)
+        countryCodeButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.centerY.equalToSuperview()
+            make.width.equalTo(ScreenAdapter.scaleW(50))
+        }
+
+        dividerView.snp.makeConstraints { make in
+            make.leading.equalTo(countryCodeButton.snp.trailing).offset(ScreenAdapter.scaleW(8))
+            make.centerY.equalToSuperview()
+            make.width.equalTo(1)
+            make.height.equalTo(ScreenAdapter.scaleH(20))
+        }
+
+        textField.snp.makeConstraints { make in
+            make.leading.equalTo(dividerView.snp.trailing).offset(ScreenAdapter.scaleW(12))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.centerY.equalToSuperview()
+        }
+
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)).isActive = true
     }
 
     override var intrinsicContentSize: CGSize {
@@ -1259,9 +1256,21 @@ class EntryLoginViewController: UIViewController {
     // 底部协议提示
     private let bottomAgreementLabel = UILabel()
 
+    private var isViewSetup = false
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        // 不在viewDidLoad中设置约束，避免iOS 27 NSISEngine重入崩溃
+        // 改在viewWillAppear中设置，此时视图已在窗口层级中
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard !isViewSetup else { return }
+        isViewSetup = true
         setupUI()
+        // 触发布局，确保约束生效
+        view.layoutIfNeeded()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -1355,130 +1364,122 @@ class EntryLoginViewController: UIViewController {
         ]
         gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
         gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
-        let gradientView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(300)))
-        gradientView.autoresizingMask = [.flexibleWidth]
+        let gradientView = UIView()
         gradientView.layer.addSublayer(gradientLayer)
-        gradientLayer.frame = gradientView.bounds
         view.addSubview(gradientView)
+        gradientView.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.height.equalTo(ScreenAdapter.scaleH(300))
+        }
+        DispatchQueue.main.async {
+            gradientLayer.frame = gradientView.bounds
+        }
 
-        // 整体用 ScrollView + 手动布局
-        let scrollView = UIScrollView()
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.keyboardDismissMode = .interactive
-        scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        scrollView.frame = CGRect(x: 0, y: ScreenAdapter.scaleH(16),
-                                   width: view.bounds.width,
-                                   height: view.bounds.height - ScreenAdapter.scaleH(16))
-        view.addSubview(scrollView)
-        self.scrollView = scrollView
-
-        let contentView = UIView()
-        contentView.autoresizingMask = [.flexibleWidth]
-        scrollView.addSubview(contentView)
-        self.contentView = contentView
-
-        // Logo + 标题区域
+        // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
-        logoView.frame = CGRect(x: ScreenAdapter.scaleW(24), y: ScreenAdapter.scaleH(20),
-                                 width: ScreenAdapter.scaleH(48), height: ScreenAdapter.scaleH(48))
-        contentView.addSubview(logoView)
 
         titleLabel.text = "欢迎使用Milo"
         titleLabel.font = ScreenAdapter.mediumFont(22)
         titleLabel.textColor = .label
-        titleLabel.frame = CGRect(x: logoView.frame.maxX + ScreenAdapter.scaleW(12),
-                                   y: ScreenAdapter.scaleH(24),
-                                   width: view.bounds.width - ScreenAdapter.scaleW(48) - ScreenAdapter.scaleW(12),
-                                   height: ScreenAdapter.scaleH(28))
-        contentView.addSubview(titleLabel)
 
         subtitleLabel.text = "输入手机号或者邮箱继续"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
-        subtitleLabel.frame = CGRect(x: titleLabel.frame.minX,
-                                      y: titleLabel.frame.maxY + ScreenAdapter.scaleH(4),
-                                      width: titleLabel.frame.width,
-                                      height: ScreenAdapter.scaleH(20))
-        contentView.addSubview(subtitleLabel)
 
-        let headerBottom = logoView.frame.maxY + ScreenAdapter.scaleH(20)
+        // 右侧标题+副标题垂直排列
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titleStack.axis = .vertical
+        titleStack.spacing = ScreenAdapter.scaleH(4)
+        titleStack.alignment = .leading
+
+        // 整体：左logo + 右标题
+        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = ScreenAdapter.scaleW(12)
+        headerStack.alignment = .center
+
+        let headerContainer = UIView()
+        headerContainer.addSubview(headerStack)
+        headerStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        logoView.snp.makeConstraints { make in
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
+        }
 
         // 玻璃卡片
-        let cardWidth = view.bounds.width - ScreenAdapter.scaleW(48)
-        let cardX = ScreenAdapter.scaleW(24)
-        let cardY = headerBottom + ScreenAdapter.scaleH(20)
-        glassCard.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: ScreenAdapter.scaleH(180))
-        contentView.addSubview(glassCard)
+        view.addSubview(glassCard)
 
         // 分段控件
         segmentedControl.onSelected = { [weak self] index in
             self?.switchMode(index)
         }
-        segmentedControl.frame = CGRect(x: ScreenAdapter.scaleW(20), y: ScreenAdapter.scaleH(20),
-                                         width: cardWidth - ScreenAdapter.scaleW(40),
-                                         height: ScreenAdapter.scaleH(44))
         glassCard.addSubview(segmentedControl)
 
         // 输入框
-        let fieldY = segmentedControl.frame.maxY + ScreenAdapter.scaleH(16)
-        let fieldHeight = ScreenAdapter.scaleH(52)
-        let fieldWidth = cardWidth - ScreenAdapter.scaleW(40)
-        let fieldX = ScreenAdapter.scaleW(20)
-
         phoneField.placeholder = "请输入手机号"
         phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        phoneField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
-        glassCard.addSubview(phoneField)
 
         emailField.placeholder = "请输入邮箱地址"
         emailField.textField.keyboardType = .emailAddress
         emailField.textField.autocapitalizationType = .none
         emailField.isHidden = true
         emailField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        emailField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
+
+        glassCard.addSubview(phoneField)
         glassCard.addSubview(emailField)
+
+        // 卡片内布局
+        segmentedControl.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+        phoneField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
+        }
+        emailField.snp.makeConstraints { make in
+            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
+        }
 
         // 协议勾选行（卡片外）
         agreementCheckBox.setImage(UIImage(systemName: "circle"), for: .normal)
         agreementCheckBox.setImage(UIImage(systemName: "checkmark.circle.fill"), for: .selected)
         agreementCheckBox.tintColor = .themePrimary
         agreementCheckBox.addTarget(self, action: #selector(toggleAgreement), for: .touchUpInside)
-        agreementCheckBox.frame = CGRect(x: cardX, y: glassCard.frame.maxY + ScreenAdapter.scaleH(16),
-                                          width: ScreenAdapter.scaleW(18), height: ScreenAdapter.scaleW(18))
-        contentView.addSubview(agreementCheckBox)
 
         agreementLabel.text = "我已阅读并同意"
         agreementLabel.font = ScreenAdapter.font(13)
         agreementLabel.textColor = .secondaryLabel
-        agreementLabel.sizeToFit()
-        agreementLabel.frame = CGRect(x: agreementCheckBox.frame.maxX + ScreenAdapter.scaleW(3),
-                                       y: agreementCheckBox.frame.minY,
-                                       width: agreementLabel.frame.width,
-                                       height: ScreenAdapter.scaleW(18))
-        contentView.addSubview(agreementLabel)
 
         userAgreementButton.setTitle("《用户协议》", for: .normal)
         userAgreementButton.titleLabel?.font = ScreenAdapter.font(13)
         userAgreementButton.setTitleColor(.themePrimary, for: .normal)
         userAgreementButton.addTarget(self, action: #selector(openUserAgreement), for: .touchUpInside)
-        userAgreementButton.sizeToFit()
-        userAgreementButton.frame = CGRect(x: agreementLabel.frame.maxX,
-                                            y: agreementLabel.frame.minY,
-                                            width: userAgreementButton.frame.width,
-                                            height: ScreenAdapter.scaleW(18))
-        contentView.addSubview(userAgreementButton)
 
         privacyPolicyButton.setTitle("《隐私政策》", for: .normal)
         privacyPolicyButton.titleLabel?.font = ScreenAdapter.font(13)
         privacyPolicyButton.setTitleColor(.themePrimary, for: .normal)
         privacyPolicyButton.addTarget(self, action: #selector(openPrivacyPolicy), for: .touchUpInside)
-        privacyPolicyButton.sizeToFit()
-        privacyPolicyButton.frame = CGRect(x: userAgreementButton.frame.maxX,
-                                            y: agreementLabel.frame.minY,
-                                            width: privacyPolicyButton.frame.width,
-                                            height: ScreenAdapter.scaleW(18))
-        contentView.addSubview(privacyPolicyButton)
+
+        let agreementStack = UIStackView(arrangedSubviews: [
+            agreementCheckBox, agreementLabel, userAgreementButton, privacyPolicyButton
+        ])
+        agreementStack.axis = .horizontal
+        agreementStack.spacing = ScreenAdapter.scaleW(3)
+        agreementStack.alignment = .center
+
+        agreementCheckBox.snp.makeConstraints { make in
+            make.width.height.equalTo(ScreenAdapter.scaleW(18))
+        }
 
         // 下一步按钮
         nextButton.setTitle("下一步", for: .normal)
@@ -1489,11 +1490,6 @@ class EntryLoginViewController: UIViewController {
         nextButton.alpha = 0.5
         nextButton.isEnabled = false
         nextButton.addTarget(self, action: #selector(loginOrRegister), for: .touchUpInside)
-        nextButton.frame = CGRect(x: cardX,
-                                   y: agreementCheckBox.frame.maxY + ScreenAdapter.scaleH(20),
-                                   width: cardWidth,
-                                   height: ScreenAdapter.scaleH(52))
-        contentView.addSubview(nextButton)
 
         // 底部小字
         bottomAgreementLabel.text = "登录即表示同意《用户协议》和《隐私政策》"
@@ -1501,93 +1497,47 @@ class EntryLoginViewController: UIViewController {
         bottomAgreementLabel.textColor = .tertiaryLabel
         bottomAgreementLabel.textAlignment = .center
         bottomAgreementLabel.numberOfLines = 0
-        bottomAgreementLabel.frame = CGRect(x: ScreenAdapter.scaleW(24),
-                                             y: nextButton.frame.maxY + ScreenAdapter.scaleH(20),
-                                             width: cardWidth,
-                                             height: ScreenAdapter.scaleH(30))
+
+        // 整体布局
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.keyboardDismissMode = .interactive
+        view.addSubview(scrollView)
+
+        let contentView = UIView()
+        scrollView.addSubview(contentView)
+
+        let mainStack = UIStackView(arrangedSubviews: [
+            headerContainer, glassCard, agreementStack, nextButton
+        ])
+        mainStack.axis = .vertical
+        mainStack.spacing = ScreenAdapter.scaleH(20)
+        mainStack.alignment = .fill
+        contentView.addSubview(mainStack)
         contentView.addSubview(bottomAgreementLabel)
 
-        // 设置 contentSize
-        contentView.frame = CGRect(x: 0, y: 0, width: view.bounds.width,
-                                    height: bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40))
-        scrollView.contentSize = CGSize(width: view.bounds.width,
-                                         height: bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40))
-    }
-
-    // 用于手动布局的引用
-    private var scrollView: UIScrollView!
-    private var contentView: UIView!
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // 重新计算布局，适配屏幕旋转
-        let w = view.bounds.width
-        let scrollViewTop = ScreenAdapter.scaleH(16) + view.safeAreaInsets.top
-        scrollView.frame = CGRect(x: 0, y: scrollViewTop,
-                                   width: w,
-                                   height: view.bounds.height - scrollViewTop)
-
-        // 重新布局所有子视图
-        let cardX = ScreenAdapter.scaleW(24)
-        let cardWidth = w - ScreenAdapter.scaleW(48)
-
-        logoView.frame = CGRect(x: cardX, y: ScreenAdapter.scaleH(20),
-                                 width: ScreenAdapter.scaleH(48), height: ScreenAdapter.scaleH(48))
-        titleLabel.frame = CGRect(x: logoView.frame.maxX + ScreenAdapter.scaleW(12),
-                                   y: ScreenAdapter.scaleH(24),
-                                   width: cardWidth - ScreenAdapter.scaleH(48) - ScreenAdapter.scaleW(12),
-                                   height: ScreenAdapter.scaleH(28))
-        subtitleLabel.frame = CGRect(x: titleLabel.frame.minX,
-                                      y: titleLabel.frame.maxY + ScreenAdapter.scaleH(4),
-                                      width: titleLabel.frame.width,
-                                      height: ScreenAdapter.scaleH(20))
-
-        let headerBottom = logoView.frame.maxY + ScreenAdapter.scaleH(20)
-        let cardY = headerBottom + ScreenAdapter.scaleH(20)
-        glassCard.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: ScreenAdapter.scaleH(180))
-
-        segmentedControl.frame = CGRect(x: ScreenAdapter.scaleW(20), y: ScreenAdapter.scaleH(20),
-                                         width: cardWidth - ScreenAdapter.scaleW(40),
-                                         height: ScreenAdapter.scaleH(44))
-
-        let fieldY = segmentedControl.frame.maxY + ScreenAdapter.scaleH(16)
-        let fieldHeight = ScreenAdapter.scaleH(52)
-        let fieldWidth = cardWidth - ScreenAdapter.scaleW(40)
-        let fieldX = ScreenAdapter.scaleW(20)
-        phoneField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
-        emailField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
-
-        agreementCheckBox.frame = CGRect(x: cardX, y: glassCard.frame.maxY + ScreenAdapter.scaleH(16),
-                                          width: ScreenAdapter.scaleW(18), height: ScreenAdapter.scaleW(18))
-        agreementLabel.sizeToFit()
-        agreementLabel.frame = CGRect(x: agreementCheckBox.frame.maxX + ScreenAdapter.scaleW(3),
-                                       y: agreementCheckBox.frame.minY,
-                                       width: agreementLabel.frame.width,
-                                       height: ScreenAdapter.scaleW(18))
-        userAgreementButton.sizeToFit()
-        userAgreementButton.frame = CGRect(x: agreementLabel.frame.maxX,
-                                            y: agreementLabel.frame.minY,
-                                            width: userAgreementButton.frame.width,
-                                            height: ScreenAdapter.scaleW(18))
-        privacyPolicyButton.sizeToFit()
-        privacyPolicyButton.frame = CGRect(x: userAgreementButton.frame.maxX,
-                                            y: agreementLabel.frame.minY,
-                                            width: privacyPolicyButton.frame.width,
-                                            height: ScreenAdapter.scaleW(18))
-
-        nextButton.frame = CGRect(x: cardX,
-                                   y: agreementCheckBox.frame.maxY + ScreenAdapter.scaleH(20),
-                                   width: cardWidth,
-                                   height: ScreenAdapter.scaleH(52))
-
-        bottomAgreementLabel.frame = CGRect(x: cardX,
-                                             y: nextButton.frame.maxY + ScreenAdapter.scaleH(20),
-                                             width: cardWidth,
-                                             height: ScreenAdapter.scaleH(30))
-
-        let contentHeight = bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40)
-        contentView.frame = CGRect(x: 0, y: 0, width: w, height: contentHeight)
-        scrollView.contentSize = CGSize(width: w, height: contentHeight)
+        scrollView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+        contentView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.width.equalTo(scrollView)
+        }
+        mainStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+        }
+        nextButton.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+        bottomAgreementLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
+        }
     }
 
     // MARK: - 交互
@@ -1848,7 +1798,6 @@ class LoginViewController: UIViewController {
         // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
-        logoView.translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.text = "登录"
         titleLabel.font = ScreenAdapter.mediumFont(22)
@@ -1863,26 +1812,25 @@ class LoginViewController: UIViewController {
         titleStack.axis = .vertical
         titleStack.spacing = ScreenAdapter.scaleH(4)
         titleStack.alignment = .leading
-        titleStack.translatesAutoresizingMaskIntoConstraints = false
 
         // 整体：左logo + 右标题
         let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
         headerStack.axis = .horizontal
         headerStack.spacing = ScreenAdapter.scaleW(12)
         headerStack.alignment = .center
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
 
         let headerContainer = UIView()
-        headerContainer.translatesAutoresizingMaskIntoConstraints = false
         headerContainer.addSubview(headerStack)
-        NSLayoutConstraint.activate([
-            headerStack.topAnchor.constraint(equalTo: headerContainer.topAnchor),
-            headerStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor),
-            headerStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor),
-            headerStack.bottomAnchor.constraint(equalTo: headerContainer.bottomAnchor),
-            logoView.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48)),
-            logoView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48))
-        ])
+        headerStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+
+        logoView.snp.makeConstraints { make in
+            make.width.height.equalTo(ScreenAdapter.scaleH(48))
+        }
+
+        // 玻璃卡片
+        view.addSubview(glassCard)
 
         // 分段控件
         segmentedControl.onSelected = { [weak self] index in
@@ -1922,55 +1870,55 @@ class LoginViewController: UIViewController {
         forgotPwdButton.setTitleColor(.themePrimary, for: .normal)
         forgotPwdButton.contentHorizontalAlignment = .right
         forgotPwdButton.addTarget(self, action: #selector(goForgotPassword), for: .touchUpInside)
-        forgotPwdButton.translatesAutoresizingMaskIntoConstraints = false
         glassCard.addSubview(forgotPwdButton)
 
         // 卡片内布局
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        emailInputField.translatesAutoresizingMaskIntoConstraints = false
-        accountDisplayField.translatesAutoresizingMaskIntoConstraints = false
-        passwordField.translatesAutoresizingMaskIntoConstraints = false
-        codeField.translatesAutoresizingMaskIntoConstraints = false
-
-        var cardConstraints: [NSLayoutConstraint] = [
-            segmentedControl.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: ScreenAdapter.scaleH(20)),
-            segmentedControl.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-            segmentedControl.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
-        ]
-
-        if isEmail {
-            cardConstraints.append(contentsOf: [
-                emailInputField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
-                emailInputField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                emailInputField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-                passwordField.topAnchor.constraint(equalTo: emailInputField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
-                passwordField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                passwordField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-                codeField.topAnchor.constraint(equalTo: emailInputField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
-                codeField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                codeField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
-            ])
-        } else {
-            cardConstraints.append(contentsOf: [
-                accountDisplayField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
-                accountDisplayField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                accountDisplayField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-                passwordField.topAnchor.constraint(equalTo: accountDisplayField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
-                passwordField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                passwordField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-                codeField.topAnchor.constraint(equalTo: accountDisplayField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
-                codeField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-                codeField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
-            ])
+        segmentedControl.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
         }
 
-        cardConstraints.append(contentsOf: [
-            forgotPwdButton.topAnchor.constraint(equalTo: passwordField.bottomAnchor, constant: ScreenAdapter.scaleH(10)),
-            forgotPwdButton.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            forgotPwdButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(20)),
-            forgotPwdButton.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
-        ])
-        NSLayoutConstraint.activate(cardConstraints)
+        if isEmail {
+            emailInputField.snp.makeConstraints { make in
+                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            passwordField.snp.makeConstraints { make in
+                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            codeField.snp.makeConstraints { make in
+                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+        } else {
+            accountDisplayField.snp.makeConstraints { make in
+                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            passwordField.snp.makeConstraints { make in
+                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+            codeField.snp.makeConstraints { make in
+                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            }
+        }
+
+        forgotPwdButton.snp.makeConstraints { make in
+            make.top.equalTo(passwordField.snp.bottom).offset(ScreenAdapter.scaleH(10))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(ScreenAdapter.scaleH(20))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
+        }
 
         // 登录按钮
         loginButton.setTitle("登录", for: .normal)
@@ -1982,7 +1930,6 @@ class LoginViewController: UIViewController {
         loginButton.isEnabled = false
         loginButton.addTarget(self, action: #selector(doLogin), for: .touchUpInside)
         loginButton.addPressScaleEffect()
-        loginButton.translatesAutoresizingMaskIntoConstraints = false
 
         // 底部注册提示
         registerTipLabel.text = "还没有账号？去注册"
@@ -1990,7 +1937,6 @@ class LoginViewController: UIViewController {
         registerTipLabel.textColor = .secondaryLabel
         registerTipLabel.textAlignment = .center
         registerTipLabel.isUserInteractionEnabled = true
-        registerTipLabel.translatesAutoresizingMaskIntoConstraints = false
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goRegister))
         registerTipLabel.addGestureRecognizer(tapGesture)
 
@@ -1998,11 +1944,9 @@ class LoginViewController: UIViewController {
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
         scrollView.keyboardDismissMode = .interactive
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
         let contentView = UIView()
-        contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
 
         let mainStack = UIStackView(arrangedSubviews: [
@@ -2011,32 +1955,30 @@ class LoginViewController: UIViewController {
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
         mainStack.alignment = .fill
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(mainStack)
         contentView.addSubview(registerTipLabel)
 
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: ScreenAdapter.scaleH(16)),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-
-            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: ScreenAdapter.scaleH(20)),
-            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
-            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
-
-            loginButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)),
-
-            registerTipLabel.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: ScreenAdapter.scaleH(20)),
-            registerTipLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            registerTipLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
-        ])
+        scrollView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+        contentView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.width.equalTo(scrollView)
+        }
+        mainStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+        }
+        loginButton.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(52))
+        }
+        registerTipLabel.snp.makeConstraints { make in
+            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.centerX.equalToSuperview()
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
+        }
 
         updateLoginButtonState()
     }
