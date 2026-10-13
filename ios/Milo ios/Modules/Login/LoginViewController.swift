@@ -41,44 +41,29 @@ class GlassSegmentedControl: UIView {
     private func setupUI() {
         layer.cornerRadius = ScreenAdapter.scaleH(22)
         layer.masksToBounds = true
-        translatesAutoresizingMaskIntoConstraints = false
+        translatesAutoresizingMaskIntoConstraints = true
 
         if #available(iOS 15.0, *) {
-            // 液态玻璃背景
+            // 液态玻璃背景 - autoresizing充满
             guard let glassView = liquidGlassView else { return }
+            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                glassView.topAnchor.constraint(equalTo: topAnchor),
-                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
         } else {
-            // 降级：普通毛玻璃
+            // 降级：普通毛玻璃 - autoresizing充满
+            blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            blurView.frame = bounds
             addSubview(blurView)
             sendSubviewToBack(blurView)
-            blurView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                blurView.topAnchor.constraint(equalTo: topAnchor),
-                blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
 
             // 白色半透明背景叠加，增加玻璃质感
             let overlayView = UIView()
             overlayView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+            overlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlayView.frame = bounds
             addSubview(overlayView)
             sendSubviewToBack(overlayView)
-            overlayView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                overlayView.topAnchor.constraint(equalTo: topAnchor),
-                overlayView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                overlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                overlayView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
         }
 
         // 选中滑块
@@ -94,6 +79,8 @@ class GlassSegmentedControl: UIView {
         stackView.axis = .horizontal
         stackView.distribution = .fillEqually
         stackView.alignment = .fill
+        stackView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        stackView.frame = bounds
         addSubview(stackView)
 
         for (index, title) in items.enumerated() {
@@ -105,14 +92,6 @@ class GlassSegmentedControl: UIView {
             buttons.append(btn)
             stackView.addArrangedSubview(btn)
         }
-
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
         updateSelection(animated: false)
     }
@@ -204,32 +183,22 @@ class GlassCardView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 8)
         layer.shadowRadius = 24
         layer.shadowOpacity = 0.08
-        translatesAutoresizingMaskIntoConstraints = false
+        translatesAutoresizingMaskIntoConstraints = true
 
         if #available(iOS 15.0, *) {
-            // 使用液态玻璃效果
+            // 使用液态玻璃效果 - autoresizing充满
             guard let glassView = liquidGlassView else { return }
+            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                glassView.topAnchor.constraint(equalTo: topAnchor),
-                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
         } else {
             // 降级：普通毛玻璃
             backgroundColor = UIColor.white.withAlphaComponent(0.6)
+            blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            blurView.frame = bounds
             addSubview(blurView)
             sendSubviewToBack(blurView)
-            blurView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                blurView.topAnchor.constraint(equalTo: topAnchor),
-                blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
             blurView.layer.cornerRadius = ScreenAdapter.scaleW(28)
             blurView.layer.masksToBounds = true
         }
@@ -276,21 +245,16 @@ class CapsuleTextField: UIView {
     }
 
     private func setupUI() {
-        translatesAutoresizingMaskIntoConstraints = false
+        translatesAutoresizingMaskIntoConstraints = true
 
         if #available(iOS 15.0, *) {
-            // 液态玻璃背景
+            // 液态玻璃背景 - autoresizing充满
             backgroundColor = .clear
             guard let glassView = liquidGlassView else { return }
+            glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            glassView.frame = bounds
             addSubview(glassView)
             sendSubviewToBack(glassView)
-            glassView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                glassView.topAnchor.constraint(equalTo: topAnchor),
-                glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-                glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
-            ])
         } else {
             // 降级：普通白色背景
             backgroundColor = UIColor.white
@@ -305,16 +269,20 @@ class CapsuleTextField: UIView {
         textField.font = ScreenAdapter.font(16)
         textField.textColor = .label
         textField.backgroundColor = .clear
+        textField.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        textField.frame = CGRect(x: ScreenAdapter.scaleW(20), y: 0,
+                                 width: max(0, bounds.width - ScreenAdapter.scaleW(40)),
+                                 height: bounds.height)
         textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
+    }
 
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            textField.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        textField.frame = CGRect(x: ScreenAdapter.scaleW(20), y: 0,
+                                 width: max(0, bounds.width - ScreenAdapter.scaleW(40)),
+                                 height: bounds.height)
     }
 
     override var intrinsicContentSize: CGSize {
@@ -412,7 +380,7 @@ class CapsulePhoneField: UIView {
     }
 
     private func setupUI() {
-        translatesAutoresizingMaskIntoConstraints = false
+        translatesAutoresizingMaskIntoConstraints = true
         backgroundColor = UIColor.white
         layer.cornerRadius = ScreenAdapter.scaleH(24)
         layer.masksToBounds = true
@@ -422,9 +390,16 @@ class CapsulePhoneField: UIView {
         countryCodeButton.setTitle("+86", for: .normal)
         countryCodeButton.setTitleColor(.label, for: .normal)
         countryCodeButton.titleLabel?.font = ScreenAdapter.font(16)
+        countryCodeButton.frame = CGRect(x: ScreenAdapter.scaleW(16), y: 0,
+                                          width: ScreenAdapter.scaleW(50),
+                                          height: ScreenAdapter.scaleH(52))
         addSubview(countryCodeButton)
 
         dividerView.backgroundColor = UIColor(red: 0.85, green: 0.86, blue: 0.88, alpha: 1.0)
+        dividerView.frame = CGRect(x: countryCodeButton.frame.maxX + ScreenAdapter.scaleW(8),
+                                    y: (ScreenAdapter.scaleH(52) - ScreenAdapter.scaleH(20)) / 2,
+                                    width: 1,
+                                    height: ScreenAdapter.scaleH(20))
         addSubview(dividerView)
 
         textField.borderStyle = .none
@@ -432,25 +407,27 @@ class CapsulePhoneField: UIView {
         textField.textColor = .label
         textField.keyboardType = .numberPad
         textField.backgroundColor = .clear
+        textField.frame = CGRect(x: dividerView.frame.maxX + ScreenAdapter.scaleW(12),
+                                  y: 0,
+                                  width: max(0, 300 - ScreenAdapter.scaleW(20) - dividerView.frame.maxX - ScreenAdapter.scaleW(12)),
+                                  height: ScreenAdapter.scaleH(52))
         textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
         textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
         addSubview(textField)
+    }
 
-        countryCodeButton.translatesAutoresizingMaskIntoConstraints = false
-        dividerView.translatesAutoresizingMaskIntoConstraints = false
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            countryCodeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ScreenAdapter.scaleW(16)),
-            countryCodeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            countryCodeButton.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(50)),
-            dividerView.leadingAnchor.constraint(equalTo: countryCodeButton.trailingAnchor, constant: ScreenAdapter.scaleW(8)),
-            dividerView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            dividerView.widthAnchor.constraint(equalToConstant: 1),
-            dividerView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(20)),
-            textField.leadingAnchor.constraint(equalTo: dividerView.trailingAnchor, constant: ScreenAdapter.scaleW(12)),
-            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            textField.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let h = bounds.height
+        countryCodeButton.frame = CGRect(x: ScreenAdapter.scaleW(16), y: 0,
+                                          width: ScreenAdapter.scaleW(50), height: h)
+        dividerView.frame = CGRect(x: countryCodeButton.frame.maxX + ScreenAdapter.scaleW(8),
+                                    y: (h - ScreenAdapter.scaleH(20)) / 2,
+                                    width: 1, height: ScreenAdapter.scaleH(20))
+        textField.frame = CGRect(x: dividerView.frame.maxX + ScreenAdapter.scaleW(12),
+                                  y: 0,
+                                  width: bounds.width - ScreenAdapter.scaleW(20) - dividerView.frame.maxX - ScreenAdapter.scaleW(12),
+                                  height: h)
     }
 
     override var intrinsicContentSize: CGSize {
@@ -1378,132 +1355,130 @@ class EntryLoginViewController: UIViewController {
         ]
         gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
         gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
-        let gradientView = UIView()
+        let gradientView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: ScreenAdapter.scaleH(300)))
+        gradientView.autoresizingMask = [.flexibleWidth]
         gradientView.layer.addSublayer(gradientLayer)
-        gradientView.translatesAutoresizingMaskIntoConstraints = false
+        gradientLayer.frame = gradientView.bounds
         view.addSubview(gradientView)
-        NSLayoutConstraint.activate([
-            gradientView.topAnchor.constraint(equalTo: view.topAnchor),
-            gradientView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            gradientView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            gradientView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(300))
-        ])
-        DispatchQueue.main.async {
-            gradientLayer.frame = gradientView.bounds
-        }
 
-        // 顶部：左侧Logo + 右侧标题+副标题
+        // 整体用 ScrollView + 手动布局
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.keyboardDismissMode = .interactive
+        scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        scrollView.frame = CGRect(x: 0, y: ScreenAdapter.scaleH(16),
+                                   width: view.bounds.width,
+                                   height: view.bounds.height - ScreenAdapter.scaleH(16))
+        view.addSubview(scrollView)
+        self.scrollView = scrollView
+
+        let contentView = UIView()
+        contentView.autoresizingMask = [.flexibleWidth]
+        scrollView.addSubview(contentView)
+        self.contentView = contentView
+
+        // Logo + 标题区域
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
+        logoView.frame = CGRect(x: ScreenAdapter.scaleW(24), y: ScreenAdapter.scaleH(20),
+                                 width: ScreenAdapter.scaleH(48), height: ScreenAdapter.scaleH(48))
+        contentView.addSubview(logoView)
 
         titleLabel.text = "欢迎使用Milo"
         titleLabel.font = ScreenAdapter.mediumFont(22)
         titleLabel.textColor = .label
+        titleLabel.frame = CGRect(x: logoView.frame.maxX + ScreenAdapter.scaleW(12),
+                                   y: ScreenAdapter.scaleH(24),
+                                   width: view.bounds.width - ScreenAdapter.scaleW(48) - ScreenAdapter.scaleW(12),
+                                   height: ScreenAdapter.scaleH(28))
+        contentView.addSubview(titleLabel)
 
         subtitleLabel.text = "输入手机号或者邮箱继续"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.frame = CGRect(x: titleLabel.frame.minX,
+                                      y: titleLabel.frame.maxY + ScreenAdapter.scaleH(4),
+                                      width: titleLabel.frame.width,
+                                      height: ScreenAdapter.scaleH(20))
+        contentView.addSubview(subtitleLabel)
 
-        // 右侧标题+副标题垂直排列
-        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        titleStack.axis = .vertical
-        titleStack.spacing = ScreenAdapter.scaleH(4)
-        titleStack.alignment = .leading
-
-        // 整体：左logo + 右标题
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
-        headerStack.axis = .horizontal
-        headerStack.spacing = ScreenAdapter.scaleW(12)
-        headerStack.alignment = .center
-
-        let headerContainer = UIView()
-        headerContainer.addSubview(headerStack)
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            headerStack.topAnchor.constraint(equalTo: headerContainer.topAnchor),
-            headerStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor),
-            headerStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor),
-            headerStack.bottomAnchor.constraint(equalTo: headerContainer.bottomAnchor)
-        ])
-
-        logoView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            logoView.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48)),
-            logoView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48))
-        ])
+        let headerBottom = logoView.frame.maxY + ScreenAdapter.scaleH(20)
 
         // 玻璃卡片
-        view.addSubview(glassCard)
+        let cardWidth = view.bounds.width - ScreenAdapter.scaleW(48)
+        let cardX = ScreenAdapter.scaleW(24)
+        let cardY = headerBottom + ScreenAdapter.scaleH(20)
+        glassCard.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: ScreenAdapter.scaleH(180))
+        contentView.addSubview(glassCard)
 
         // 分段控件
         segmentedControl.onSelected = { [weak self] index in
             self?.switchMode(index)
         }
+        segmentedControl.frame = CGRect(x: ScreenAdapter.scaleW(20), y: ScreenAdapter.scaleH(20),
+                                         width: cardWidth - ScreenAdapter.scaleW(40),
+                                         height: ScreenAdapter.scaleH(44))
         glassCard.addSubview(segmentedControl)
 
         // 输入框
+        let fieldY = segmentedControl.frame.maxY + ScreenAdapter.scaleH(16)
+        let fieldHeight = ScreenAdapter.scaleH(52)
+        let fieldWidth = cardWidth - ScreenAdapter.scaleW(40)
+        let fieldX = ScreenAdapter.scaleW(20)
+
         phoneField.placeholder = "请输入手机号"
         phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
+        phoneField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
+        glassCard.addSubview(phoneField)
 
         emailField.placeholder = "请输入邮箱地址"
         emailField.textField.keyboardType = .emailAddress
         emailField.textField.autocapitalizationType = .none
         emailField.isHidden = true
         emailField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-
-        glassCard.addSubview(phoneField)
+        emailField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
         glassCard.addSubview(emailField)
-
-        // 卡片内布局
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        phoneField.translatesAutoresizingMaskIntoConstraints = false
-        emailField.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            segmentedControl.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: ScreenAdapter.scaleH(20)),
-            segmentedControl.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-            segmentedControl.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            phoneField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
-            phoneField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-            phoneField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            phoneField.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20)),
-            emailField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
-            emailField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
-            emailField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
-            emailField.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
-        ])
 
         // 协议勾选行（卡片外）
         agreementCheckBox.setImage(UIImage(systemName: "circle"), for: .normal)
         agreementCheckBox.setImage(UIImage(systemName: "checkmark.circle.fill"), for: .selected)
         agreementCheckBox.tintColor = .themePrimary
         agreementCheckBox.addTarget(self, action: #selector(toggleAgreement), for: .touchUpInside)
+        agreementCheckBox.frame = CGRect(x: cardX, y: glassCard.frame.maxY + ScreenAdapter.scaleH(16),
+                                          width: ScreenAdapter.scaleW(18), height: ScreenAdapter.scaleW(18))
+        contentView.addSubview(agreementCheckBox)
 
         agreementLabel.text = "我已阅读并同意"
         agreementLabel.font = ScreenAdapter.font(13)
         agreementLabel.textColor = .secondaryLabel
+        agreementLabel.sizeToFit()
+        agreementLabel.frame = CGRect(x: agreementCheckBox.frame.maxX + ScreenAdapter.scaleW(3),
+                                       y: agreementCheckBox.frame.minY,
+                                       width: agreementLabel.frame.width,
+                                       height: ScreenAdapter.scaleW(18))
+        contentView.addSubview(agreementLabel)
 
         userAgreementButton.setTitle("《用户协议》", for: .normal)
         userAgreementButton.titleLabel?.font = ScreenAdapter.font(13)
         userAgreementButton.setTitleColor(.themePrimary, for: .normal)
         userAgreementButton.addTarget(self, action: #selector(openUserAgreement), for: .touchUpInside)
+        userAgreementButton.sizeToFit()
+        userAgreementButton.frame = CGRect(x: agreementLabel.frame.maxX,
+                                            y: agreementLabel.frame.minY,
+                                            width: userAgreementButton.frame.width,
+                                            height: ScreenAdapter.scaleW(18))
+        contentView.addSubview(userAgreementButton)
 
         privacyPolicyButton.setTitle("《隐私政策》", for: .normal)
         privacyPolicyButton.titleLabel?.font = ScreenAdapter.font(13)
         privacyPolicyButton.setTitleColor(.themePrimary, for: .normal)
         privacyPolicyButton.addTarget(self, action: #selector(openPrivacyPolicy), for: .touchUpInside)
-
-        let agreementStack = UIStackView(arrangedSubviews: [
-            agreementCheckBox, agreementLabel, userAgreementButton, privacyPolicyButton
-        ])
-        agreementStack.axis = .horizontal
-        agreementStack.spacing = ScreenAdapter.scaleW(3)
-        agreementStack.alignment = .center
-
-        agreementCheckBox.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            agreementCheckBox.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(18)),
-            agreementCheckBox.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleW(18))
-        ])
+        privacyPolicyButton.sizeToFit()
+        privacyPolicyButton.frame = CGRect(x: userAgreementButton.frame.maxX,
+                                            y: agreementLabel.frame.minY,
+                                            width: privacyPolicyButton.frame.width,
+                                            height: ScreenAdapter.scaleW(18))
+        contentView.addSubview(privacyPolicyButton)
 
         // 下一步按钮
         nextButton.setTitle("下一步", for: .normal)
@@ -1514,6 +1489,11 @@ class EntryLoginViewController: UIViewController {
         nextButton.alpha = 0.5
         nextButton.isEnabled = false
         nextButton.addTarget(self, action: #selector(loginOrRegister), for: .touchUpInside)
+        nextButton.frame = CGRect(x: cardX,
+                                   y: agreementCheckBox.frame.maxY + ScreenAdapter.scaleH(20),
+                                   width: cardWidth,
+                                   height: ScreenAdapter.scaleH(52))
+        contentView.addSubview(nextButton)
 
         // 底部小字
         bottomAgreementLabel.text = "登录即表示同意《用户协议》和《隐私政策》"
@@ -1521,58 +1501,93 @@ class EntryLoginViewController: UIViewController {
         bottomAgreementLabel.textColor = .tertiaryLabel
         bottomAgreementLabel.textAlignment = .center
         bottomAgreementLabel.numberOfLines = 0
-
-        // 整体布局
-        let scrollView = UIScrollView()
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.keyboardDismissMode = .interactive
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(scrollView)
-
-        let contentView = UIView()
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(contentView)
-
-        let mainStack = UIStackView(arrangedSubviews: [
-            headerContainer, glassCard, agreementStack, nextButton
-        ])
-        mainStack.axis = .vertical
-        mainStack.spacing = ScreenAdapter.scaleH(20)
-        mainStack.alignment = .fill
-        contentView.addSubview(mainStack)
+        bottomAgreementLabel.frame = CGRect(x: ScreenAdapter.scaleW(24),
+                                             y: nextButton.frame.maxY + ScreenAdapter.scaleH(20),
+                                             width: cardWidth,
+                                             height: ScreenAdapter.scaleH(30))
         contentView.addSubview(bottomAgreementLabel)
 
-        // ScrollView 约束
-        let guide = view.safeAreaLayoutGuide
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: ScreenAdapter.scaleH(16)),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
+        // 设置 contentSize
+        contentView.frame = CGRect(x: 0, y: 0, width: view.bounds.width,
+                                    height: bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40))
+        scrollView.contentSize = CGSize(width: view.bounds.width,
+                                         height: bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40))
+    }
 
-        // ContentView 约束 (使用 contentLayoutGuide 确定内容尺寸，frameLayoutGuide 确定宽度)
-        NSLayoutConstraint.activate([
-            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
-        ])
+    // 用于手动布局的引用
+    private var scrollView: UIScrollView!
+    private var contentView: UIView!
 
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        nextButton.translatesAutoresizingMaskIntoConstraints = false
-        bottomAgreementLabel.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: ScreenAdapter.scaleH(20)),
-            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
-            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
-            nextButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)),
-            bottomAgreementLabel.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: ScreenAdapter.scaleH(20)),
-            bottomAgreementLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
-            bottomAgreementLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
-            bottomAgreementLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
-        ])
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 重新计算布局，适配屏幕旋转
+        let w = view.bounds.width
+        let scrollViewTop = ScreenAdapter.scaleH(16) + view.safeAreaInsets.top
+        scrollView.frame = CGRect(x: 0, y: scrollViewTop,
+                                   width: w,
+                                   height: view.bounds.height - scrollViewTop)
+
+        // 重新布局所有子视图
+        let cardX = ScreenAdapter.scaleW(24)
+        let cardWidth = w - ScreenAdapter.scaleW(48)
+
+        logoView.frame = CGRect(x: cardX, y: ScreenAdapter.scaleH(20),
+                                 width: ScreenAdapter.scaleH(48), height: ScreenAdapter.scaleH(48))
+        titleLabel.frame = CGRect(x: logoView.frame.maxX + ScreenAdapter.scaleW(12),
+                                   y: ScreenAdapter.scaleH(24),
+                                   width: cardWidth - ScreenAdapter.scaleH(48) - ScreenAdapter.scaleW(12),
+                                   height: ScreenAdapter.scaleH(28))
+        subtitleLabel.frame = CGRect(x: titleLabel.frame.minX,
+                                      y: titleLabel.frame.maxY + ScreenAdapter.scaleH(4),
+                                      width: titleLabel.frame.width,
+                                      height: ScreenAdapter.scaleH(20))
+
+        let headerBottom = logoView.frame.maxY + ScreenAdapter.scaleH(20)
+        let cardY = headerBottom + ScreenAdapter.scaleH(20)
+        glassCard.frame = CGRect(x: cardX, y: cardY, width: cardWidth, height: ScreenAdapter.scaleH(180))
+
+        segmentedControl.frame = CGRect(x: ScreenAdapter.scaleW(20), y: ScreenAdapter.scaleH(20),
+                                         width: cardWidth - ScreenAdapter.scaleW(40),
+                                         height: ScreenAdapter.scaleH(44))
+
+        let fieldY = segmentedControl.frame.maxY + ScreenAdapter.scaleH(16)
+        let fieldHeight = ScreenAdapter.scaleH(52)
+        let fieldWidth = cardWidth - ScreenAdapter.scaleW(40)
+        let fieldX = ScreenAdapter.scaleW(20)
+        phoneField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
+        emailField.frame = CGRect(x: fieldX, y: fieldY, width: fieldWidth, height: fieldHeight)
+
+        agreementCheckBox.frame = CGRect(x: cardX, y: glassCard.frame.maxY + ScreenAdapter.scaleH(16),
+                                          width: ScreenAdapter.scaleW(18), height: ScreenAdapter.scaleW(18))
+        agreementLabel.sizeToFit()
+        agreementLabel.frame = CGRect(x: agreementCheckBox.frame.maxX + ScreenAdapter.scaleW(3),
+                                       y: agreementCheckBox.frame.minY,
+                                       width: agreementLabel.frame.width,
+                                       height: ScreenAdapter.scaleW(18))
+        userAgreementButton.sizeToFit()
+        userAgreementButton.frame = CGRect(x: agreementLabel.frame.maxX,
+                                            y: agreementLabel.frame.minY,
+                                            width: userAgreementButton.frame.width,
+                                            height: ScreenAdapter.scaleW(18))
+        privacyPolicyButton.sizeToFit()
+        privacyPolicyButton.frame = CGRect(x: userAgreementButton.frame.maxX,
+                                            y: agreementLabel.frame.minY,
+                                            width: privacyPolicyButton.frame.width,
+                                            height: ScreenAdapter.scaleW(18))
+
+        nextButton.frame = CGRect(x: cardX,
+                                   y: agreementCheckBox.frame.maxY + ScreenAdapter.scaleH(20),
+                                   width: cardWidth,
+                                   height: ScreenAdapter.scaleH(52))
+
+        bottomAgreementLabel.frame = CGRect(x: cardX,
+                                             y: nextButton.frame.maxY + ScreenAdapter.scaleH(20),
+                                             width: cardWidth,
+                                             height: ScreenAdapter.scaleH(30))
+
+        let contentHeight = bottomAgreementLabel.frame.maxY + ScreenAdapter.scaleH(40)
+        contentView.frame = CGRect(x: 0, y: 0, width: w, height: contentHeight)
+        scrollView.contentSize = CGSize(width: w, height: contentHeight)
     }
 
     // MARK: - 交互
