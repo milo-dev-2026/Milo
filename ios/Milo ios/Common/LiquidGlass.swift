@@ -115,42 +115,28 @@ class LiquidGlassView: UIView {
         backgroundColor = .clear
         clipsToBounds = false
         layer.masksToBounds = false
+        translatesAutoresizingMaskIntoConstraints = true
 
-        // 1. 毛玻璃层
+        // 1. 毛玻璃层 - 用autoresizing充满父视图
         blurEffectView.effect = UIBlurEffect(style: blurStyle)
-        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        blurEffectView.frame = bounds
         addSubview(blurEffectView)
-        NSLayoutConstraint.activate([
-            blurEffectView.topAnchor.constraint(equalTo: topAnchor),
-            blurEffectView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            blurEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            blurEffectView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
-        // 2. 活力效果层（嵌套在毛玻璃内）
+        // 2. 活力效果层（嵌套在毛玻璃内）- 用autoresizing充满
         let vibrancyEffect = UIVibrancyEffect(blurEffect: UIBlurEffect(style: blurStyle), style: .label)
         vibrancyEffectView.effect = vibrancyEffect
-        vibrancyEffectView.translatesAutoresizingMaskIntoConstraints = false
+        vibrancyEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        vibrancyEffectView.frame = blurEffectView.contentView.bounds
         blurEffectView.contentView.addSubview(vibrancyEffectView)
-        NSLayoutConstraint.activate([
-            vibrancyEffectView.topAnchor.constraint(equalTo: blurEffectView.contentView.topAnchor),
-            vibrancyEffectView.leadingAnchor.constraint(equalTo: blurEffectView.contentView.leadingAnchor),
-            vibrancyEffectView.trailingAnchor.constraint(equalTo: blurEffectView.contentView.trailingAnchor),
-            vibrancyEffectView.bottomAnchor.constraint(equalTo: blurEffectView.contentView.bottomAnchor)
-        ])
 
-        // 3. 半透明色调叠加
+        // 3. 半透明色调叠加 - 用autoresizing充满
         tintOverlayView.backgroundColor = tintColorForGlass
-        tintOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        tintOverlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        tintOverlayView.frame = bounds
         addSubview(tintOverlayView)
         sendSubviewToBack(tintOverlayView)
         insertSubview(tintOverlayView, aboveSubview: blurEffectView)
-        NSLayoutConstraint.activate([
-            tintOverlayView.topAnchor.constraint(equalTo: topAnchor),
-            tintOverlayView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            tintOverlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            tintOverlayView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
         // 4. 顶部高光渐变
         highlightLayer.colors = [
@@ -169,17 +155,12 @@ class LiquidGlassView: UIView {
         borderLayer.frame = bounds
         layer.addSublayer(borderLayer)
 
-        // 6. 内容容器
+        // 6. 内容容器 - 用autoresizing充满
         contentContainer.backgroundColor = .clear
-        contentContainer.translatesAutoresizingMaskIntoConstraints = false
+        contentContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        contentContainer.frame = bounds
         addSubview(contentContainer)
         bringSubviewToFront(contentContainer)
-        NSLayoutConstraint.activate([
-            contentContainer.topAnchor.constraint(equalTo: topAnchor),
-            contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
-            contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
         // 初始设置
         updateCornerRadius()
@@ -188,6 +169,10 @@ class LiquidGlassView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        // 手动更新CALayer的frame，避免Auto Layout引擎介入
+        highlightLayer.frame = bounds
+        borderLayer.frame = bounds
+        updateCornerRadius()
         updateBorder()
         updateHighlight()
     }
@@ -422,37 +407,27 @@ class LiquidGlassButton: UIControl {
     private func setupUI() {
         backgroundColor = .clear
         clipsToBounds = false
+        translatesAutoresizingMaskIntoConstraints = true
 
-        // 玻璃背景
+        // 玻璃背景 - autoresizing充满
         glassView.cornerRadius = cornerRadius
         glassView.glassOpacity = 0.5
-        glassView.translatesAutoresizingMaskIntoConstraints = false
+        glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        glassView.frame = bounds
         addSubview(glassView)
-        NSLayoutConstraint.activate([
-            glassView.topAnchor.constraint(equalTo: topAnchor),
-            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
         // 内容栈
         contentStack.axis = .horizontal
         contentStack.alignment = .center
         contentStack.spacing = 6
         contentStack.isUserInteractionEnabled = false
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
         glassView.addContent(contentStack)
 
         // 图标
         iconView.contentMode = .scaleAspectFit
         iconView.tintColor = iconTintColor
         iconView.isHidden = true
-        iconView.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(iconView)
-        NSLayoutConstraint.activate([
-            iconView.widthAnchor.constraint(equalToConstant: 20),
-            iconView.heightAnchor.constraint(equalToConstant: 20)
-        ])
 
         // 标题
         titleLabel.text = title
@@ -462,18 +437,22 @@ class LiquidGlassButton: UIControl {
         titleLabel.isUserInteractionEnabled = false
         contentStack.addArrangedSubview(titleLabel)
 
-        NSLayoutConstraint.activate([
-            contentStack.centerXAnchor.constraint(equalTo: glassView.contentContainer.centerXAnchor),
-            contentStack.centerYAnchor.constraint(equalTo: glassView.contentContainer.centerYAnchor),
-            contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: glassView.contentContainer.leadingAnchor, constant: 12),
-            contentStack.trailingAnchor.constraint(lessThanOrEqualTo: glassView.contentContainer.trailingAnchor, constant: -12)
-        ])
-
         // 阴影
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.12
         layer.shadowOffset = CGSize(width: 0, height: 4)
         layer.shadowRadius = 8
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // 手动布局内容栈，居中
+        let stackSize = contentStack.systemLayoutSizeFitting(bounds.size)
+        let stackX = max(12, (bounds.width - stackSize.width) / 2)
+        let stackY = (bounds.height - stackSize.height) / 2
+        contentStack.frame = CGRect(x: stackX, y: stackY,
+                                     width: min(stackSize.width, bounds.width - 24),
+                                     height: stackSize.height)
     }
 
     private func updateIconConstraints() {
