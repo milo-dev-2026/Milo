@@ -1,4 +1,4 @@
-﻿import UIKit
+import UIKit
 import SnapKit
 import PhotosUI
 
@@ -1833,6 +1833,7 @@ class LoginViewController: UIViewController {
         // 顶部：左侧Logo + 右侧标题+副标题
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
+        logoView.translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.text = "登录"
         titleLabel.font = ScreenAdapter.mediumFont(22)
@@ -1847,25 +1848,26 @@ class LoginViewController: UIViewController {
         titleStack.axis = .vertical
         titleStack.spacing = ScreenAdapter.scaleH(4)
         titleStack.alignment = .leading
+        titleStack.translatesAutoresizingMaskIntoConstraints = false
 
         // 整体：左logo + 右标题
         let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
         headerStack.axis = .horizontal
         headerStack.spacing = ScreenAdapter.scaleW(12)
         headerStack.alignment = .center
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
 
         let headerContainer = UIView()
+        headerContainer.translatesAutoresizingMaskIntoConstraints = false
         headerContainer.addSubview(headerStack)
-        headerStack.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-
-        logoView.snp.makeConstraints { make in
-            make.width.height.equalTo(ScreenAdapter.scaleH(48))
-        }
-
-        // 玻璃卡片
-        view.addSubview(glassCard)
+        NSLayoutConstraint.activate([
+            headerStack.topAnchor.constraint(equalTo: headerContainer.topAnchor),
+            headerStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor),
+            headerStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor),
+            headerStack.bottomAnchor.constraint(equalTo: headerContainer.bottomAnchor),
+            logoView.widthAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48)),
+            logoView.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(48))
+        ])
 
         // 分段控件
         segmentedControl.onSelected = { [weak self] index in
@@ -1905,55 +1907,55 @@ class LoginViewController: UIViewController {
         forgotPwdButton.setTitleColor(.themePrimary, for: .normal)
         forgotPwdButton.contentHorizontalAlignment = .right
         forgotPwdButton.addTarget(self, action: #selector(goForgotPassword), for: .touchUpInside)
+        forgotPwdButton.translatesAutoresizingMaskIntoConstraints = false
         glassCard.addSubview(forgotPwdButton)
 
         // 卡片内布局
-        segmentedControl.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        emailInputField.translatesAutoresizingMaskIntoConstraints = false
+        accountDisplayField.translatesAutoresizingMaskIntoConstraints = false
+        passwordField.translatesAutoresizingMaskIntoConstraints = false
+        codeField.translatesAutoresizingMaskIntoConstraints = false
+
+        var cardConstraints: [NSLayoutConstraint] = [
+            segmentedControl.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: ScreenAdapter.scaleH(20)),
+            segmentedControl.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+            segmentedControl.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
+        ]
 
         if isEmail {
-            emailInputField.snp.makeConstraints { make in
-                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
-            passwordField.snp.makeConstraints { make in
-                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
-            codeField.snp.makeConstraints { make in
-                make.top.equalTo(emailInputField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
+            cardConstraints.append(contentsOf: [
+                emailInputField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
+                emailInputField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                emailInputField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+                passwordField.topAnchor.constraint(equalTo: emailInputField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
+                passwordField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                passwordField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+                codeField.topAnchor.constraint(equalTo: emailInputField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
+                codeField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                codeField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
+            ])
         } else {
-            accountDisplayField.snp.makeConstraints { make in
-                make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
-            passwordField.snp.makeConstraints { make in
-                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
-            codeField.snp.makeConstraints { make in
-                make.top.equalTo(accountDisplayField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            }
+            cardConstraints.append(contentsOf: [
+                accountDisplayField.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: ScreenAdapter.scaleH(16)),
+                accountDisplayField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                accountDisplayField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+                passwordField.topAnchor.constraint(equalTo: accountDisplayField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
+                passwordField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                passwordField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+                codeField.topAnchor.constraint(equalTo: accountDisplayField.bottomAnchor, constant: ScreenAdapter.scaleH(12)),
+                codeField.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: ScreenAdapter.scaleW(20)),
+                codeField.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20))
+            ])
         }
 
-        forgotPwdButton.snp.makeConstraints { make in
-            make.top.equalTo(passwordField.snp.bottom).offset(ScreenAdapter.scaleH(10))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.height.equalTo(ScreenAdapter.scaleH(20))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
+        cardConstraints.append(contentsOf: [
+            forgotPwdButton.topAnchor.constraint(equalTo: passwordField.bottomAnchor, constant: ScreenAdapter.scaleH(10)),
+            forgotPwdButton.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -ScreenAdapter.scaleW(20)),
+            forgotPwdButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(20)),
+            forgotPwdButton.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
+        ])
+        NSLayoutConstraint.activate(cardConstraints)
 
         // 登录按钮
         loginButton.setTitle("登录", for: .normal)
@@ -1965,6 +1967,7 @@ class LoginViewController: UIViewController {
         loginButton.isEnabled = false
         loginButton.addTarget(self, action: #selector(doLogin), for: .touchUpInside)
         loginButton.addPressScaleEffect()
+        loginButton.translatesAutoresizingMaskIntoConstraints = false
 
         // 底部注册提示
         registerTipLabel.text = "还没有账号？去注册"
@@ -1972,6 +1975,7 @@ class LoginViewController: UIViewController {
         registerTipLabel.textColor = .secondaryLabel
         registerTipLabel.textAlignment = .center
         registerTipLabel.isUserInteractionEnabled = true
+        registerTipLabel.translatesAutoresizingMaskIntoConstraints = false
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(goRegister))
         registerTipLabel.addGestureRecognizer(tapGesture)
 
@@ -1979,9 +1983,11 @@ class LoginViewController: UIViewController {
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
         scrollView.keyboardDismissMode = .interactive
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
         let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
 
         let mainStack = UIStackView(arrangedSubviews: [
@@ -1990,30 +1996,32 @@ class LoginViewController: UIViewController {
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
         mainStack.alignment = .fill
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(mainStack)
         contentView.addSubview(registerTipLabel)
 
-        scrollView.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
-            make.leading.trailing.bottom.equalToSuperview()
-        }
-        contentView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-            make.width.equalTo(scrollView)
-        }
-        mainStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-        }
-        loginButton.snp.makeConstraints { make in
-            make.height.equalTo(ScreenAdapter.scaleH(52))
-        }
-        registerTipLabel.snp.makeConstraints { make in
-            make.top.equalTo(mainStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
-            make.centerX.equalToSuperview()
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: ScreenAdapter.scaleH(16)),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: ScreenAdapter.scaleH(20)),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: ScreenAdapter.scaleW(24)),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -ScreenAdapter.scaleW(24)),
+
+            loginButton.heightAnchor.constraint(equalToConstant: ScreenAdapter.scaleH(52)),
+
+            registerTipLabel.topAnchor.constraint(equalTo: mainStack.bottomAnchor, constant: ScreenAdapter.scaleH(20)),
+            registerTipLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            registerTipLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -ScreenAdapter.scaleH(20))
+        ])
 
         updateLoginButtonState()
     }
