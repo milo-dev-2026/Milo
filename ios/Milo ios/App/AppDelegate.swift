@@ -9,72 +9,81 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // 0. 安装布局引擎保护，必须早于任何视图创建。
-        // iOS 26/27 在 Core Animation 布局过程中激活约束会触发
-        // -[NSISEngine setShouldIntegralize:] 重入断言 -> SIGABRT 闪退。
+        // 0. 安装布局引擎保护（必须早于任何视图创建）
         LayoutEngineGuard.install()
 
-        // 1. 最早初始化崩溃日志捕获
+        // 1. 崩溃日志
         _ = CrashLogger.shared
-        CrashLogger.shared.log("didFinishLaunchingWithOptions started")
+        CrashLogger.shared.log("[Boot] didFinishLaunching start")
 
-        // 1. 全局主题配置
-        CrashLogger.shared.log("Step 1: setupGlobalTheme")
+        // 2. 全局主题外观（UIAppearance 很快，不涉及视图创建，可以在启动期做）
         setupGlobalTheme()
-        CrashLogger.shared.log("Step 1: done")
+        CrashLogger.shared.log("[Boot] setupGlobalTheme done")
 
-        // 2. 创建 window
-        CrashLogger.shared.log("Step 2: creating window")
+        // 3. 创建 window，先用最轻量的空白根控制器
+        //    这样 didFinishLaunching 能尽快返回，避免 scene-create watchdog
         let mainWindow = UIWindow(frame: UIScreen.main.bounds)
         mainWindow.backgroundColor = .themeBackground
         self.window = mainWindow
-        CrashLogger.shared.log("Step 2: done")
 
-        // 3. 创建根控制器并显示窗口。
-        // 布局引擎保护（LayoutEngineGuard）已在第 0 步安装，它会拦截布局过程中
-        // 的约束激活并推迟到下一个 runloop，因此无需预加载整棵视图树 — 那样
-        // 会把所有 tab / 子控制器的 viewDidLoad 集中到启动期执行，耗时超过
-        // 20s 触发 watchdog (0x8BADF00D)。
-        // 现在的策略：启动时只加载首屏视图，其余 VC 懒加载，LayoutEngineGuard
-        // 兜底防止 iOS 27 NSISEngine 重入崩溃。
+        let placeholder = UIViewController()
+        placeholder.view.backgroundColor = .themeBackground
+        mainWindow.rootViewController = placeholder
+        mainWindow.makeKeyAndVisible()
+        CrashLogger.shared.log("[Boot] makeKeyAndVisible done (placeholder)")
+
+        // 4. 下一个 runloop 再切换到真正的根控制器
+        //    此时 scene-create 看门狗阶段已过，有充足时间初始化
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            CrashLogger.shared.log("[Boot] switching to real root VC")
+            self.switchToRealRootController(in: mainWindow)
+            CrashLogger.shared.log("[Boot] real root VC set")
+
+            // 5. 首屏显示后再延迟初始化 SDK
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self = self else { return }
+                CrashLogger.shared.log("[Boot] delayed SDK init starting")
+                self.setupKeyboardManager()
+                self.registerPushNotification(application)
+                self.setupAppLockCheck()
+                self.setupAMapPrivacy()
+                COSUploadManager.shared.setup()
+                CrashLogger.shared.log("[Boot] all SDK init complete")
+            }
+        }
+
+        CrashLogger.shared.log("[Boot] didFinishLaunching returning true")
+        return true
+    }
+
+    /// 切换到真正的根控制器（登录页 或 主界面）
+    private func switchToRealRootController(in window: UIWindow) {
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-        CrashLogger.shared.log("Step 3: uid.isEmpty=\(uid.isEmpty)")
+        CrashLogger.shared.log("[Boot] uid.isEmpty=\(uid.isEmpty)")
+
         let rootVC: UIViewController
         if uid.isEmpty {
-            CrashLogger.shared.log("Step 3: creating EntryLoginViewController")
+            CrashLogger.shared.log("[Boot] -> EntryLoginViewController")
             let vc = EntryLoginViewController()
             rootVC = BaseNavigationController(rootViewController: vc)
         } else {
-            CrashLogger.shared.log("Step 3: creating MainTabBarController")
+            CrashLogger.shared.log("[Boot] -> MainTabBarController")
             rootVC = MainTabBarController()
+
+            // IM 连接放后台队列，不阻塞主线程
             DispatchQueue.global(qos: .userInitiated).async {
-                CrashLogger.shared.log("Step 3 bg: IMManager connect")
+                CrashLogger.shared.log("[Boot] bg: IMManager connect")
                 IMManager.shared.connect()
-                CrashLogger.shared.log("Step 3 bg: DataSyncManager sync")
+                CrashLogger.shared.log("[Boot] bg: DataSyncManager sync")
                 DataSyncManager.shared.syncAll()
             }
         }
 
-        // 4. 显示窗口
-        CrashLogger.shared.log("Step 4: makeKeyAndVisible")
-        mainWindow.rootViewController = rootVC
-        mainWindow.makeKeyAndVisible()
-        CrashLogger.shared.log("Step 4: done")
-
-        // 6. 延迟初始化 SDK
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            CrashLogger.shared.log("Step 6: delayed SDK init starting")
-            self.setupKeyboardManager()
-            self.registerPushNotification(application)
-            self.setupAppLockCheck()
-            self.setupAMapPrivacy()
-            CrashLogger.shared.log("Step 6: COSUploadManager setup")
-            COSUploadManager.shared.setup()
-            CrashLogger.shared.log("Step 6: all SDK init complete")
-        }
-
-        CrashLogger.shared.log("didFinishLaunchingWithOptions returning true")
-        return true
+        // 用过渡动画切换，避免生硬
+        UIView.transition(with: window, duration: 0.2, options: .transitionCrossDissolve, animations: {
+            window.rootViewController = rootVC
+        }, completion: nil)
     }
 
     // MARK: - 全局主题配置
@@ -117,10 +126,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: - 高德隐私合规
     private func setupAMapPrivacy() {
-        // 高德 SDK 初始化（已在 Podfile 中配置）
-        // 注意：高德地图 SDK 需要在主线程初始化
         DispatchQueue.main.async {
-            _ = MAMapView() // 触发 SDK 加载
+            _ = MAMapView()
             AMapServices.shared().enableHTTPS = true
             AMapServices.shared().apiKey = APIConfig.amapKey
         }
