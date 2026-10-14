@@ -25,43 +25,56 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         self.window = mainWindow
         CrashLogger.shared.log("Step 2: done")
 
-        // 3. 设置根控制器
-        CrashLogger.shared.log("Step 3: setting root VC")
-        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-        CrashLogger.shared.log("Step 3: uid.isEmpty=\(uid.isEmpty)")
-        if uid.isEmpty {
-            CrashLogger.shared.log("Step 3: creating EntryLoginViewController")
-            let vc = EntryLoginViewController()
-            CrashLogger.shared.log("Step 3: creating BaseNavigationController")
-            mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
-        } else {
-            CrashLogger.shared.log("Step 3: creating MainTabBarController")
-            let vc = MainTabBarController()
-            mainWindow.rootViewController = vc
-            DispatchQueue.global(qos: .userInitiated).async {
-                CrashLogger.shared.log("Step 3 bg: IMManager connect")
-                IMManager.shared.connect()
-                CrashLogger.shared.log("Step 3 bg: DataSyncManager sync")
-                DataSyncManager.shared.syncAll()
-            }
-        }
-        CrashLogger.shared.log("Step 3: done")
+        // 3. 先设置空白根控制器，避开iOS 27启动时NSISEngine约束引擎bug
+        // iOS 27在应用启动后的第一个CA commit中激活约束会导致NSISEngine重入崩溃
+        // 先显示空白窗口，等第一个run loop完成后再设置真正的根控制器
+        CrashLogger.shared.log("Step 3: setting placeholder root VC (iOS 27 workaround)")
+        let placeholderVC = UIViewController()
+        placeholderVC.view.backgroundColor = .themeBackground
+        mainWindow.rootViewController = placeholderVC
+        CrashLogger.shared.log("Step 3: placeholder VC set")
 
         // 4. 显示窗口
         CrashLogger.shared.log("Step 4: makeKeyAndVisible")
         mainWindow.makeKeyAndVisible()
-        CrashLogger.shared.log("Step 4: done - app should be visible now")
+        CrashLogger.shared.log("Step 4: done")
 
-        // 5. 延迟初始化 SDK
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            CrashLogger.shared.log("Step 5: delayed SDK init starting")
+        // 5. 延迟到下一个run loop设置真正的根控制器
+        // 此时第一个CA commit已完成，约束引擎状态稳定，不会触发重入崩溃
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            CrashLogger.shared.log("Step 5: setting real root VC")
+            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            CrashLogger.shared.log("Step 5: uid.isEmpty=\(uid.isEmpty)")
+            if uid.isEmpty {
+                CrashLogger.shared.log("Step 5: creating EntryLoginViewController")
+                let vc = EntryLoginViewController()
+                CrashLogger.shared.log("Step 5: creating BaseNavigationController")
+                mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
+            } else {
+                CrashLogger.shared.log("Step 5: creating MainTabBarController")
+                let vc = MainTabBarController()
+                mainWindow.rootViewController = vc
+                DispatchQueue.global(qos: .userInitiated).async {
+                    CrashLogger.shared.log("Step 5 bg: IMManager connect")
+                    IMManager.shared.connect()
+                    CrashLogger.shared.log("Step 5 bg: DataSyncManager sync")
+                    DataSyncManager.shared.syncAll()
+                }
+            }
+            CrashLogger.shared.log("Step 5: real root VC set")
+        }
+
+        // 6. 延迟初始化 SDK
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            CrashLogger.shared.log("Step 6: delayed SDK init starting")
             self.setupKeyboardManager()
             self.registerPushNotification(application)
             self.setupAppLockCheck()
             self.setupAMapPrivacy()
-            CrashLogger.shared.log("Step 5: COSUploadManager setup")
+            CrashLogger.shared.log("Step 6: COSUploadManager setup")
             COSUploadManager.shared.setup()
-            CrashLogger.shared.log("Step 5: all SDK init complete")
+            CrashLogger.shared.log("Step 6: all SDK init complete")
         }
 
         CrashLogger.shared.log("didFinishLaunchingWithOptions returning true")
