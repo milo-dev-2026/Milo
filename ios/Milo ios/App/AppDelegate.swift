@@ -9,7 +9,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // 0. 最早初始化崩溃日志捕获
+        // 0. 安装布局引擎保护，必须早于任何视图创建。
+        // iOS 26/27 在 Core Animation 布局过程中激活约束会触发
+        // -[NSISEngine setShouldIntegralize:] 重入断言 -> SIGABRT 闪退。
+        LayoutEngineGuard.install()
+
+        // 1. 最早初始化崩溃日志捕获
         _ = CrashLogger.shared
         CrashLogger.shared.log("didFinishLaunchingWithOptions started")
 
@@ -25,45 +30,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         self.window = mainWindow
         CrashLogger.shared.log("Step 2: done")
 
-        // 3. 先设置空白根控制器，避开iOS 27启动时NSISEngine约束引擎bug
-        // iOS 27在应用启动后的第一个CA commit中激活约束会导致NSISEngine重入崩溃
-        // 先显示空白窗口，等第一个run loop完成后再设置真正的根控制器
-        CrashLogger.shared.log("Step 3: setting placeholder root VC (iOS 27 workaround)")
-        let placeholderVC = UIViewController()
-        placeholderVC.view.backgroundColor = .themeBackground
-        mainWindow.rootViewController = placeholderVC
-        CrashLogger.shared.log("Step 3: placeholder VC set")
+        // 3. 在第一次 CA commit 之前，把根控制器的整棵视图树全部预加载完成。
+        // 否则 UIKit 会在首次布局过程中懒加载子控制器视图
+        // (_ensureToViewControllersViewIsLoaded:)，其 viewDidLoad/viewWillAppear
+        // 中激活的约束会在布局引擎忙碌时触发 NSISEngine 重入断言 -> SIGABRT。
+        // 预加载发生在 didFinishLaunching 中，此时不处于任何布局过程，约束激活是安全的。
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        CrashLogger.shared.log("Step 3: uid.isEmpty=\(uid.isEmpty)")
+        let rootVC: UIViewController
+        if uid.isEmpty {
+            CrashLogger.shared.log("Step 3: creating EntryLoginViewController")
+            let vc = EntryLoginViewController()
+            rootVC = BaseNavigationController(rootViewController: vc)
+        } else {
+            CrashLogger.shared.log("Step 3: creating MainTabBarController")
+            rootVC = MainTabBarController()
+            DispatchQueue.global(qos: .userInitiated).async {
+                CrashLogger.shared.log("Step 3 bg: IMManager connect")
+                IMManager.shared.connect()
+                CrashLogger.shared.log("Step 3 bg: DataSyncManager sync")
+                DataSyncManager.shared.syncAll()
+            }
+        }
+        preloadViewHierarchy(rootVC)
+        CrashLogger.shared.log("Step 3: view hierarchy preloaded")
 
-        // 4. 显示窗口
+        // 4. 安装根控制器并显示窗口
         CrashLogger.shared.log("Step 4: makeKeyAndVisible")
+        mainWindow.rootViewController = rootVC
         mainWindow.makeKeyAndVisible()
         CrashLogger.shared.log("Step 4: done")
-
-        // 5. 延迟到下一个run loop设置真正的根控制器
-        // 此时第一个CA commit已完成，约束引擎状态稳定，不会触发重入崩溃
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            CrashLogger.shared.log("Step 5: setting real root VC")
-            let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-            CrashLogger.shared.log("Step 5: uid.isEmpty=\(uid.isEmpty)")
-            if uid.isEmpty {
-                CrashLogger.shared.log("Step 5: creating EntryLoginViewController")
-                let vc = EntryLoginViewController()
-                CrashLogger.shared.log("Step 5: creating BaseNavigationController")
-                mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
-            } else {
-                CrashLogger.shared.log("Step 5: creating MainTabBarController")
-                let vc = MainTabBarController()
-                mainWindow.rootViewController = vc
-                DispatchQueue.global(qos: .userInitiated).async {
-                    CrashLogger.shared.log("Step 5 bg: IMManager connect")
-                    IMManager.shared.connect()
-                    CrashLogger.shared.log("Step 5 bg: DataSyncManager sync")
-                    DataSyncManager.shared.syncAll()
-                }
-            }
-            CrashLogger.shared.log("Step 5: real root VC set")
-        }
 
         // 6. 延迟初始化 SDK
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -79,6 +75,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         CrashLogger.shared.log("didFinishLaunchingWithOptions returning true")
         return true
+    }
+
+    // MARK: - 预加载整棵视图树
+    /// 递归加载容器控制器（Navigation/TabBar/Split）及其所有子控制器的视图，
+    /// 让所有 viewDidLoad 在首次 CA commit 之前完成，消除 UIKit 在布局过程中
+    /// 懒加载子视图的路径（该路径正是 NSISEngine 重入崩溃的触发点）。
+    private func preloadViewHierarchy(_ viewController: UIViewController) {
+        viewController.loadViewIfNeeded()
+        if let nav = viewController as? UINavigationController {
+            nav.viewControllers.forEach { preloadViewHierarchy($0) }
+        } else if let tab = viewController as? UITabBarController {
+            tab.viewControllers?.forEach { preloadViewHierarchy($0) }
+        } else if let split = viewController as? UISplitViewController {
+            split.viewControllers.forEach { preloadViewHierarchy($0) }
+        }
+        viewController.children.forEach { preloadViewHierarchy($0) }
     }
 
     // MARK: - 全局主题配置
