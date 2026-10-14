@@ -1,4 +1,5 @@
 import UIKit
+import QuartzCore
 import UserNotifications
 import IQKeyboardManagerSwift
 import MAMapKit
@@ -10,7 +11,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // 0. 安装布局引擎保护（必须早于任何视图创建）
-        LayoutEngineGuard.install()
+        // 临时禁用：怀疑推迟机制可能导致主线程卡死
+        // LayoutEngineGuard.install()
+        CrashLogger.shared.log("[Boot] LayoutEngineGuard: disabled (testing)")
 
         // 1. 崩溃日志
         _ = CrashLogger.shared
@@ -64,12 +67,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         let rootVC: UIViewController
         if uid.isEmpty {
-            CrashLogger.shared.log("[Boot] -> EntryLoginViewController")
+            CrashLogger.shared.log("[Boot] creating EntryLoginVC...")
+            let t0 = CACurrentMediaTime()
             let vc = EntryLoginViewController()
+            CrashLogger.shared.log("[Boot] EntryLoginVC init done (\(String(format: "%.3f", CACurrentMediaTime() - t0))s)")
+            let t1 = CACurrentMediaTime()
             rootVC = BaseNavigationController(rootViewController: vc)
+            CrashLogger.shared.log("[Boot] BaseNav init done (\(String(format: "%.3f", CACurrentMediaTime() - t1))s)")
         } else {
-            CrashLogger.shared.log("[Boot] -> MainTabBarController")
+            CrashLogger.shared.log("[Boot] creating MainTabBar...")
+            let t0 = CACurrentMediaTime()
             rootVC = MainTabBarController()
+            CrashLogger.shared.log("[Boot] MainTabBar init done (\(String(format: "%.3f", CACurrentMediaTime() - t0))s)")
 
             // IM 连接放后台队列，不阻塞主线程
             DispatchQueue.global(qos: .userInitiated).async {
@@ -80,10 +89,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
 
+        CrashLogger.shared.log("[Boot] setting rootVC transition...")
         // 用过渡动画切换，避免生硬
         UIView.transition(with: window, duration: 0.2, options: .transitionCrossDissolve, animations: {
             window.rootViewController = rootVC
-        }, completion: nil)
+        }, completion: { _ in
+            CrashLogger.shared.log("[Boot] rootVC transition complete")
+        })
     }
 
     // MARK: - 全局主题配置
