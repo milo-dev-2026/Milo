@@ -172,7 +172,7 @@ class LiquidGlassView: UIView {
         // 手动更新CALayer的frame，避免Auto Layout引擎介入
         highlightLayer.frame = bounds
         borderLayer.frame = bounds
-        updateCornerRadius()
+        // 注意：不要在这里调用 updateCornerRadius()，它会调用 setNeedsLayout() 导致无限循环
         updateBorder()
         updateHighlight()
     }
