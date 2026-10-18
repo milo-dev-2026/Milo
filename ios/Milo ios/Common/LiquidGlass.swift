@@ -117,7 +117,7 @@ class LiquidGlassView: UIView {
         layer.masksToBounds = false
         translatesAutoresizingMaskIntoConstraints = true
 
-        // 1. 毛玻璃层 - 用autoresizing充满父视图，避免init中激活AutoLayout约束
+        // 1. 毛玻璃层 - 用autoresizing充满父视图
         blurEffectView.effect = UIBlurEffect(style: blurStyle)
         blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         blurEffectView.frame = bounds
@@ -172,7 +172,7 @@ class LiquidGlassView: UIView {
         // 手动更新CALayer的frame，避免Auto Layout引擎介入
         highlightLayer.frame = bounds
         borderLayer.frame = bounds
-        // 注意：不要在这里调用 updateCornerRadius()，它会调用 setNeedsLayout() 导致无限循环
+        updateCornerRadius()
         updateBorder()
         updateHighlight()
     }
@@ -407,14 +407,14 @@ class LiquidGlassButton: UIControl {
     private func setupUI() {
         backgroundColor = .clear
         clipsToBounds = false
+        translatesAutoresizingMaskIntoConstraints = true
 
-        // 玻璃背景
+        // 玻璃背景 - autoresizing充满
         glassView.cornerRadius = cornerRadius
         glassView.glassOpacity = 0.5
+        glassView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        glassView.frame = bounds
         addSubview(glassView)
-        glassView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
 
         // 内容栈
         contentStack.axis = .horizontal
@@ -437,21 +437,22 @@ class LiquidGlassButton: UIControl {
         titleLabel.isUserInteractionEnabled = false
         contentStack.addArrangedSubview(titleLabel)
 
-        contentStack.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.leading.greaterThanOrEqualToSuperview().offset(12)
-            make.trailing.lessThanOrEqualToSuperview().offset(-12)
-        }
-
-        iconView.snp.makeConstraints { make in
-            make.width.height.equalTo(20)
-        }
-
         // 阴影
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.12
         layer.shadowOffset = CGSize(width: 0, height: 4)
         layer.shadowRadius = 8
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // 手动布局内容栈，居中
+        let stackSize = contentStack.systemLayoutSizeFitting(bounds.size)
+        let stackX = max(12, (bounds.width - stackSize.width) / 2)
+        let stackY = (bounds.height - stackSize.height) / 2
+        contentStack.frame = CGRect(x: stackX, y: stackY,
+                                     width: min(stackSize.width, bounds.width - 24),
+                                     height: stackSize.height)
     }
 
     private func updateIconConstraints() {
@@ -715,10 +716,14 @@ extension UIView {
 
         let glassView = LiquidGlassView(style: blurStyle, cornerRadius: cornerRadius)
         glassView.isUserInteractionEnabled = false
+        glassView.translatesAutoresizingMaskIntoConstraints = false
         insertSubview(glassView, at: 0)
-        glassView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        NSLayoutConstraint.activate([
+            glassView.topAnchor.constraint(equalTo: topAnchor),
+            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glassView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         lg_glassView = glassView
 

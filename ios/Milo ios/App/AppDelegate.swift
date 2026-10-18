@@ -1,5 +1,4 @@
 import UIKit
-import QuartzCore
 import UserNotifications
 import IQKeyboardManagerSwift
 import MAMapKit
@@ -10,57 +9,62 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // 0. 布局引擎保护 - 暂时禁用（可能导致启动卡顿/看门狗超时）
-        // LayoutEngineGuard.install()
+        // 0. 最早初始化崩溃日志捕获
+        _ = CrashLogger.shared
+        CrashLogger.shared.log("didFinishLaunchingWithOptions started")
 
-        CrashLogger.shared.log("[Boot] didFinishLaunching start")
-
-        // 全局主题外观
+        // 1. 全局主题配置
+        CrashLogger.shared.log("Step 1: setupGlobalTheme")
         setupGlobalTheme()
-        CrashLogger.shared.log("[Boot] setupGlobalTheme done")
+        CrashLogger.shared.log("Step 1: done")
 
-        // 创建 window 和根控制器
+        // 2. 创建 window
+        CrashLogger.shared.log("Step 2: creating window")
         let mainWindow = UIWindow(frame: UIScreen.main.bounds)
         mainWindow.backgroundColor = .themeBackground
         self.window = mainWindow
+        CrashLogger.shared.log("Step 2: done")
 
+        // 3. 设置根控制器
+        CrashLogger.shared.log("Step 3: setting root VC")
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-        CrashLogger.shared.log("[Boot] uid.isEmpty=\(uid.isEmpty)")
-
-        let rootVC: UIViewController
+        CrashLogger.shared.log("Step 3: uid.isEmpty=\(uid.isEmpty)")
         if uid.isEmpty {
-            CrashLogger.shared.log("[Boot] creating EntryLoginVC...")
+            CrashLogger.shared.log("Step 3: creating EntryLoginViewController")
             let vc = EntryLoginViewController()
-            rootVC = BaseNavigationController(rootViewController: vc)
-            CrashLogger.shared.log("[Boot] EntryLogin+BaseNav done")
+            CrashLogger.shared.log("Step 3: creating BaseNavigationController")
+            mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
         } else {
-            CrashLogger.shared.log("[Boot] creating MainTabBar...")
-            rootVC = MainTabBarController()
-            CrashLogger.shared.log("[Boot] MainTabBar done")
-
+            CrashLogger.shared.log("Step 3: creating MainTabBarController")
+            let vc = MainTabBarController()
+            mainWindow.rootViewController = vc
             DispatchQueue.global(qos: .userInitiated).async {
+                CrashLogger.shared.log("Step 3 bg: IMManager connect")
                 IMManager.shared.connect()
+                CrashLogger.shared.log("Step 3 bg: DataSyncManager sync")
                 DataSyncManager.shared.syncAll()
             }
         }
+        CrashLogger.shared.log("Step 3: done")
 
-        mainWindow.rootViewController = rootVC
+        // 4. 显示窗口
+        CrashLogger.shared.log("Step 4: makeKeyAndVisible")
         mainWindow.makeKeyAndVisible()
-        CrashLogger.shared.log("[Boot] makeKeyAndVisible done")
+        CrashLogger.shared.log("Step 4: done - app should be visible now")
 
-        // 延迟初始化 SDK
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let self = self else { return }
-            CrashLogger.shared.log("[Boot] delayed SDK init starting")
+        // 5. 延迟初始化 SDK
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            CrashLogger.shared.log("Step 5: delayed SDK init starting")
             self.setupKeyboardManager()
             self.registerPushNotification(application)
             self.setupAppLockCheck()
             self.setupAMapPrivacy()
+            CrashLogger.shared.log("Step 5: COSUploadManager setup")
             COSUploadManager.shared.setup()
-            CrashLogger.shared.log("[Boot] all SDK init complete")
+            CrashLogger.shared.log("Step 5: all SDK init complete")
         }
 
-        CrashLogger.shared.log("[Boot] didFinishLaunching returning true")
+        CrashLogger.shared.log("didFinishLaunchingWithOptions returning true")
         return true
     }
 
@@ -104,8 +108,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: - 高德隐私合规
     private func setupAMapPrivacy() {
+        // 高德 SDK 初始化（已在 Podfile 中配置）
+        // 注意：高德地图 SDK 需要在主线程初始化
         DispatchQueue.main.async {
-            _ = MAMapView()
+            _ = MAMapView() // 触发 SDK 加载
             AMapServices.shared().enableHTTPS = true
             AMapServices.shared().apiKey = APIConfig.amapKey
         }
