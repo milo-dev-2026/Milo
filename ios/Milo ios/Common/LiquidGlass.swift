@@ -115,30 +115,28 @@ class LiquidGlassView: UIView {
         backgroundColor = .clear
         clipsToBounds = false
         layer.masksToBounds = false
+        translatesAutoresizingMaskIntoConstraints = true
 
-        // 1. 毛玻璃层
+        // 1. 毛玻璃层 - 用autoresizing充满父视图，避免init中激活AutoLayout约束
         blurEffectView.effect = UIBlurEffect(style: blurStyle)
+        blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        blurEffectView.frame = bounds
         addSubview(blurEffectView)
-        blurEffectView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
 
-        // 2. 活力效果层（嵌套在毛玻璃内）
+        // 2. 活力效果层（嵌套在毛玻璃内）- 用autoresizing充满
         let vibrancyEffect = UIVibrancyEffect(blurEffect: UIBlurEffect(style: blurStyle), style: .label)
         vibrancyEffectView.effect = vibrancyEffect
+        vibrancyEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        vibrancyEffectView.frame = blurEffectView.contentView.bounds
         blurEffectView.contentView.addSubview(vibrancyEffectView)
-        vibrancyEffectView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
 
-        // 3. 半透明色调叠加
+        // 3. 半透明色调叠加 - 用autoresizing充满
         tintOverlayView.backgroundColor = tintColorForGlass
+        tintOverlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        tintOverlayView.frame = bounds
         addSubview(tintOverlayView)
         sendSubviewToBack(tintOverlayView)
         insertSubview(tintOverlayView, aboveSubview: blurEffectView)
-        tintOverlayView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
 
         // 4. 顶部高光渐变
         highlightLayer.colors = [
@@ -157,13 +155,12 @@ class LiquidGlassView: UIView {
         borderLayer.frame = bounds
         layer.addSublayer(borderLayer)
 
-        // 6. 内容容器
+        // 6. 内容容器 - 用autoresizing充满
         contentContainer.backgroundColor = .clear
+        contentContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        contentContainer.frame = bounds
         addSubview(contentContainer)
         bringSubviewToFront(contentContainer)
-        contentContainer.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
 
         // 初始设置
         updateCornerRadius()
@@ -172,6 +169,10 @@ class LiquidGlassView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        // 手动更新CALayer的frame，避免Auto Layout引擎介入
+        highlightLayer.frame = bounds
+        borderLayer.frame = bounds
+        updateCornerRadius()
         updateBorder()
         updateHighlight()
     }

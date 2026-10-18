@@ -10,6 +10,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // 0. 最早安装布局引擎保护（必须在任何视图创建之前）
+        LayoutEngineGuard.install()
+        CrashLogger.shared.log("[Boot] LayoutEngineGuard installed")
+
         CrashLogger.shared.log("[Boot] didFinishLaunching start")
 
         // 全局主题外观
