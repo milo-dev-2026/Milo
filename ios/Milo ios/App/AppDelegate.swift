@@ -10,96 +10,55 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // 0. 安装布局引擎保护（必须早于任何视图创建）
-        // 临时禁用：怀疑推迟机制可能导致主线程卡死
-        // LayoutEngineGuard.install()
-        CrashLogger.shared.log("[Boot] LayoutEngineGuard: disabled (testing)")
-
-        // 1. 崩溃日志
-        _ = CrashLogger.shared
         CrashLogger.shared.log("[Boot] didFinishLaunching start")
 
-        // 2. 全局主题外观（UIAppearance 很快，不涉及视图创建，可以在启动期做）
+        // 全局主题外观
         setupGlobalTheme()
         CrashLogger.shared.log("[Boot] setupGlobalTheme done")
 
-        // 3. 创建 window，先用最轻量的空白根控制器
-        //    这样 didFinishLaunching 能尽快返回，避免 scene-create watchdog
+        // 创建 window 和根控制器
         let mainWindow = UIWindow(frame: UIScreen.main.bounds)
         mainWindow.backgroundColor = .themeBackground
         self.window = mainWindow
 
-        let placeholder = UIViewController()
-        placeholder.view.backgroundColor = .themeBackground
-        mainWindow.rootViewController = placeholder
-        mainWindow.makeKeyAndVisible()
-        CrashLogger.shared.log("[Boot] makeKeyAndVisible done (placeholder)")
-
-        // 4. 下一个 runloop 再切换到真正的根控制器
-        //    此时 scene-create 看门狗阶段已过，有充足时间初始化
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            CrashLogger.shared.log("[Boot] switching to real root VC")
-            self.switchToRealRootController(in: mainWindow)
-            CrashLogger.shared.log("[Boot] real root VC set")
-
-            // 5. 首屏显示后再延迟初始化 SDK
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                guard let self = self else { return }
-                CrashLogger.shared.log("[Boot] delayed SDK init starting")
-                self.setupKeyboardManager()
-                self.registerPushNotification(application)
-                self.setupAppLockCheck()
-                self.setupAMapPrivacy()
-                COSUploadManager.shared.setup()
-                CrashLogger.shared.log("[Boot] all SDK init complete")
-            }
-        }
-
-        CrashLogger.shared.log("[Boot] didFinishLaunching returning true")
-        return true
-    }
-
-    /// 切换到真正的根控制器（登录页 或 主界面）
-    private func switchToRealRootController(in window: UIWindow) {
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
         CrashLogger.shared.log("[Boot] uid.isEmpty=\(uid.isEmpty)")
 
         let rootVC: UIViewController
         if uid.isEmpty {
             CrashLogger.shared.log("[Boot] creating EntryLoginVC...")
-            let t0 = CACurrentMediaTime()
             let vc = EntryLoginViewController()
-            CrashLogger.shared.log("[Boot] EntryLoginVC init done (\(String(format: "%.3f", CACurrentMediaTime() - t0))s)")
-            let t1 = CACurrentMediaTime()
             rootVC = BaseNavigationController(rootViewController: vc)
-            CrashLogger.shared.log("[Boot] BaseNav init done (\(String(format: "%.3f", CACurrentMediaTime() - t1))s)")
+            CrashLogger.shared.log("[Boot] EntryLogin+BaseNav done")
         } else {
             CrashLogger.shared.log("[Boot] creating MainTabBar...")
-            let t0 = CACurrentMediaTime()
             rootVC = MainTabBarController()
-            CrashLogger.shared.log("[Boot] MainTabBar init done (\(String(format: "%.3f", CACurrentMediaTime() - t0))s)")
+            CrashLogger.shared.log("[Boot] MainTabBar done")
 
-            // IM 连接放后台队列，不阻塞主线程
             DispatchQueue.global(qos: .userInitiated).async {
-                CrashLogger.shared.log("[Boot] bg: IMManager connect")
                 IMManager.shared.connect()
-                CrashLogger.shared.log("[Boot] bg: DataSyncManager sync")
                 DataSyncManager.shared.syncAll()
             }
         }
 
-        CrashLogger.shared.log("[Boot] setting rootVC...")
-        // 直接设置 rootViewController，确保 viewWillAppear/viewDidAppear 正确触发
-        // 用 CATransition 做过渡动画，避免 UIView.transition 的生命周期问题
-        let transition = CATransition()
-        transition.duration = 0.2
-        transition.type = .fade
-        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        window.layer.add(transition, forKey: "kCATransition")
-        window.rootViewController = rootVC
-        window.makeKeyAndVisible()
-        CrashLogger.shared.log("[Boot] rootVC set complete")
+        mainWindow.rootViewController = rootVC
+        mainWindow.makeKeyAndVisible()
+        CrashLogger.shared.log("[Boot] makeKeyAndVisible done")
+
+        // 延迟初始化 SDK
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self else { return }
+            CrashLogger.shared.log("[Boot] delayed SDK init starting")
+            self.setupKeyboardManager()
+            self.registerPushNotification(application)
+            self.setupAppLockCheck()
+            self.setupAMapPrivacy()
+            COSUploadManager.shared.setup()
+            CrashLogger.shared.log("[Boot] all SDK init complete")
+        }
+
+        CrashLogger.shared.log("[Boot] didFinishLaunching returning true")
+        return true
     }
 
     // MARK: - 全局主题配置
