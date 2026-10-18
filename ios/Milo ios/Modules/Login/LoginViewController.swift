@@ -1260,16 +1260,24 @@ class EntryLoginViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // 不在viewDidLoad中设置约束，避免iOS 27 NSISEngine重入崩溃
-        // 改在viewWillAppear中设置，此时视图已在窗口层级中
+        // 先设置背景色，避免白屏
+        view.backgroundColor = .white
+        // 用 async 在下一个 runloop 设置 UI，避免 iOS 27 NSISEngine 重入崩溃
+        // 同时确保无论 viewWillAppear 是否被调用，UI 都会被创建
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, !self.isViewSetup else { return }
+            self.isViewSetup = true
+            self.setupUI()
+            self.view.layoutIfNeeded()
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 兜底：如果 viewDidLoad 中的 async 还没执行，这里也尝试设置
         guard !isViewSetup else { return }
         isViewSetup = true
         setupUI()
-        // 触发布局，确保约束生效
         view.layoutIfNeeded()
     }
 

@@ -89,13 +89,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
 
-        CrashLogger.shared.log("[Boot] setting rootVC transition...")
-        // 用过渡动画切换，避免生硬
-        UIView.transition(with: window, duration: 0.2, options: .transitionCrossDissolve, animations: {
-            window.rootViewController = rootVC
-        }, completion: { _ in
-            CrashLogger.shared.log("[Boot] rootVC transition complete")
-        })
+        CrashLogger.shared.log("[Boot] setting rootVC...")
+        // 直接设置 rootViewController，确保 viewWillAppear/viewDidAppear 正确触发
+        // 用 CATransition 做过渡动画，避免 UIView.transition 的生命周期问题
+        let transition = CATransition()
+        transition.duration = 0.2
+        transition.type = .fade
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        window.layer.add(transition, forKey: "kCATransition")
+        window.rootViewController = rootVC
+        window.makeKeyAndVisible()
+        CrashLogger.shared.log("[Boot] rootVC set complete")
     }
 
     // MARK: - 全局主题配置
