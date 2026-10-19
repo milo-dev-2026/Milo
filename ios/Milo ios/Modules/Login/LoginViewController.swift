@@ -1269,6 +1269,7 @@ class EntryLoginViewController: UIViewController {
         guard !isViewSetup else { return }
         isViewSetup = true
         setupUI()
+        // 触发布局，确保约束生效
         view.layoutIfNeeded()
     }
 
@@ -2979,27 +2980,18 @@ class RegisterViewController: UIViewController {
 // MARK: - 页面4：忘记密码
 class ForgotPasswordViewController: UIViewController {
 
-    // 顶部区域
-    private let logoView = UIImageView()
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-
-    // 玻璃卡片
-    private let glassCard = GlassCardView()
-    private let segmentedControl = GlassSegmentedControl(items: ["手机号", "邮箱"])
-    private var isEmailMode = false
-
-    private let phoneField = CapsulePhoneField()
-    private let emailField = CapsuleTextField()
-    private let codeField = CapsuleCodeField()
-    private let pwdField = CapsulePasswordField()
-    private let confirmPwdField = CapsulePasswordField()
-
+    private let phoneField = PhoneFloatingLabelField()
+    private let codeField = CodeFloatingLabelField()
+    private let passwordField = PasswordFloatingLabelField()
     private let resetButton = UIButton(type: .system)
     private var isLoading = false
 
+    private let logoView = UIImageView()
+    private let subtitleLabel = UILabel()
+
     private var countdown = 0
     private var countdownTimer: Timer?
+
     private var hasAnimatedEntrance = false
 
     override func viewDidLoad() {
@@ -3011,24 +3003,22 @@ class ForgotPasswordViewController: UIViewController {
         super.viewDidAppear(animated)
         guard !hasAnimatedEntrance else { return }
         hasAnimatedEntrance = true
-        animateEntrance()
+        playEntranceAnimation()
     }
 
-    deinit { countdownTimer?.invalidate() }
-
-    private func animateEntrance() {
-        // Logo 缩放弹入
+    private func playEntranceAnimation() {
+        // 初始状态
         logoView.alpha = 0
-        logoView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
-
-        // 标题从下往上淡入
-        titleLabel.alpha = 0
-        titleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+        logoView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
 
         subtitleLabel.alpha = 0
         subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 20)
 
-        UIView.animate(withDuration: 0.5,
+        resetButton.alpha = 0
+        resetButton.transform = CGAffineTransform(translationX: 0, y: 20)
+
+        // 顺序播放
+        UIView.animate(withDuration: 0.6,
                        delay: 0,
                        usingSpringWithDamping: 0.7,
                        initialSpringVelocity: 0.5,
@@ -3038,150 +3028,71 @@ class ForgotPasswordViewController: UIViewController {
         }
 
         UIView.animate(withDuration: 0.4, delay: 0.15, options: .curveEaseOut) {
-            self.titleLabel.alpha = 1
-            self.titleLabel.transform = .identity
-        }
-
-        UIView.animate(withDuration: 0.4, delay: 0.2, options: .curveEaseOut) {
             self.subtitleLabel.alpha = 1
             self.subtitleLabel.transform = .identity
         }
+
+        UIView.animate(withDuration: 0.5,
+                       delay: 0.4,
+                       usingSpringWithDamping: 0.7,
+                       initialSpringVelocity: 0.5,
+                       options: .curveEaseOut) {
+            self.resetButton.alpha = 1
+            self.resetButton.transform = .identity
+        }
     }
 
-    private func setupUI() {
-        view.backgroundColor = .white
+    deinit { countdownTimer?.invalidate() }
 
-        // 顶部：左侧Logo + 右侧标题+副标题
+    private func setupUI() {
+        title = "重置密码"
+        view.backgroundColor = .themeBackground
+
+        // Logo
         logoView.image = UIImage(named: "LoginLogo")
         logoView.contentMode = .scaleAspectFit
 
-        titleLabel.text = "重置密码"
-        titleLabel.font = ScreenAdapter.mediumFont(22)
-        titleLabel.textColor = .label
-
+        // 副标题
         subtitleLabel.text = "重置您的账号密码"
         subtitleLabel.font = ScreenAdapter.font(14)
         subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textAlignment = .center
 
-        let titleStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        titleStack.axis = .vertical
-        titleStack.spacing = ScreenAdapter.scaleH(4)
-        titleStack.alignment = .leading
-
-        let headerStack = UIStackView(arrangedSubviews: [logoView, titleStack])
-        headerStack.axis = .horizontal
-        headerStack.spacing = ScreenAdapter.scaleW(12)
-        headerStack.alignment = .center
-
-        let headerContainer = UIView()
-        headerContainer.addSubview(headerStack)
-        headerStack.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-        logoView.snp.makeConstraints { make in
-            make.width.height.equalTo(ScreenAdapter.scaleH(48))
-        }
-
-        // 玻璃卡片
-        view.addSubview(glassCard)
-
-        // 分段控件
-        segmentedControl.onSelected = { [weak self] index in
-            self?.switchMode(index)
-        }
-        glassCard.addSubview(segmentedControl)
-
-        // 手机号输入框
-        phoneField.placeholder = "请输入手机号"
+        phoneField.placeholder = "手机号"
+        phoneField.textField.keyboardType = .numberPad
         phoneField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        glassCard.addSubview(phoneField)
 
-        // 邮箱输入框
-        emailField.placeholder = "请输入邮箱地址"
-        emailField.textField.keyboardType = .emailAddress
-        emailField.textField.autocapitalizationType = .none
-        emailField.isHidden = true
-        emailField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        glassCard.addSubview(emailField)
-
-        // 验证码输入框
-        codeField.placeholder = "请输入验证码"
-        codeField.sendCodeButton.addTarget(self, action: #selector(getCode), for: .touchUpInside)
+        codeField.placeholder = "验证码"
+        codeField.sendCodeButton.addTarget(self, action: #selector(sendCode), for: .touchUpInside)
         codeField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        glassCard.addSubview(codeField)
 
-        // 新密码输入框
-        pwdField.placeholder = "请输入新密码(6-20位)"
-        pwdField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        glassCard.addSubview(pwdField)
+        passwordField.placeholder = "新密码(6-20位)"
+        passwordField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
 
-        // 确认密码输入框
-        confirmPwdField.placeholder = "请确认新密码"
-        confirmPwdField.textField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
-        glassCard.addSubview(confirmPwdField)
-
-        // 卡片内布局
-        segmentedControl.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        phoneField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        emailField.snp.makeConstraints { make in
-            make.top.equalTo(segmentedControl.snp.bottom).offset(ScreenAdapter.scaleH(16))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        codeField.snp.makeConstraints { make in
-            make.top.equalTo(phoneField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        pwdField.snp.makeConstraints { make in
-            make.top.equalTo(codeField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-        confirmPwdField.snp.makeConstraints { make in
-            make.top.equalTo(pwdField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(20))
-        }
-
-        // 重置按钮
-        resetButton.setTitle("确认重置", for: .normal)
-        resetButton.titleLabel?.font = ScreenAdapter.mediumFont(17)
+        resetButton.setTitle("重置密码", for: .normal)
         resetButton.backgroundColor = .themePrimary
         resetButton.setTitleColor(.white, for: .normal)
+        resetButton.titleLabel?.font = ScreenAdapter.mediumFont(17)
         resetButton.layer.cornerRadius = ScreenAdapter.scaleW(26)
         resetButton.alpha = 0.5
         resetButton.isEnabled = false
-        resetButton.addTarget(self, action: #selector(submit), for: .touchUpInside)
-        resetButton.addPressScaleEffect()
+        resetButton.addTarget(self, action: #selector(doReset), for: .touchUpInside)
 
         // 整体布局
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
-        scrollView.keyboardDismissMode = .interactive
         view.addSubview(scrollView)
 
         let contentView = UIView()
         scrollView.addSubview(contentView)
 
-        let mainStack = UIStackView(arrangedSubviews: [headerContainer, glassCard, resetButton])
+        let mainStack = UIStackView(arrangedSubviews: [logoView, subtitleLabel, phoneField, codeField, passwordField, resetButton])
         mainStack.axis = .vertical
         mainStack.spacing = ScreenAdapter.scaleH(20)
-        mainStack.alignment = .fill
         contentView.addSubview(mainStack)
 
         scrollView.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(16))
-            make.leading.trailing.bottom.equalToSuperview()
+            make.edges.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -3191,192 +3102,152 @@ class ForgotPasswordViewController: UIViewController {
             make.top.equalToSuperview().offset(ScreenAdapter.scaleH(20))
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
             make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
-            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(20))
+            make.bottom.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleH(40))
+        }
+        logoView.snp.makeConstraints { make in
+            make.height.equalTo(ScreenAdapter.scaleH(70))
+            make.centerX.equalToSuperview()
         }
         resetButton.snp.makeConstraints { make in
             make.height.equalTo(ScreenAdapter.scaleH(52))
         }
-
-        updateButtonState()
-    }
-
-    private func switchMode(_ index: Int) {
-        isEmailMode = (index == 1)
-        phoneField.isHidden = isEmailMode
-        emailField.isHidden = !isEmailMode
-
-        // 更新验证码输入框的顶部约束
-        codeField.snp.remakeConstraints { make in
-            if isEmailMode {
-                make.top.equalTo(emailField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            } else {
-                make.top.equalTo(phoneField.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            }
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
-        }
-
-        if AnimationIntegration.shared.config.enableHapticFeedback {
-            HapticManager.shared.selectionChanged()
-        }
-
-        updateButtonState()
     }
 
     // MARK: - 交互
     @objc private func textFieldDidChange() {
-        updateButtonState()
+        updateResetButtonState()
     }
 
-    private func updateButtonState() {
-        let hasAccount: Bool
-        if isEmailMode {
-            hasAccount = !(emailField.textField.text ?? "").isEmpty
-        } else {
-            hasAccount = AppUtility.isValidPhone(phoneField.textField.text ?? "")
-        }
+    private func updateResetButtonState() {
+        let hasPhone = AppUtility.isValidPhone(phoneField.textField.text ?? "")
         let hasCode = !(codeField.textField.text ?? "").isEmpty
-        let hasPwd = (pwdField.textField.text ?? "").count >= 6
-        let hasConfirm = (confirmPwdField.textField.text ?? "").count >= 6
-        let enabled = hasAccount && hasCode && hasPwd && hasConfirm && !isLoading
+        let hasPassword = (passwordField.textField.text ?? "").count >= 6
+        let enabled = hasPhone && hasCode && hasPassword && !isLoading
         resetButton.isEnabled = enabled
         resetButton.alpha = enabled ? 1.0 : 0.5
     }
 
-    @objc private func getCode() {
-        if isEmailMode {
-            guard let email = emailField.textField.text, !email.isEmpty else {
-                AppUtility.showToast("请输入邮箱"); return
-            }
-            Task {
-                do {
-                    _ = try await APIClient.shared.requestRaw(.sendEmailCode(email: email))
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("验证码已发送")
-                        self.startCountdown()
-                    }
-                } catch { DispatchQueue.main.async { AppUtility.showToast("发送失败") } }
-            }
-        } else {
-            guard let phone = phoneField.textField.text, !phone.isEmpty else {
-                AppUtility.showToast("请输入手机号"); return
-            }
-            Task {
-                do {
-                    _ = try await APIClient.shared.requestRaw(.sendForgetSMSCode(phone: phone))
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("验证码已发送")
-                        self.startCountdown()
-                    }
-                } catch { DispatchQueue.main.async { AppUtility.showToast("发送失败") } }
+    // MARK: - 发送验证码
+    @objc private func sendCode() {
+        let phone = phoneField.textField.text ?? ""
+        guard AppUtility.isValidPhone(phone) else {
+            AppUtility.showToast("请输入正确的手机号")
+            return
+        }
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.sendForgetSMSCode(phone: phone))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("验证码已发送")
+                    self.startCountdown()
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("发送失败: \(error.localizedDescription)")
+                }
             }
         }
     }
 
+    // MARK: - 重置密码
+    @objc private func doReset() {
+        view.endEditing(true)
+        let phone = phoneField.textField.text ?? ""
+        let code = codeField.textField.text ?? ""
+        let password = passwordField.textField.text ?? ""
+
+        guard AppUtility.isValidPhone(phone) else {
+            AppUtility.showToast("请输入正确的手机号")
+            return
+        }
+        guard code.count >= 4 else {
+            AppUtility.showToast("请输入验证码")
+            return
+        }
+        guard password.count >= 6, password.count <= 20 else {
+            AppUtility.showToast("密码需6-20位")
+            return
+        }
+
+        isLoading = true
+        resetButton.isEnabled = false
+        resetButton.setTitle("重置中...", for: .normal)
+
+        Task {
+            do {
+                let resp: ResetPasswordResponse = try await APIClient.shared.request(.resetPasswordByPhone(phone: phone, code: code, password: password))
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.resetButton.isEnabled = true
+                    self.resetButton.setTitle("重置密码", for: .normal)
+                    self.updateResetButtonState()
+                    if resp.status == 200 || resp.status == nil {
+                        AppUtility.showToast("密码重置成功")
+                        self.navigationController?.popViewController(animated: true)
+                    } else {
+                        AppUtility.showToast(resp.msg ?? "重置失败")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.resetButton.isEnabled = true
+                    self.resetButton.setTitle("重置密码", for: .normal)
+                    self.updateResetButtonState()
+                    AppUtility.showToast("重置失败: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    // MARK: - 倒计时
     private func startCountdown() {
         countdown = 60
         codeField.sendCodeButton.isEnabled = false
+
+        // 开始倒计时的按钮动画
+        codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.2,
+                       delay: 0,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.8,
+                       options: .curveEaseOut) {
+            self.codeField.sendCodeButton.transform = .identity
+        }
+
+        if AnimationIntegration.shared.config.enableHapticFeedback {
+            HapticManager.shared.impactLight()
+        }
+
         countdownTimer?.invalidate()
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
-            guard let self = self else { t.invalidate(); return }
-            self.countdown -= 1
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             if self.countdown <= 0 {
-                t.invalidate()
                 self.codeField.sendCodeButton.setTitle("重新获取", for: .normal)
                 self.codeField.sendCodeButton.isEnabled = true
+                self.countdownTimer?.invalidate()
+
+                // 倒计时结束弹跳动画
+                self.codeField.sendCodeButton.transform = CGAffineTransform(scaleX: 1.15, y: 1.15)
+                UIView.animate(withDuration: 0.4,
+                               delay: 0,
+                               usingSpringWithDamping: 0.4,
+                               initialSpringVelocity: 0.8,
+                               options: .curveEaseInOut) {
+                    self.codeField.sendCodeButton.transform = .identity
+                }
+
+                if AnimationIntegration.shared.config.enableHapticFeedback {
+                    HapticManager.shared.notificationSuccess()
+                }
             } else {
-                self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
-            }
-        }
-    }
-
-    @objc private func submit() {
-        view.endEditing(true)
-
-        if isEmailMode {
-            guard let email = emailField.textField.text, !email.isEmpty else {
-                AppUtility.showToast("请输入邮箱"); return
-            }
-            guard let code = codeField.textField.text, code.count == 6 else {
-                AppUtility.showToast("请输入6位验证码"); return
-            }
-            guard let pwd = pwdField.textField.text, pwd.count >= 6, pwd.count <= 20 else {
-                AppUtility.showToast("密码需6-20位"); return
-            }
-            guard let confirmPwd = confirmPwdField.textField.text, confirmPwd == pwd else {
-                AppUtility.showToast("两次密码不一致"); return
-            }
-
-            isLoading = true
-            resetButton.isEnabled = false
-            resetButton.setTitle("重置中...", for: .normal)
-            Task {
-                do {
-                    let resp = try await APIClient.shared.requestRaw(.changePwdByEmail(email: email, code: code, pwd: pwd))
-                    let status = resp["status"] as? Int ?? 0
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.resetButton.isEnabled = true
-                        self.resetButton.setTitle("确认重置", for: .normal)
-                        self.updateButtonState()
-                        if status == 200 {
-                            AppUtility.showToast("密码重置成功")
-                            self.navigationController?.popViewController(animated: true)
-                        } else {
-                            AppUtility.showToast(resp["msg"] as? String ?? "重置失败")
-                        }
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.resetButton.isEnabled = true
-                        self.resetButton.setTitle("确认重置", for: .normal)
-                        self.updateButtonState()
-                        AppUtility.showToast("操作失败")
-                    }
+                // 数字变化时的淡入淡出动画
+                UIView.transition(with: self.codeField.sendCodeButton,
+                                  duration: 0.2,
+                                  options: .transitionCrossDissolve) {
+                    self.codeField.sendCodeButton.setTitle("\(self.countdown)s", for: .normal)
                 }
-            }
-        } else {
-            guard let phone = phoneField.textField.text, !phone.isEmpty else {
-                AppUtility.showToast("请输入手机号"); return
-            }
-            guard let code = codeField.textField.text, code.count == 6 else {
-                AppUtility.showToast("请输入6位验证码"); return
-            }
-            guard let pwd = pwdField.textField.text, pwd.count >= 6, pwd.count <= 20 else {
-                AppUtility.showToast("密码需6-20位"); return
-            }
-            guard let confirmPwd = confirmPwdField.textField.text, confirmPwd == pwd else {
-                AppUtility.showToast("两次密码不一致"); return
-            }
-
-            isLoading = true
-            resetButton.isEnabled = false
-            resetButton.setTitle("重置中...", for: .normal)
-            Task {
-                do {
-                    let resp: ResetPasswordResponse = try await APIClient.shared.request(.resetPasswordByPhone(phone: phone, code: code, password: pwd))
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.resetButton.isEnabled = true
-                        self.resetButton.setTitle("确认重置", for: .normal)
-                        self.updateButtonState()
-                        if resp.status == 200 || resp.status == nil {
-                            AppUtility.showToast("密码重置成功")
-                            self.navigationController?.popViewController(animated: true)
-                        } else {
-                            AppUtility.showToast(resp.msg ?? "重置失败")
-                        }
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.resetButton.isEnabled = true
-                        self.resetButton.setTitle("确认重置", for: .normal)
-                        self.updateButtonState()
-                        AppUtility.showToast("重置失败: \(error.localizedDescription)")
-                    }
-                }
+                self.countdown -= 1
             }
         }
     }
