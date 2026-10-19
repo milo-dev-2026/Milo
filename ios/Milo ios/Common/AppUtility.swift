@@ -47,6 +47,7 @@ class AppUtility {
             imageView.tintColor = UIColor.systemGray5
             return
         }
+        print("[Avatar] 加载头像: \(url.absoluteString)")
         imageView.kf.setImage(
             with: url,
             placeholder: UIImage(systemName: "person.circle.fill"),
@@ -56,10 +57,13 @@ class AppUtility {
             ]
         ) { result in
             switch result {
-            case .failure:
+            case .failure(let error):
+                print("[Avatar] 加载失败: \(url.absoluteString) - \(error.localizedDescription)")
                 imageView.image = UIImage(systemName: "person.circle.fill")
                 imageView.tintColor = UIColor.systemGray5
-            case .success: break
+            case .success:
+                print("[Avatar] 加载成功: \(url.absoluteString)")
+                break
             }
         }
     }

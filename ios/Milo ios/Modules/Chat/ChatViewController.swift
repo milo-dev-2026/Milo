@@ -170,9 +170,7 @@ class ChatViewController: UIViewController {
                 )
                 DispatchQueue.main.async {
                     navTitleLabel.text = channelInfo.displayName
-                    if let avatar = channelInfo.logo ?? channelInfo.avatar, let url = URL(string: avatar) {
-                        AppUtility.loadAvatar(url, into: navAvatar)
-                    }
+                    AppUtility.loadAvatar(channelInfo.avatarURL, into: navAvatar)
                 }
             } catch { }
         }
@@ -312,10 +310,16 @@ class ChatViewController: UIViewController {
                     .syncChannelMessages(channelId: channelId, channelType: self.channelType, startMessageSeq: 0, limit: 50)
                 )
                 if let msgs = response.messages {
+                    print("[Chat] 加载到 \(msgs.count) 条消息")
                     messages = msgs.map { Message(from: $0) }.sorted { $0.timestamp < $1.timestamp }
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
                         self.scrollToBottom()
+                    }
+                } else {
+                    print("[Chat] 消息列表为空")
+                    DispatchQueue.main.async {
+                        self.tableView.reloadData()
                     }
                 }
             } catch {

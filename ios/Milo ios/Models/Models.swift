@@ -143,21 +143,32 @@ struct WKMessageData: Codable {
     var channel_type: Int?
     var timestamp: Int64?
     var payload: String?
+    /// 当 payload 是字典而非 base64 字符串时，存储原始字典
+    var payloadDict: [String: Any]?
 
     enum CodingKeys: String, CodingKey {
         case message_id, message_idstr, client_msg_no, message_seq
         case from_uid, channel_id, channel_type, timestamp, payload
+        case seq // 兼容 seq 字段（部分 API 返回 seq 而非 message_seq）
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         message_idstr = try c.decodeIfPresent(String.self, forKey: .message_idstr)
         client_msg_no = try c.decodeIfPresent(String.self, forKey: .client_msg_no)
-        message_seq = try c.decodeIfPresent(Int.self, forKey: .message_seq)
         from_uid = try c.decodeIfPresent(String.self, forKey: .from_uid)
         channel_id = try c.decodeIfPresent(String.self, forKey: .channel_id)
         channel_type = try c.decodeIfPresent(Int.self, forKey: .channel_type)
-        payload = try c.decodeIfPresent(String.self, forKey: .payload)
+
+        // message_seq: 兼容 message_seq 和 seq 两种字段名
+        if let seq = try c.decodeIfPresent(Int.self, forKey: .message_seq) {
+            message_seq = seq
+        } else if let seq = try c.decodeIfPresent(Int.self, forKey: .seq) {
+            message_seq = seq
+        } else {
+            message_seq = nil
+        }
+
         // timestamp can be Int or String
         if let v = try? c.decodeIfPresent(Int64.self, forKey: .timestamp) {
             timestamp = v
@@ -174,6 +185,31 @@ struct WKMessageData: Codable {
         } else {
             message_id = nil
         }
+
+        // payload: 兼容 String (base64) 和 Dictionary 两种格式
+        if let payloadStr = try? c.decodeIfPresent(String.self, forKey: .payload) {
+            payload = payloadStr
+            payloadDict = nil
+        } else if let payloadDict = try? c.decodeIfPresent([String: AnyCodable].self, forKey: .payload) {
+            // payload 是字典格式，转为 [String: Any] 并同时序列化为 JSON 字符串存入 payload
+            var dict = [String: Any]()
+            for (key, value) in payloadDict {
+                dict[key] = value.value
+            }
+            self.payloadDict = dict
+            // 将字典转回 JSON 字符串，保持 payload 字段兼容
+            if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
+               let jsonStr = String(data: jsonData, encoding: .utf8) {
+                // 注意：这里存的是原始 JSON 字符串，不是 base64
+                // decodedPayload 会识别并正确处理
+                self.payload = jsonStr
+            } else {
+                self.payload = nil
+            }
+        } else {
+            payload = nil
+            payloadDict = nil
+        }
     }
 
     var messageIDString: String {
@@ -183,14 +219,30 @@ struct WKMessageData: Codable {
     }
 
     var decodedPayload: (type: Int, content: String) {
-        guard let payload = payload,
-              let data = Data(base64Encoded: payload),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        // 优先尝试从 payloadDict 解析（字典格式）
+        if let dict = payloadDict {
+            let type = dict["type"] as? Int ?? 1
+            let content = dict["content"] as? String ?? ""
+            return (type, content)
+        }
+        guard let payload = payload, !payload.isEmpty else {
             return (1, "")
         }
-        let type = json["type"] as? Int ?? 1
-        let content = json["content"] as? String ?? ""
-        return (type, content)
+        // 尝试 base64 解码 → JSON 解析
+        if let data = Data(base64Encoded: payload),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let type = json["type"] as? Int ?? 1
+            let content = json["content"] as? String ?? ""
+            return (type, content)
+        }
+        // 尝试直接 JSON 解析（payload 本身就是 JSON 字符串）
+        if let data = payload.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let type = json["type"] as? Int ?? 1
+            let content = json["content"] as? String ?? ""
+            return (type, content)
+        }
+        return (1, "")
     }
 }
 
@@ -465,7 +517,8 @@ struct GroupMember: Codable {
         if avatar.hasPrefix("http") {
             return URL(string: avatar)
         }
-        return URL(string: APIConfig.apiBaseURL + "/" + avatar)
+        let path = avatar.hasPrefix("/") ? avatar : "/\(avatar)"
+        return URL(string: APIConfig.apiBaseURL + path)
     }
 }
 

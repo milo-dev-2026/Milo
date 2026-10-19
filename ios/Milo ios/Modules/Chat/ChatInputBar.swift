@@ -113,6 +113,7 @@ class ChatInputBar: UIView {
             make.trailing.equalToSuperview().offset(-hPad)
             make.top.equalTo(textView.snp.bottom).offset(vPad)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
+            make.bottom.equalToSuperview().offset(-vPad)
         }
     }
 
@@ -149,8 +150,8 @@ class ChatInputBar: UIView {
         panel.delegate = self
         addSubview(panel)
 
+        // 表情面板从底部向上展开：只约束底部和高度
         panel.snp.makeConstraints { make in
-            make.top.equalTo(moreButton.snp.bottom).offset(ScreenAdapter.scaleH(6))
             make.leading.trailing.bottom.equalToSuperview()
             self.emojiPanelHeight = make.height.equalTo(0).constraint
         }
@@ -219,8 +220,8 @@ class ChatInputBar: UIView {
             prevButton = btn
         }
 
+        // 面板从底部向上展开：只约束底部和高度，不约束顶部
         panel.snp.makeConstraints { make in
-            make.top.equalTo(moreButton.snp.bottom).offset(vPad)
             make.leading.trailing.bottom.equalToSuperview()
             self.morePanelHeight = make.height.equalTo(0).constraint
         }
