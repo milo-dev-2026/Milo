@@ -392,17 +392,6 @@ class RobotListCell: UITableViewCell {
             make.width.greaterThanOrEqualTo(32)
         }
 
-        // 描述
-        descLabel.font = ScreenAdapter.font(12)
-        descLabel.textColor = .secondaryLabel
-        descLabel.numberOfLines = 1
-        cardView.addSubview(descLabel)
-        descLabel.snp.makeConstraints { make in
-            make.leading.equalTo(avatarLabel.snp.trailing).offset(12)
-            make.bottom.equalToSuperview().offset(-12)
-            make.trailing.equalTo(addButton.snp.leading).offset(-8)
-        }
-
         // 添加按钮
         addButton.titleLabel?.font = ScreenAdapter.font(13, weight: .medium)
         addButton.layer.cornerRadius = 14
@@ -415,6 +404,17 @@ class RobotListCell: UITableViewCell {
             make.centerY.equalToSuperview()
             make.width.equalTo(64)
             make.height.equalTo(28)
+        }
+
+        // 描述
+        descLabel.font = ScreenAdapter.font(12)
+        descLabel.textColor = .secondaryLabel
+        descLabel.numberOfLines = 1
+        cardView.addSubview(descLabel)
+        descLabel.snp.makeConstraints { make in
+            make.leading.equalTo(avatarLabel.snp.trailing).offset(12)
+            make.bottom.equalToSuperview().offset(-12)
+            make.trailing.equalTo(addButton.snp.leading).offset(-8)
         }
     }
 

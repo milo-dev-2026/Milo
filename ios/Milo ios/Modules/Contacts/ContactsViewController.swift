@@ -85,18 +85,6 @@ class ContactsViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        // 搜索按钮
-        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
-        searchButton.tintColor = .label
-        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
-        titleBarView.addSubview(searchButton)
-        searchButton.snp.makeConstraints { make in
-            make.trailing.equalTo(addButton.snp.leading).offset(-8)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
-        }
-
         // 加号按钮
         let addConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
         addButton.setImage(UIImage(systemName: "person.badge.plus", withConfiguration: addConfig), for: .normal)
@@ -105,6 +93,18 @@ class ContactsViewController: UIViewController {
         titleBarView.addSubview(addButton)
         addButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-12)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
+        // 搜索按钮
+        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
+        searchButton.tintColor = .label
+        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
+        titleBarView.addSubview(searchButton)
+        searchButton.snp.makeConstraints { make in
+            make.trailing.equalTo(addButton.snp.leading).offset(-8)
             make.centerY.equalToSuperview()
             make.width.height.equalTo(40)
         }

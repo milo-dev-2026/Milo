@@ -111,6 +111,18 @@ class MySettingViewController: UIViewController {
             make.width.height.equalTo(90)
         }
 
+        // 二维码按钮
+        let qrConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+        qrButton.setImage(UIImage(systemName: "qrcode", withConfiguration: qrConfig), for: .normal)
+        qrButton.tintColor = .secondaryLabel
+        qrButton.addTarget(self, action: #selector(showMyQRCode), for: .touchUpInside)
+        userInfoCard.addSubview(qrButton)
+        qrButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
         // 名字
         nameLabel.font = ScreenAdapter.boldFont(20)
         nameLabel.textColor = .label
@@ -131,18 +143,6 @@ class MySettingViewController: UIViewController {
             make.leading.equalTo(nameLabel)
             make.top.equalTo(nameLabel.snp.bottom).offset(8)
             make.trailing.equalTo(qrButton.snp.leading).offset(-8)
-        }
-
-        // 二维码按钮
-        let qrConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-        qrButton.setImage(UIImage(systemName: "qrcode", withConfiguration: qrConfig), for: .normal)
-        qrButton.tintColor = .secondaryLabel
-        qrButton.addTarget(self, action: #selector(showMyQRCode), for: .touchUpInside)
-        userInfoCard.addSubview(qrButton)
-        qrButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
         }
 
         // 箭头
