@@ -94,18 +94,6 @@ class ConversationListViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        // 右侧搜索按钮
-        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
-        searchButton.tintColor = .label
-        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
-        titleBarView.addSubview(searchButton)
-        searchButton.snp.makeConstraints { make in
-            make.trailing.equalTo(addButton.snp.leading).offset(-8)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
-        }
-
         // 右侧加号按钮
         let addConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
         addButton.setImage(UIImage(systemName: "plus.circle", withConfiguration: addConfig), for: .normal)
@@ -114,6 +102,18 @@ class ConversationListViewController: UIViewController {
         titleBarView.addSubview(addButton)
         addButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-12)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+
+        // 右侧搜索按钮
+        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
+        searchButton.tintColor = .label
+        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
+        titleBarView.addSubview(searchButton)
+        searchButton.snp.makeConstraints { make in
+            make.trailing.equalTo(addButton.snp.leading).offset(-8)
             make.centerY.equalToSuperview()
             make.width.height.equalTo(40)
         }
