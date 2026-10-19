@@ -275,7 +275,6 @@ class LiquidGlassView: UIView {
         tintOverlayView.clipsToBounds = true
         contentContainer.layer.cornerRadius = cornerRadius
         contentContainer.clipsToBounds = true
-        setNeedsLayout()
     }
 
     private func updateGlassOpacity() {

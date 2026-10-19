@@ -130,21 +130,28 @@ class GlassSegmentedControl: UIView {
             }
         }
 
-        let duration = animated ? 0.25 : 0
-        UIView.animate(withDuration: duration, delay: 0, options: .curveEaseInOut) {
-            self.layoutIfNeeded()
-            let totalWidth = self.bounds.width
-            let itemWidth = totalWidth / CGFloat(self.items.count)
-            let selectorInset = ScreenAdapter.scaleW(4)
-            let selectorWidth = itemWidth - selectorInset * 2
-            let selectorX = itemWidth * CGFloat(self.selectedIndex) + selectorInset
-            self.selectorView.frame = CGRect(
-                x: selectorX,
-                y: ScreenAdapter.scaleH(4),
-                width: selectorWidth,
-                height: ScreenAdapter.scaleH(36)
-            )
+        if animated {
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseInOut) {
+                self.applySelectorFrame()
+            }
+        } else {
+            applySelectorFrame()
         }
+    }
+
+    // 仅更新滑块位置，不触发布局，可在 layoutSubviews 中安全调用
+    private func applySelectorFrame() {
+        guard bounds.width > 0, !items.isEmpty else { return }
+        let itemWidth = bounds.width / CGFloat(items.count)
+        let selectorInset = ScreenAdapter.scaleW(4)
+        let selectorWidth = itemWidth - selectorInset * 2
+        let selectorX = itemWidth * CGFloat(selectedIndex) + selectorInset
+        selectorView.frame = CGRect(
+            x: selectorX,
+            y: ScreenAdapter.scaleH(4),
+            width: selectorWidth,
+            height: ScreenAdapter.scaleH(36)
+        )
     }
 
     override func layoutSubviews() {
