@@ -212,6 +212,29 @@ struct WKMessageData: Codable {
         }
     }
 
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(message_id, forKey: .message_id)
+        try c.encodeIfPresent(message_idstr, forKey: .message_idstr)
+        try c.encodeIfPresent(client_msg_no, forKey: .client_msg_no)
+        try c.encodeIfPresent(message_seq, forKey: .message_seq)
+        try c.encodeIfPresent(from_uid, forKey: .from_uid)
+        try c.encodeIfPresent(channel_id, forKey: .channel_id)
+        try c.encodeIfPresent(channel_type, forKey: .channel_type)
+        try c.encodeIfPresent(timestamp, forKey: .timestamp)
+        // payload: 如果有字典格式，序列化为 JSON 字符串后编码
+        if let dict = payloadDict {
+            if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
+               let jsonStr = String(data: jsonData, encoding: .utf8) {
+                try c.encode(jsonStr, forKey: .payload)
+            } else {
+                try c.encodeIfPresent(payload, forKey: .payload)
+            }
+        } else {
+            try c.encodeIfPresent(payload, forKey: .payload)
+        }
+    }
+
     var messageIDString: String {
         if let str = message_idstr, !str.isEmpty { return str }
         if let id = message_id { return String(id) }
