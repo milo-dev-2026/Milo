@@ -446,6 +446,7 @@ class LiquidGlassButton: UIControl {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        glassView.cornerRadius = min(cornerRadius, bounds.height / 2)
         // 手动布局内容栈，居中
         let stackSize = contentStack.systemLayoutSizeFitting(bounds.size)
         let stackX = max(12, (bounds.width - stackSize.width) / 2)
@@ -530,11 +531,6 @@ class LiquidGlassButton: UIControl {
         if AnimationIntegration.shared.config.enableHapticFeedback {
             HapticManager.shared.selectionChanged()
         }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        glassView.cornerRadius = min(cornerRadius, bounds.height / 2)
     }
 }
 
