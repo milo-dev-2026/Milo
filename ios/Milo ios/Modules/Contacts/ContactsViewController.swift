@@ -246,19 +246,23 @@ class ContactsViewController: UIViewController {
     }
 
     @objc private func showSavedGroups() {
-        AppUtility.showToast("保存的群聊")
+        let vc = SavedGroupsViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showJoinedGroups() {
-        AppUtility.showToast("加入的群聊")
+        let vc = JoinedGroupsViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showFileHelper() {
-        AppUtility.showToast("文件传输助手")
+        let vc = FileHelperViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSystemNotice() {
-        AppUtility.showToast("系统通知")
+        let vc = SystemTeamViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func startScan() {
