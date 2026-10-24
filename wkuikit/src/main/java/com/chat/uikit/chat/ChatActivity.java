@@ -190,7 +190,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private int autoSyncedMsgCount = 0;            // 已自动同步的消息数量
     private int autoSyncRetryCount = 0;            // 自动同步失败重试次数
     private boolean isFirstDataLoad = true;        // 是否首次加载数据
-    private static final int MAX_AUTO_SYNC_MSG = 500; // 最大自动同步消息数
+    private static final int MAX_AUTO_SYNC_MSG = 5000; // 单次进入最多自动同步的消息数
     private static final int MAX_AUTO_SYNC_RETRY = 3; // 最大重试次数
     // 记录每个频道是否已同步到顶（key: channelId_channelType）
     private static final java.util.HashSet<String> syncedToTopChannels = new java.util.HashSet<>();
@@ -1982,8 +1982,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (!isAutoSyncingHistory) return;
         if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
             isAutoSyncingHistory = false;
-            markSyncCompleted();
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit " + MAX_AUTO_SYNC_MSG + ", stopped");
+            isRefreshLoading = false;
+            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit " + MAX_AUTO_SYNC_MSG + ", paused");
             return;
         }
 
@@ -2078,8 +2078,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 
                 if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
                     isAutoSyncingHistory = false;
-                    markSyncCompleted();
-                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit! total=" + autoSyncedMsgCount);
+                    isRefreshLoading = false;
+                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit, paused! total=" + autoSyncedMsgCount);
                 } else if (newFirstOrderSeq <= 1000) {
                     isAutoSyncingHistory = false;
                     markSyncCompleted();
@@ -2106,7 +2106,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         } else {
             isAutoSyncingHistory = false;
             isRefreshLoading = false;
-            isCanRefresh = false;
             if (autoSyncRetryCount >= MAX_AUTO_SYNC_RETRY) {
                 android.util.Log.d("ChatHistoryFix", "autoSyncHistory: max retries reached, stopped! total=" + autoSyncedMsgCount);
             } else {
