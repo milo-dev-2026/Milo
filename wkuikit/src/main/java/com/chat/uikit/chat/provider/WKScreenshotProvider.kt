@@ -44,10 +44,12 @@ class WKScreenshotProvider : WKChatBaseProvider() {
     ) {
         super.convert(helper, item)
         var content = ""
+        var contentFromUid = ""
         if (!TextUtils.isEmpty(item.wkMsg.content)) {
             try {
                 val jsonObject = JSONObject(item.wkMsg.content)
                 content = jsonObject.optString("text")
+                contentFromUid = jsonObject.optString("from")
             } catch (e: Exception) {
                 content = item.wkMsg.content
             }
@@ -55,14 +57,17 @@ class WKScreenshotProvider : WKChatBaseProvider() {
         if (TextUtils.isEmpty(content)) {
             content = item.wkMsg.baseContentMsgModel?.getDisplayContent() ?: ""
         }
-        // 单聊时根据发送者动态显示文本：自己发的显示"你已截图"，对方发的显示"对方已截图"
+        // 单聊时根据发送者动态显示文本：自己发的显示"你已截图"，对方发的显示"对方已截图"。
+        // 三重判定：本机发送记录 / 消息内容里的 from / msg.fromUID，任意一个命中即算自己。
         if (item.wkMsg.channelType == WKChannelType.PERSONAL) {
             val myUid = WKConfig.getInstance().uid
-            if (!TextUtils.isEmpty(myUid) && myUid == item.wkMsg.fromUID) {
-                content = context.getString(R.string.screenshot_single_self)
-            } else {
-                content = context.getString(R.string.screenshot_single_text)
-            }
+            val modelFromUid = (item.wkMsg.baseContentMsgModel
+                    as? com.chat.uikit.chat.msgmodel.WKScreenshotContent)?.fromUid
+            val isSelf = com.chat.uikit.chat.ScreenShotHelper.isSelfScreenshotMsg(item.wkMsg.clientMsgNO)
+                    || (!TextUtils.isEmpty(myUid) && (myUid == item.wkMsg.fromUID
+                    || myUid == contentFromUid || myUid == modelFromUid))
+            content = if (isSelf) context.getString(R.string.screenshot_single_self)
+            else context.getString(R.string.screenshot_single_text)
         }
         val rootView = helper.getView<View>(R.id.systemRootView)
         rootView?.setOnClickListener {

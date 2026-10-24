@@ -28,6 +28,13 @@ public class ScreenShotHelper {
     private static final long SCREENSHOT_NOTIFY_INTERVAL_MS = 5000;
     private long lastScreenshotNotifyTime = 0;
     private String lastScreenshotName = "";
+    // 本机发出的截图消息 clientMsgNO：渲染时用于可靠判断「自己截图」，不依赖 msg.fromUID
+    private static final java.util.Set<String> SELF_MSG_NOS =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
+    public static boolean isSelfScreenshotMsg(String clientMsgNO) {
+        return clientMsgNO != null && !clientMsgNO.isEmpty() && SELF_MSG_NOS.contains(clientMsgNO);
+    }
 
     private ScreenShotHelper() {}
 
@@ -153,7 +160,11 @@ public class ScreenShotHelper {
                     tip = activity.getString(R.string.screenshot_single_text);
                 }
                 WKScreenshotContent screenshotContent = new WKScreenshotContent(tip);
+                // 携带发送者 uid，接收端据此显示「你已截图 / 对方已截图」
+                screenshotContent.fromUid = WKConfig.getInstance().getUid();
                 WKMsg wkMsg = new WKMsg();
+                wkMsg.clientMsgNO = java.util.UUID.randomUUID().toString().replace("-", "");
+                SELF_MSG_NOS.add(wkMsg.clientMsgNO);
                 wkMsg.channelID = channelId;
                 wkMsg.channelType = (byte) channelType;
                 wkMsg.type = screenshotContent.type;

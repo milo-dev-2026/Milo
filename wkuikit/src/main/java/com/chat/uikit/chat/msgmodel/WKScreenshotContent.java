@@ -15,6 +15,8 @@ import org.json.JSONObject;
 public class WKScreenshotContent extends WKMessageContent {
 
     public String text;
+    // 截图消息发送者 uid：接收端用它可靠区分「自己截图 / 对方截图」，不依赖 msg.fromUID
+    public String fromUid;
 
     public WKScreenshotContent() {
         type = WKContentType.screenshot;
@@ -32,6 +34,7 @@ public class WKScreenshotContent extends WKMessageContent {
         try {
             jsonObject.put("text", text != null ? text : "");
             jsonObject.put("type", type);
+            jsonObject.put("from", fromUid != null ? fromUid : "");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -42,6 +45,7 @@ public class WKScreenshotContent extends WKMessageContent {
     public WKMessageContent decodeMsg(JSONObject jsonObject) {
         if (jsonObject == null) return this;
         text = jsonObject.optString("text");
+        fromUid = jsonObject.optString("from");
         return this;
     }
 
