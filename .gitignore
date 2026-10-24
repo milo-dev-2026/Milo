@@ -47,3 +47,7 @@ ios/DerivedData/
 
 # macOS
 .DS_Store
+
+# python cache
+__pycache__/
+*.pyc
