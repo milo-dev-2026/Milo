@@ -108,6 +108,9 @@ enum APIRouter: URLRequestConvertible {
     case removeBlackList(uid: String)
     case complaint(uid: String, reason: String)
     case rejectFriendApply(uid: String)
+    case getGroupQrCode(groupId: String)
+    case updateGroupSetting(groupId: String, key: String, value: Int)
+    case updateGroupSettingString(groupId: String, key: String, value: String)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -363,6 +366,10 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "reason": reason])
         case let .rejectFriendApply(uid):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
+        case .updateGroupSetting(let groupId, let key, let value):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
+        case .updateGroupSettingString(let groupId, let key, let value):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
         default:
             break
         }
@@ -467,6 +474,9 @@ enum APIRouter: URLRequestConvertible {
         case .removeBlackList(let uid): return "/v1/user/blacklist/\(uid)"
         case .complaint: return "/v1/complaint"
         case .rejectFriendApply: return "/v1/friends/reject"
+        case .getGroupQrCode(let groupId): return "/v1/groups/\(groupId)/qrcode"
+        case .updateGroupSetting(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
+        case .updateGroupSettingString(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         }
     }
 
@@ -484,12 +494,14 @@ enum APIRouter: URLRequestConvertible {
              .setForbidAddFriend, .setForbidTempChat, .setForbidNewMemberViewHistory,
              .updateMyNicknameInGroup, .setMessageDisturb, .setChatTop,
              .saveToContacts, .setShowGroupNickname,
-             .updateUserSetting, .updateUserSettingString, .updateFriendRemark:
+             .updateGroupSetting, .updateGroupSettingString, .updateUserSetting, .updateUserSettingString, .updateFriendRemark:
             return .put
         case .deleteFavorite, .deleteLockScreenPwd, .kickDevice,
              .dismissGroup, .deleteNote, .deleteNoteGroup, .deleteTag,
              .removeBlackList:
             return .delete
+        case .getGroupQrCode:
+            return .get
         default:
             return .post
         }

@@ -520,7 +520,7 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
-        case .info: return 2
+        case .info: return 3
         case .settings: return 4
         case .manage:
             // 群主/管理员才显示管理功能组
@@ -571,6 +571,12 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             case 1:
                 cell.textLabel?.text = "群二维码"
                 cell.imageView?.image = UIImage(systemName: "qrcode")
+            case 2:
+                cell.textLabel?.text = "群备注"
+                cell.imageView?.image = UIImage(systemName: "pencil")
+                cell.detailTextLabel?.text = UserDefaults.standard.string(forKey: "group_remark_\(groupId)") ?? ""
+                cell.detailTextLabel?.font = ScreenAdapter.font(14)
+                cell.detailTextLabel?.textColor = .secondaryLabel
             default: break
             }
             return cell
@@ -670,6 +676,10 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             case 1:
                 // 群二维码
                 let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
+                navigationController?.pushViewController(vc, animated: true)
+            case 2:
+                // 群备注
+                let vc = SetGroupRemarkViewController(groupId: groupId)
                 navigationController?.pushViewController(vc, animated: true)
             default: break
             }

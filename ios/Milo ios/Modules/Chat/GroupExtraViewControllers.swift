@@ -55,6 +55,65 @@ class GroupQRCodeViewController: UIViewController {
         }
 
         generateQRCode()
+        loadServerQRCode()
+
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis"),
+            style: .plain,
+            target: self,
+            action: #selector(showMoreMenu)
+        )
+        navigationItem.rightBarButtonItem?.tintColor = .themePrimary
+    }
+
+    @objc private func showMoreMenu() {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "保存二维码图片", style: .default) { [weak self] _ in
+            self?.saveQRCodeImage()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    private func saveQRCodeImage() {
+        guard let image = qrImageView.image else { return }
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if error != nil {
+            AppUtility.showToast("保存失败")
+        } else {
+            AppUtility.showToast("已保存到相册")
+        }
+    }
+
+    private func loadServerQRCode() {
+        Task {
+            do {
+                let response = try await APIClient.shared.requestRaw(.getGroupQrCode(groupId: groupId))
+                if let data = response["data"] as? [String: Any],
+                   let qrcode = data["qrcode"] as? String, !qrcode.isEmpty {
+                    DispatchQueue.main.async {
+                        self.displayQRCode(from: qrcode)
+                        self.tipLabel.text = "该二维码永久有效"
+                    }
+                }
+            } catch {
+                // 服务端获取失败时保持本地生成的二维码
+            }
+        }
+    }
+
+    private func displayQRCode(from string: String) {
+        guard let data = string.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else { return }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel")
+        guard let outputImage = filter.outputImage else { return }
+        let scale = max(qrImageView.bounds.width, 200) / outputImage.extent.width
+        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        qrImageView.image = UIImage(ciImage: scaledImage)
     }
 
     private func generateQRCode() {
@@ -205,13 +264,50 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "JGCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+        loadGroups()
+    }
+
+    private func loadGroups() {
+        // 从会话列表获取群频道
+        let conversations = IMManager.shared.getConversationList()
+        var list: [(groupId: String, name: String, memberCount: Int)] = []
+        for conv in conversations {
+            if conv.channel.channelType == 2 {
+                let gid = conv.channel.channelId ?? ""
+                var name = gid
+                if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2) {
+                    name = info.name ?? gid
+                }
+                list.append((groupId: gid, name: name, memberCount: 0))
+            }
+        }
+        // 按名称排序
+        list.sort { $0.name < $1.name }
+        DispatchQueue.main.async {
+            self.groups = list
+            self.tableView.reloadData()
+        }
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(groups.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "JGCell", for: indexPath)
         if groups.isEmpty { cell.textLabel?.text = "暂未加入群组"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let g = groups[indexPath.row]; cell.textLabel?.text = g.name; cell.detailTextLabel?.text = "\(g.memberCount)人"; cell.imageView?.image = UIImage(systemName: "person.3.fill"); cell.imageView?.tintColor = .themePrimary }
+        else {
+            let g = groups[indexPath.row]
+            cell.textLabel?.text = g.name
+            cell.detailTextLabel?.text = "\(g.memberCount)人"
+            cell.imageView?.image = UIImage(systemName: "person.3.fill")
+            cell.imageView?.tintColor = .themePrimary
+            AppUtility.loadChannelAvatar(channelId: g.groupId, channelType: 2, name: g.name, into: cell.imageView!)
+        }
         return cell
+    }
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard !groups.isEmpty else { return }
+        let g = groups[indexPath.row]
+        let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
+        navigationController?.pushViewController(chatVC, animated: true)
     }
 }
 
@@ -229,13 +325,84 @@ class SavedGroupsViewController: UIViewController, UITableViewDataSource, UITabl
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SGCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: "创建新群",
+            style: .plain,
+            target: self,
+            action: #selector(createNewGroup)
+        )
+        navigationItem.rightBarButtonItem?.tintColor = .themePrimary
+
+        loadSavedGroups()
+    }
+
+    private func loadSavedGroups() {
+        Task {
+            // 从会话列表获取群频道，过滤已保存到通讯录的
+            let conversations = IMManager.shared.getConversationList()
+            var list: [(groupId: String, name: String)] = []
+            for conv in conversations {
+                if conv.channel.channelType == 2 {
+                    let gid = conv.channel.channelId ?? ""
+                    var name = gid
+                    if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2) {
+                        name = info.name ?? gid
+                    }
+                    // 检查是否已保存到通讯录
+                    if let groupInfo = try? await APIClient.shared.requestRaw(.getGroupInfo(groupId: gid)),
+                       let data = groupInfo["data"] as? [String: Any],
+                       let saved = data["saved_to_contacts"] as? Bool, saved {
+                        list.append((groupId: gid, name: name))
+                    }
+                }
+            }
+            list.sort { $0.name < $1.name }
+            DispatchQueue.main.async {
+                self.groups = list
+                self.tableView.reloadData()
+            }
+        }
+    }
+
+    @objc private func createNewGroup() {
+        let vc = ChooseContactsViewController(maxSelection: 99)
+        vc.onContactsSelected = { [weak self] uids in
+            guard let self = self else { return }
+            Task {
+                do {
+                    let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: "", memberUids: uids))
+                    _ = response
+                    DispatchQueue.main.async {
+                        AppUtility.showToast("创建成功")
+                        self.loadSavedGroups()
+                    }
+                } catch {
+                    DispatchQueue.main.async { AppUtility.showToast("创建失败") }
+                }
+            }
+        }
+        navigationController?.pushViewController(vc, animated: true)
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(groups.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "SGCell", for: indexPath)
         if groups.isEmpty { cell.textLabel?.text = "暂无保存的群"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let g = groups[indexPath.row]; cell.textLabel?.text = g.name; cell.imageView?.image = UIImage(systemName: "bookmark.fill"); cell.imageView?.tintColor = .themePrimary }
+        else {
+            let g = groups[indexPath.row]
+            cell.textLabel?.text = g.name
+            cell.imageView?.image = UIImage(systemName: "bookmark.fill")
+            cell.imageView?.tintColor = .themePrimary
+            AppUtility.loadChannelAvatar(channelId: g.groupId, channelType: 2, name: g.name, into: cell.imageView!)
+        }
         return cell
+    }
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard !groups.isEmpty else { return }
+        let g = groups[indexPath.row]
+        let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
+        navigationController?.pushViewController(chatVC, animated: true)
     }
 }
 
@@ -417,8 +584,21 @@ class SetGroupRemarkViewController: UIViewController {
         saveButton.snp.makeConstraints { make in make.height.equalTo(ScreenAdapter.scaleH(48)) }
     }
     @objc private func save() {
-        UserDefaults.standard.set(textField.text, forKey: "group_remark_\(groupId)")
-        AppUtility.showToast("已保存"); navigationController?.popViewController(animated: true)
+        let remark = textField.text ?? ""
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.updateGroupSettingString(groupId: groupId, key: "remark", value: remark))
+                UserDefaults.standard.set(remark, forKey: "group_remark_\(groupId)")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("已保存")
+                    self.navigationController?.popViewController(animated: true)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("保存失败")
+                }
+            }
+        }
     }
 }
 
@@ -427,6 +607,7 @@ class UpdateGroupNameViewController: UIViewController {
     private var groupId: String
     private let textField = UITextField()
     private let saveButton = UIButton(type: .system)
+    private var currentName: String = ""
 
     init(groupId: String) { self.groupId = groupId; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError() }
@@ -449,9 +630,41 @@ class UpdateGroupNameViewController: UIViewController {
         }
         textField.snp.makeConstraints { make in make.height.equalTo(ScreenAdapter.scaleH(48)) }
         saveButton.snp.makeConstraints { make in make.height.equalTo(ScreenAdapter.scaleH(48)) }
+
+        loadCurrentName()
     }
+
+    private func loadCurrentName() {
+        Task {
+            do {
+                let response: APIResponse<Group> = try await APIClient.shared.request(.getGroupInfo(groupId: groupId))
+                if let data = response.data {
+                    DispatchQueue.main.async {
+                        self.currentName = data.name
+                        self.textField.text = data.name
+                    }
+                }
+            } catch {}
+        }
+    }
+
     @objc private func save() {
         guard let name = textField.text, !name.isEmpty else { AppUtility.showToast("请输入群名"); return }
-        AppUtility.showToast("已修改"); navigationController?.popViewController(animated: true)
+        guard name != currentName else { AppUtility.showToast("群名未修改"); return }
+        saveButton.isEnabled = false
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.updateGroupInfo(groupId: groupId, name: name, avatar: nil))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("已修改")
+                    self.navigationController?.popViewController(animated: true)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.saveButton.isEnabled = true
+                    AppUtility.showToast("修改失败")
+                }
+            }
+        }
     }
 }
