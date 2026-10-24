@@ -1238,10 +1238,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         long aroundMsgSeq = 0;
         // 默认允许加载更多历史消息，确保能全量同步历史记录
         isCanLoadMore = true;
-        if (unreadStartMsgOrderSeq != 0) {
-            aroundMsgSeq = unreadStartMsgOrderSeq;
-        }
-        isUpdateRedDot = unreadStartMsgOrderSeq > 0;
+        // 进入会话统一定位到最新一条消息，不再跳到首条未读
+        unreadStartMsgOrderSeq = 0;
+        isUpdateRedDot = redDot > 0;
         if (lastPreviewMsgOrderSeq != 0) aroundMsgSeq = lastPreviewMsgOrderSeq;
         if (tipsOrderSeq != 0) {
             aroundMsgSeq = tipsOrderSeq;
@@ -1262,8 +1261,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
                 // 标记非首次加载，getData时用loadMoreLimit同步更新的消息
                 isFirstDataLoad = false;
-                // 同步最新消息（往新的方向拉）
-                getData(1, false, 0, false);
+                // 同步最新消息（往新的方向拉），保持停在最新一条
+                getData(1, false, 0, isScrollToEnd);
             } else {
                 getData(lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
             }
