@@ -198,19 +198,32 @@ class MySettingViewController: UIViewController {
 
     // MARK: - 加载用户信息
     private func loadUserInfo() {
-        if let userInfo = UserDefaults.standard.dictionary(forKey: "userInfo"),
-           let name = userInfo["name"] as? String {
-            nameLabel.text = name
-            if let uid = userInfo["uid"] as? String {
-                idLabel.text = "Milo号：\(uid)"
-                if let avatarUrl = userInfo["avatar"] as? String, let url = URL(string: avatarUrl) {
-                    AppUtility.loadAvatar(url, into: avatarImageView)
+        let defaults = UserDefaults.standard
+        let uid = defaults.string(forKey: "uid") ?? ""
+        let token = defaults.string(forKey: "token") ?? ""
+        if !uid.isEmpty && !token.isEmpty {
+            let name = defaults.string(forKey: "name") ?? ""
+            nameLabel.text = name.isEmpty ? "Milo用户" : name
+            let shortNo = defaults.string(forKey: "short_no") ?? ""
+            idLabel.text = "Milo号：\(shortNo.isEmpty ? uid : shortNo)"
+            if let avatarUrl = defaults.string(forKey: "avatar"), !avatarUrl.isEmpty {
+                let fullURLString: String
+                if avatarUrl.hasPrefix("http") {
+                    fullURLString = avatarUrl
+                } else {
+                    let path = avatarUrl.hasPrefix("/") ? avatarUrl : "/\(avatarUrl)"
+                    fullURLString = APIConfig.apiBaseURL + path
                 }
+                AppUtility.loadAvatar(URL(string: fullURLString), into: avatarImageView)
+            } else {
+                avatarImageView.image = UIImage(systemName: "person.circle.fill")
+                avatarImageView.tintColor = .systemGray5
             }
         } else {
             nameLabel.text = "点击登录"
             idLabel.text = ""
             avatarImageView.image = UIImage(systemName: "person.circle.fill")
+            avatarImageView.tintColor = .systemGray5
         }
     }
 
@@ -221,9 +234,8 @@ class MySettingViewController: UIViewController {
     }
 
     @objc private func showMyQRCode() {
-        let userInfo = UserDefaults.standard.dictionary(forKey: "userInfo") ?? [:]
-        let uid = userInfo["uid"] as? String ?? ""
-        let name = userInfo["name"] as? String ?? ""
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        let name = UserDefaults.standard.string(forKey: "name") ?? ""
         let qrVC = UserQRCodeViewController(uid: uid, name: name)
         navigationController?.pushViewController(qrVC, animated: true)
     }

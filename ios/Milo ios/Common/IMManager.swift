@@ -20,6 +20,8 @@ class IMManager: NSObject {
     var onReminderChanged: ((WKChannel, [WKReminder]) -> Void)?
 
     private var isSetup = false
+    /// 当前 IM 连接状态（由 onConnectStatus 回调维护）
+    private(set) var isConnected = false
 
     static let messageReceivedNotification = NSNotification.Name("IMMessageReceived")
     static let messageStatusUpdateNotification = NSNotification.Name("IMMessageStatusUpdate")
@@ -314,11 +316,16 @@ class IMManager: NSObject {
     }
 
     func disconnect() {
+        isConnected = false
         WKSDK.shared().connectionManager.disconnect(false)
     }
 
     // MARK: - 发送文本消息
     func sendTextMessage(channelId: String, content: String, channelType: Int = 1) {
+        if !isConnected {
+            print("[IM] 发送时未连接，尝试重新连接")
+            connect()
+        }
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -584,6 +591,7 @@ extension IMManager: WKConnectionManagerDelegate {
                 print("[IM] 状态: \(status.rawValue), reason: \(reasonCode.rawValue)")
                 break
             }
+            self.isConnected = isConnected
             self.onConnectionChanged?(isConnected)
             NotificationCenter.default.post(name: IMManager.connectionStatusChangedNotification, object: NSNumber(value: isConnected))
         }
@@ -592,6 +600,7 @@ extension IMManager: WKConnectionManagerDelegate {
     func onKick(_ reasonCode: WKReason) {
         DispatchQueue.main.async {
             print("[IM] 被踢下线, reason: \(reasonCode.rawValue)")
+            self.isConnected = false
             self.onConnectionChanged?(false)
             NotificationCenter.default.post(name: IMManager.connectionStatusChangedNotification, object: NSNumber(value: false))
         }

@@ -146,6 +146,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func setupKeyboardManager() {
         IQKeyboardManager.shared.isEnabled = true
         IQKeyboardManager.shared.resignOnTouchOutside = true
+        // 聊天页自行处理键盘弹出，禁用 IQKeyboardManager 避免双重偏移导致输入栏飞出屏幕
+        IQKeyboardManager.shared.disabledDistanceHandlingClasses.append(ChatViewController.self)
     }
 
     // MARK: - APNs Token

@@ -90,30 +90,31 @@ class ChatInputBar: UIView {
 
         addSubviews(emojiButton, textView, sendButton, moreButton)
 
+        moreButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-hPad)
+            make.centerY.equalTo(textView)
+            make.width.height.equalTo(ScreenAdapter.scaleW(28))
+        }
+
+        sendButton.snp.makeConstraints { make in
+            make.trailing.equalTo(moreButton.snp.leading).offset(-hPad)
+            make.centerY.equalTo(textView)
+            make.width.equalTo(ScreenAdapter.scaleW(44))
+            make.height.equalTo(ScreenAdapter.scaleH(36))
+        }
+
         emojiButton.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
-            make.top.equalToSuperview().offset(vPad)
+            make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
 
         textView.snp.makeConstraints { make in
             make.leading.equalTo(emojiButton.snp.trailing).offset(hPad)
             make.top.equalToSuperview().offset(vPad)
+            make.bottom.equalToSuperview().offset(-vPad)
             self.textViewHeight = make.height.equalTo(minH).constraint
             make.trailing.equalTo(sendButton.snp.leading).offset(-hPad)
-        }
-
-        sendButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-hPad)
-            make.centerY.equalTo(textView)
-            make.width.equalTo(ScreenAdapter.scaleW(44))
-        }
-
-        moreButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-hPad)
-            make.top.equalTo(textView.snp.bottom).offset(vPad)
-            make.width.height.equalTo(ScreenAdapter.scaleW(28))
-            make.bottom.equalToSuperview().offset(-vPad)
         }
     }
 

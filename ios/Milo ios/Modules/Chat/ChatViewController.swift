@@ -346,10 +346,11 @@ class ChatViewController: UIViewController {
 
     @objc private func keyboardWillShow(_ notification: Notification) {
         if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-            let height = frame.height
+            let bottomInset = view.safeAreaInsets.bottom
+            let offset = max(frame.height - bottomInset, 0)
             UIView.animate(withDuration: 0.25) {
                 self.inputBar.snp.updateConstraints { make in
-                    make.bottom.equalTo(self.view.safeAreaLayoutGuide.snp.bottom).offset(-height)
+                    make.bottom.equalTo(self.view.safeAreaLayoutGuide.snp.bottom).offset(-offset)
                 }
                 self.view.layoutIfNeeded()
             }
@@ -641,6 +642,9 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 extension ChatViewController: ChatInputBarDelegate {
 
     func didSendTextMessage(_ text: String) {
+        if !IMManager.shared.isConnected {
+            AppUtility.showToast("连接已断开，正在重连...")
+        }
         IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
         let msg = Message(
             messageID: UUID().uuidString,
