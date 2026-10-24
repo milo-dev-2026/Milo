@@ -23,7 +23,8 @@ enum APIRouter: URLRequestConvertible {
     case deleteMessage(messageId: String)
     case syncFriends
     case getChannelInfo(channelId: String, channelType: Int)
-    case updateUserInfo(name: String?, avatar: String?)
+    case updateUserInfo(name: String?, avatar: String?, shortNo: String? = nil)
+    case updateUserInfoFields([String: Any])
     case getGroupInfo(groupId: String)
     case uploadFile(fileName: String, data: Data)
     case getFriendsApply
@@ -99,6 +100,14 @@ enum APIRouter: URLRequestConvertible {
     case syncTags
     case upsertTag(id: String, name: String, colorRawValue: Int, members: [Any], updateTime: Int64)
     case deleteTag(tagId: String)
+    // P0: 单聊设置 / 用户黑名单 / 好友备注 / 投诉
+    case updateUserSetting(key: String, value: Int)
+    case updateUserSettingString(key: String, value: String)
+    case updateFriendRemark(uid: String, remark: String)
+    case addBlackList(uid: String)
+    case removeBlackList(uid: String)
+    case complaint(uid: String, reason: String)
+    case rejectFriendApply(uid: String)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -195,11 +204,14 @@ enum APIRouter: URLRequestConvertible {
             ])
         case let .getChannelInfo(channelId, channelType):
             break
-        case let .updateUserInfo(name, avatar):
+        case let .updateUserInfo(name, avatar, shortNo):
             var body: [String: Any] = [:]
             if let n = name { body["name"] = n }
             if let a = avatar { body["avatar"] = a }
+            if let s = shortNo { body["short_no"] = s }
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        case let .updateUserInfoFields(fields):
+            request.httpBody = try JSONSerialization.data(withJSONObject: fields)
         case let .getGroupInfo(groupId):
             request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
         case let .uploadFile(fileName, data):
@@ -341,6 +353,16 @@ enum APIRouter: URLRequestConvertible {
                 "id": id, "name": name, "colorRawValue": colorRawValue,
                 "members": members, "updateTime": updateTime
             ])
+        case let .updateUserSetting(key, value):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
+        case let .updateUserSettingString(key, value):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
+        case let .updateFriendRemark(uid, remark):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "remark": remark])
+        case let .complaint(uid, reason):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "reason": reason])
+        case let .rejectFriendApply(uid):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
         default:
             break
         }
@@ -369,7 +391,7 @@ enum APIRouter: URLRequestConvertible {
         case .deleteMessage: return "/v1/messages/delete"
         case .syncFriends: return "/v1/friend/sync"
         case let .getChannelInfo(channelId, channelType): return "/v1/channels/\(channelId)/\(channelType)"
-        case .updateUserInfo: return "/v1/user/current"
+        case .updateUserInfo, .updateUserInfoFields: return "/v1/user/current"
         case .getGroupInfo: return "/v1/groups/info"
         case .uploadFile: return "/v1/files/upload"
         case .getFriendsApply: return "/v1/friends/apply"
@@ -439,6 +461,12 @@ enum APIRouter: URLRequestConvertible {
         case .syncTags: return "/v1/tags/sync"
         case .upsertTag: return "/v1/tags"
         case .deleteTag(let tagId): return "/v1/tags/\(tagId)"
+        case .updateUserSetting, .updateUserSettingString: return "/v1/user/my/setting"
+        case .updateFriendRemark: return "/v1/friend/remark"
+        case .addBlackList(let uid): return "/v1/user/blacklist/\(uid)"
+        case .removeBlackList(let uid): return "/v1/user/blacklist/\(uid)"
+        case .complaint: return "/v1/complaint"
+        case .rejectFriendApply: return "/v1/friends/reject"
         }
     }
 
@@ -455,10 +483,12 @@ enum APIRouter: URLRequestConvertible {
              .updateGroupInfo, .setJoinApproval, .setGroupMuteAll,
              .setForbidAddFriend, .setForbidTempChat, .setForbidNewMemberViewHistory,
              .updateMyNicknameInGroup, .setMessageDisturb, .setChatTop,
-             .saveToContacts, .setShowGroupNickname:
+             .saveToContacts, .setShowGroupNickname,
+             .updateUserSetting, .updateUserSettingString, .updateFriendRemark:
             return .put
         case .deleteFavorite, .deleteLockScreenPwd, .kickDevice,
-             .dismissGroup, .deleteNote, .deleteNoteGroup, .deleteTag:
+             .dismissGroup, .deleteNote, .deleteNoteGroup, .deleteTag,
+             .removeBlackList:
             return .delete
         default:
             return .post

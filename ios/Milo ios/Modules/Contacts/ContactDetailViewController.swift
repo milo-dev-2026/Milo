@@ -153,7 +153,7 @@ class ContactDetailViewController: UIViewController {
         }
 
         addInfoRow(to: infoCard, title: "设置备注和标签", showArrow: true, isLast: true) { [weak self] in
-            AppUtility.showToast("设置备注")
+            self?.showRemarkEditor()
         }
 
         // MARK: - 操作按钮区
@@ -215,8 +215,11 @@ class ContactDetailViewController: UIViewController {
         addInfoRow(to: moreCard, title: "推荐给朋友", showArrow: true) {
             AppUtility.showToast("推荐给朋友")
         }
-        addInfoRow(to: moreCard, title: "加入黑名单", showArrow: false, isLast: true, isDestructive: true) { [weak self] in
-            self?.showBlockAlert()
+        addInfoRow(to: moreCard, title: "投诉", showArrow: true) { [weak self] in
+            self?.showComplaintEditor()
+        }
+        addInfoRow(to: moreCard, title: isBlacklisted ? "移出黑名单" : "加入黑名单", showArrow: false, isLast: true, isDestructive: true) { [weak self] in
+            self?.toggleBlacklist()
         }
 
         // 底部约束
@@ -320,6 +323,121 @@ class ContactDetailViewController: UIViewController {
     // MARK: - 按钮操作
     @objc private func backTapped() {
         navigationController?.popViewController(animated: true)
+    }
+
+    private var isBlacklisted = false
+
+    // MARK: - 显示备注编辑
+    private func showRemarkEditor() {
+        let alert = UIAlertController(title: "设置备注", message: nil, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "请输入备注名"
+            textField.text = self.userInfo?.remark ?? ""
+        }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { [weak self] _ in
+            guard let self = self, let remark = alert.textFields?.first?.text else { return }
+            self.saveRemark(remark)
+        })
+        present(alert, animated: true)
+    }
+
+    private func saveRemark(_ remark: String) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.updateFriendRemark(uid: uid, remark: remark))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("备注已保存")
+                    self.userInfo?.remark = remark
+                    self.remarkLabel.text = remark.isEmpty ? "" : "备注：\(remark)"
+                    // 刷新通讯录缓存
+                    NotificationCenter.default.post(name: NSNotification.Name("ContactsSynced"), object: nil)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("保存备注失败")
+                }
+            }
+        }
+    }
+
+    // MARK: - 显示投诉编辑
+    private func showComplaintEditor() {
+        let alert = UIAlertController(title: "投诉", message: "请描述投诉原因", preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "请输入投诉原因"
+        }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "提交", style: .destructive) { [weak self] _ in
+            guard let self = self, let reason = alert.textFields?.first?.text, !reason.isEmpty else { return }
+            self.submitComplaint(reason: reason)
+        })
+        present(alert, animated: true)
+    }
+
+    private func submitComplaint(reason: String) {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.complaint(uid: uid, reason: reason))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("投诉已提交")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("投诉提交失败")
+                }
+            }
+        }
+    }
+
+    // MARK: - 黑名单切换
+    private func toggleBlacklist() {
+        if isBlacklisted {
+            removeFromBlacklist()
+        } else {
+            showBlockAlert()
+        }
+    }
+
+    private func showBlockAlert() {
+        let alert = UIAlertController(title: "加入黑名单", message: "加入黑名单后将不再接收对方消息", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
+            self?.addToBlacklist()
+        })
+        present(alert, animated: true)
+    }
+
+    private func addToBlacklist() {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.addBlackList(uid: uid))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("已加入黑名单")
+                    self.isBlacklisted = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("操作失败")
+                }
+            }
+        }
+    }
+
+    private func removeFromBlacklist() {
+        Task {
+            do {
+                _ = try await APIClient.shared.requestRaw(.removeBlackList(uid: uid))
+                DispatchQueue.main.async {
+                    AppUtility.showToast("已移出黑名单")
+                    self.isBlacklisted = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("操作失败")
+                }
+            }
+        }
     }
 
     @objc private func sendMessageTapped() {

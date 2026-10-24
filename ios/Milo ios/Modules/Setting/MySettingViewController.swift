@@ -217,8 +217,8 @@ class MySettingViewController: UIViewController {
 
     // MARK: - 页面跳转
     @objc private func showMyInfo() {
-        let profileVC = ProfileEditViewController()
-        navigationController?.pushViewController(profileVC, animated: true)
+        let myInfoVC = MyInfoViewController()
+        navigationController?.pushViewController(myInfoVC, animated: true)
     }
 
     @objc private func showMyQRCode() {

@@ -230,8 +230,8 @@ class ChatViewController: UIViewController {
                 self?.searchChatHistory()
             })
         } else {
-            alert.addAction(UIAlertAction(title: "联系人资料", style: .default) { [weak self] _ in
-                self?.openContactDetail()
+            alert.addAction(UIAlertAction(title: "聊天信息", style: .default) { [weak self] _ in
+                self?.openChatPersonal()
             })
             alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
                 AppUtility.showToast("语音通话")
@@ -241,9 +241,6 @@ class ChatViewController: UIViewController {
             })
             alert.addAction(UIAlertAction(title: "查找聊天记录", style: .default) { [weak self] _ in
                 self?.searchChatHistory()
-            })
-            alert.addAction(UIAlertAction(title: "设为免打扰", style: .default) { _ in
-                AppUtility.showToast("已设为免打扰")
             })
         }
 
@@ -262,6 +259,11 @@ class ChatViewController: UIViewController {
     private func openContactDetail() {
         let detailVC = ContactDetailViewController(uid: channelId)
         navigationController?.pushViewController(detailVC, animated: true)
+    }
+
+    private func openChatPersonal() {
+        let vc = ChatPersonalViewController(channelId: channelId, title: titleText, channelType: channelType)
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     private func searchChatHistory() {

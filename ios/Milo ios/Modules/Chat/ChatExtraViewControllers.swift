@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 import AVFoundation
 
@@ -299,60 +299,6 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
     }
 }
 
-class ChatPersonalViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var channelId: String
-
-    init(channelId: String) { self.channelId = channelId; super.init(nibName: nil, bundle: nil) }
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        title = "聊天信息"
-        view.backgroundColor = .themeBackground
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "ChatPersonalCell")
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-    }
-
-    func numberOfSections(in tableView: UITableView) -> Int { 2 }
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { section == 0 ? 1 : 3 }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ChatPersonalCell", for: indexPath)
-        cell.accessoryType = .disclosureIndicator
-        cell.imageView?.tintColor = .themePrimary
-        if indexPath.section == 0 {
-            cell.textLabel?.text = "聊天背景"
-            cell.imageView?.image = UIImage(systemName: "photo")
-        } else {
-            switch indexPath.row {
-            case 0: cell.textLabel?.text = "消息隐私"; cell.imageView?.image = UIImage(systemName: "eye.slash")
-            case 1: cell.textLabel?.text = "置顶消息"; cell.imageView?.image = UIImage(systemName: "pin")
-            case 2: cell.textLabel?.text = "清空聊天记录"; cell.imageView?.image = UIImage(systemName: "trash"); cell.textLabel?.textColor = .systemRed
-            default: break
-            }
-        }
-        return cell
-    }
-
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        switch (indexPath.section, indexPath.row) {
-        case (0, 0): navigationController?.pushViewController(ChatBackgroundViewController(), animated: true)
-        case (1, 0): navigationController?.pushViewController(ChatMessagePrivacyViewController(), animated: true)
-        case (1, 1): navigationController?.pushViewController(MessagePinViewController(), animated: true)
-        case (1, 2):
-            let alert = UIAlertController(title: "清空聊天记录", message: "确定清空当前聊天记录？", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            alert.addAction(UIAlertAction(title: "确定", style: .destructive) { _ in AppUtility.showToast("已清空") })
-            present(alert, animated: true)
-        default: break
-        }
-    }
-}
 
 class ChatFileViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)

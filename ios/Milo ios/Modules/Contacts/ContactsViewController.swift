@@ -241,7 +241,8 @@ class ContactsViewController: UIViewController {
 
     // MARK: - 入口项点击
     @objc private func showFriendApplyList() {
-        AppUtility.showToast("新的朋友")
+        let vc = NewFriendsViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSavedGroups() {
