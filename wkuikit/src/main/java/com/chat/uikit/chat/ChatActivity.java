@@ -732,6 +732,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     isTipMessage = false;
                     CommonAnim.getInstance().showOrHide(wkVBinding.timeTv, false, true);
                     EndpointManager.getInstance().invoke("stop_reaction_animation", null);
+                    android.util.Log.d("ScrollDbg", "idle canDown=" + wkVBinding.recyclerView.canScrollVertically(1) + " canUp=" + wkVBinding.recyclerView.canScrollVertically(-1) + " first=" + linearLayoutManager.findFirstVisibleItemPosition() + " last=" + linearLayoutManager.findLastVisibleItemPosition() + " count=" + chatAdapter.getItemCount());
                     if (!wkVBinding.recyclerView.canScrollVertically(1)) { // 到达底部
                         showMoreLoading();
                     } else if (!wkVBinding.recyclerView.canScrollVertically(-1)) { // 到达顶部
@@ -1456,7 +1457,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
         // 指定群不展示系统通知、撤回提示、截图提示
-        if (HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) && channelType == WKChannelType.GROUP && WKReader.isNotEmpty(msgList)) {
+        if (isHideSystemNotifyChannel() && WKReader.isNotEmpty(msgList)) {
             List<WKMsg> visibleList = new ArrayList<>(msgList.size());
             for (WKMsg msg : msgList) {
                 if (!isHideSystemNotifyMsg(msg)) {
@@ -1676,6 +1677,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
             }
         } else {
+            android.util.Log.d("ScrollDbg", "showData tail: isScrollToEnd=" + isScrollToEnd + " pullMode=" + pullMode + " isSetNewData=" + isSetNewData + " count=" + chatAdapter.getItemCount());
             if (isScrollToEnd)
                 wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
             else wkVBinding.recyclerView.setVisibility(View.VISIBLE);
@@ -1903,7 +1905,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      */
     private boolean isPageAllHidden(List<WKMsg> list) {
         if (WKReader.isEmpty(list)) return false;
-        if (!HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) || channelType != WKChannelType.GROUP) return false;
+        if (!isHideSystemNotifyChannel()) return false;
         int realCount = 0;
         int hiddenCount = 0;
         for (WKMsg msg : list) {
@@ -1923,6 +1925,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         for (int i = 0, size = data.size(); i < size; i++) {
             WKMsg msg = data.get(i).wkMsg;
             if (msg != null && anchorMsgNo.equals(msg.clientMsgNO)) {
+                android.util.Log.d("ScrollDbg", "keepScrollPosition restore anchor=" + anchorMsgNo + " index=" + i + " offset=" + anchorOffset + " count=" + data.size());
                 linearLayoutManager.scrollToPositionWithOffset(i, anchorOffset);
                 return;
             }
@@ -1930,11 +1933,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void scrollToPosition(int index) {
+        android.util.Log.d("ScrollDbg", "scrollToPosition index=" + index + " count=" + chatAdapter.getItemCount() + " caller=" + android.util.Log.getStackTraceString(new Throwable()).substring(0, 260));
         linearLayoutManager.scrollToPosition(index);
     }
 
 
     private void showRefreshLoading() {
+        android.util.Log.d("ScrollDbg", "showRefreshLoading called isRefreshLoading=" + isRefreshLoading + " isCanRefresh=" + isCanRefresh);
         if (isRefreshLoading || !isCanRefresh) return;
         isRefreshLoading = true;
         WKMsg wkMsg = new WKMsg();
@@ -1955,6 +1960,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void showMoreLoading() {
+        android.util.Log.d("ScrollDbg", "showMoreLoading called isMoreLoading=" + isMoreLoading + " isCanLoadMore=" + isCanLoadMore);
         if (isMoreLoading || !isCanLoadMore) return;
         isMoreLoading = true;
         WKMsg wkMsg = new WKMsg();
@@ -3384,22 +3390,33 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
     }
 
-    // 该群不展示任何系统通知消息（入群/退群/管理员变更/群信息变更/群公告等）
-    private static final String HIDE_SYSTEM_NOTIFY_CHANNEL_ID = "ab8d2a8ed49747658ca5682abd593ca5";
+    // 需要隐藏全部系统通知的群（入群/退群/管理员变更/群信息变更/群公告/撤回/截图提示等）
+    // 新增群只需在此追加 channel_id
+    private static final String[] HIDE_SYSTEM_NOTIFY_CHANNEL_IDS = {
+            "ab8d2a8ed49747658ca5682abd593ca5"
+    };
 
     /**
-     * 是否为需要隐藏的系统通知消息（仅针对指定群）
+     * 当前会话是否为需要隐藏系统通知的群
+     */
+    private boolean isHideSystemNotifyChannel() {
+        if (channelType != WKChannelType.GROUP) return false;
+        for (String id : HIDE_SYSTEM_NOTIFY_CHANNEL_IDS) {
+            if (id.equals(channelId)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 是否为需要隐藏的系统通知类消息
+     * 覆盖：系统通知(1000-2000)、撤回提示、本地撤回占位、截图提示
      */
     private boolean isHideSystemNotifyMsg(WKMsg msg) {
-        if (msg == null
-                || !HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId)
-                || channelType != WKChannelType.GROUP) {
-            return false;
-        }
-        // 系统通知类（入群/退群/管理员变更/群信息变更等）、撤回提示、截图提示
+        if (msg == null || !isHideSystemNotifyChannel()) return false;
         return WKContentType.isSystemMsg(msg.type)
                 || msg.type == WKContentType.revoke
-                || msg.type == WKContentType.screenshot;
+                || msg.type == WKContentType.screenshot
+                || (msg.remoteExtra != null && msg.remoteExtra.revoke == 1);
     }
 
     private synchronized void refreshMsg(WKMsg wkMsg) {
