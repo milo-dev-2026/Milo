@@ -613,6 +613,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         chatAdapter = new ChatAdapter(this, ChatAdapter.AdapterType.normalMessage);
         linearLayoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
+        // 聊天页从底部堆叠，进入会话天然贴住最新消息
+        linearLayoutManager.setStackFromEnd(true);
         wkVBinding.recyclerView.setLayoutManager(linearLayoutManager);
         wkVBinding.recyclerView.setAdapter(chatAdapter);
         wkVBinding.recyclerView.setItemAnimator(new MyItemAnimator());
@@ -1242,11 +1244,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         // 进入会话统一定位到最新一条消息，不再跳到首条未读
         unreadStartMsgOrderSeq = 0;
         isUpdateRedDot = redDot > 0;
-        if (lastPreviewMsgOrderSeq != 0) aroundMsgSeq = lastPreviewMsgOrderSeq;
-        if (tipsOrderSeq != 0) {
-            aroundMsgSeq = tipsOrderSeq;
-        }
-        if (aroundMsgSeq == 0 && getIntent().hasExtra("aroundMsgSeq")) {
+        // 进入会话统一定位在最新消息，只有搜索/置顶/提醒等显式跳转才使用 aroundMsgSeq
+        if (getIntent().hasExtra("aroundMsgSeq")) {
             aroundMsgSeq = getIntent().getLongExtra("aroundMsgSeq", 0);
         }
         // 只有显式跳转到某条消息时才不定位到最新
