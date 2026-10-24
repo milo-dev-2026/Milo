@@ -726,13 +726,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             @Override
             public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
                 super.onScrollStateChanged(recyclerView, newState);
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) userScrolledSinceEnter = true;
                 int lastItemPosition = linearLayoutManager.findLastVisibleItemPosition();
                 isShowHistory = lastItemPosition < chatAdapter.getItemCount() - 1;
                 if (newState == SCROLL_STATE_IDLE) {
                     isTipMessage = false;
                     CommonAnim.getInstance().showOrHide(wkVBinding.timeTv, false, true);
                     EndpointManager.getInstance().invoke("stop_reaction_animation", null);
-                    android.util.Log.d("ScrollDbg", "idle canDown=" + wkVBinding.recyclerView.canScrollVertically(1) + " canUp=" + wkVBinding.recyclerView.canScrollVertically(-1) + " first=" + linearLayoutManager.findFirstVisibleItemPosition() + " last=" + linearLayoutManager.findLastVisibleItemPosition() + " count=" + chatAdapter.getItemCount());
                     if (!wkVBinding.recyclerView.canScrollVertically(1)) { // 到达底部
                         showMoreLoading();
                     } else if (!wkVBinding.recyclerView.canScrollVertically(-1)) { // 到达顶部
@@ -1204,10 +1204,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
 
         //定位消息
-        if (getIntent().hasExtra("lastPreviewMsgOrderSeq")) {
-            lastPreviewMsgOrderSeq = getIntent().getLongExtra("lastPreviewMsgOrderSeq", 0L);
-            isCanLoadMore = lastPreviewMsgOrderSeq > 0;
-        }
         if (getIntent().hasExtra("keepOffsetY")) {
             keepOffsetY = getIntent().getIntExtra("keepOffsetY", 0);
         }
@@ -1234,7 +1230,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
         // 先获取聊天数据
-        boolean isScrollToEnd = unreadStartMsgOrderSeq == 0 && lastPreviewMsgOrderSeq == 0;
+        boolean isScrollToEnd = true;
         long aroundMsgSeq = 0;
         // 默认允许加载更多历史消息，确保能全量同步历史记录
         isCanLoadMore = true;
@@ -1248,6 +1244,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (aroundMsgSeq == 0 && getIntent().hasExtra("aroundMsgSeq")) {
             aroundMsgSeq = getIntent().getLongExtra("aroundMsgSeq", 0);
         }
+        // 只有显式跳转到某条消息时才不定位到最新
+        if (aroundMsgSeq != 0) isScrollToEnd = false;
 
         // 内存缓存：如果有缓存且无需定位到特定消息，先显示缓存快速呈现，再同步最新消息
         boolean useCache = isFirstDataLoad && aroundMsgSeq == 0 && lastPreviewMsgOrderSeq == 0
@@ -1257,7 +1255,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (cacheList != null && !cacheList.isEmpty()) {
                 chatAdapter.setNewInstance(cacheList);
                 if (isScrollToEnd) {
-                    wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
+                    scrollToBottomSafely();
                 }
                 // 标记非首次加载，getData时用loadMoreLimit同步更新的消息
                 isFirstDataLoad = false;
@@ -1362,37 +1360,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
                 isRefreshLoading = false;
                 isMoreLoading = false;
-                // 自动同步历史消息：每次进入页面都检查是否需要继续同步
-                // 已同步到顶的频道直接跳过
-                String channelKey = channelId + "_" + channelType;
-                if (!syncedToTopChannels.contains(channelKey) && !isAutoSyncingHistory) {
-                    // 检查本地最早的消息是否还有更早的（orderSeq > 1 说明还有更早的）
-                    long realFirstOrderSeq = 0;
-                    List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
-                    if (allItems != null) {
-                        for (WKUIChatMsgItemEntity item : allItems) {
-                            if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
-                                && item.wkMsg.type != WKContentType.emptyView 
-                                && item.wkMsg.type != WKContentType.spanEmptyView) {
-                                if (realFirstOrderSeq == 0 || item.wkMsg.orderSeq < realFirstOrderSeq) {
-                                    realFirstOrderSeq = item.wkMsg.orderSeq;
-                                }
-                            }
-                        }
-                    }
-                    // 如果还有更早的消息，启动同步（orderSeq = messageSeq * 1000，到顶时最小为1000）
-                    if (realFirstOrderSeq > 1000) {
-                        isAutoSyncingHistory = true;
-                        autoSyncedMsgCount = 0;
-                        autoSyncRetryCount = 0;
-                        android.util.Log.d("ChatHistoryFix", "autoSyncHistory: start! channel=" + channelId + " firstOrderSeq=" + realFirstOrderSeq);
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 300);
-                    } else {
-                        // 已经到顶了，标记
-                        syncedToTopChannels.add(channelKey);
-                        android.util.Log.d("ChatHistoryFix", "autoSyncHistory: already at top, skip! channel=" + channelId);
-                    }
-                }
                 isFirstDataLoad = false;
             }
         });
@@ -1676,9 +1643,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
             }
         } else {
-            android.util.Log.d("ScrollDbg", "showData tail: isScrollToEnd=" + isScrollToEnd + " pullMode=" + pullMode + " isSetNewData=" + isSetNewData + " count=" + chatAdapter.getItemCount());
             if (isScrollToEnd)
-                wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
+                scrollToBottomSafely();
             else wkVBinding.recyclerView.setVisibility(View.VISIBLE);
         }
         if (isCanLoadMore && WKReader.isNotEmpty(chatAdapter.getData()) && chatAdapter.getData().get(chatAdapter.getData().size() - 1).wkMsg != null) {
@@ -1931,6 +1897,21 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
     }
 
+    // 进入会话后定位到底部：等布局完成再滚，避免被后续渲染覆盖；用户一旦滑动即停止干预
+    private boolean userScrolledSinceEnter = false;
+
+    private void scrollToBottomSafely() {
+        if (userScrolledSinceEnter) return;
+        final Runnable r = () -> {
+            if (userScrolledSinceEnter) return;
+            int count = chatAdapter.getItemCount();
+            if (count > 0) wkVBinding.recyclerView.scrollToPosition(count - 1);
+        };
+        wkVBinding.recyclerView.post(r);
+        wkVBinding.recyclerView.postDelayed(r, 120);
+        wkVBinding.recyclerView.postDelayed(r, 350);
+    }
+
     private void scrollToPosition(int index) {
         android.util.Log.d("ScrollDbg", "scrollToPosition index=" + index + " count=" + chatAdapter.getItemCount() + " caller=" + android.util.Log.getStackTraceString(new Throwable()).substring(0, 260));
         linearLayoutManager.scrollToPosition(index);
@@ -1969,158 +1950,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         lastPreviewMsgOrderSeq = 0;
         unreadStartMsgOrderSeq = 0;
         new Handler().postDelayed(() -> getData(1, false, 0, false), 300);
-    }
-
-    /**
-     * 自动全量同步历史消息
-     * 进入聊天页面后自动循环拉取历史消息，直到拉取完所有消息
-     * 加固：失败自动重试、同步到顶后标记（下次进入直接跳过）
-     * 注意：使用 getData(0, false, 0, false) 和用户手动下拉走同样的路径，确保参数正确
-     */
-    private void autoSyncMoreHistory() {
-        if (!isAutoSyncingHistory) return;
-        if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
-            isAutoSyncingHistory = false;
-            isRefreshLoading = false;
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit " + MAX_AUTO_SYNC_MSG + ", paused");
-            return;
-        }
-
-        // 跳过emptyView等占位消息，找到真正最早的消息orderSeq
-        long realFirstOrderSeq = 0;
-        List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
-        if (allItems != null) {
-            for (WKUIChatMsgItemEntity item : allItems) {
-                if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
-                    && item.wkMsg.type != WKContentType.emptyView 
-                    && item.wkMsg.type != WKContentType.spanEmptyView) {
-                    if (realFirstOrderSeq == 0 || item.wkMsg.orderSeq < realFirstOrderSeq) {
-                        realFirstOrderSeq = item.wkMsg.orderSeq;
-                    }
-                }
-            }
-        }
-        android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: realFirstOrderSeq=" + realFirstOrderSeq + " total synced=" + autoSyncedMsgCount + " retry=" + autoSyncRetryCount);
-
-        boolean reachedEarliest = realFirstOrderSeq <= 1000
-                || (rawEarliestOrderSeq > 0 && rawEarliestOrderSeq <= 1000);
-        if (reachedEarliest) {
-            isAutoSyncingHistory = false;
-            isRefreshLoading = false;
-            markSyncCompleted();
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + realFirstOrderSeq + ", raw=" + rawEarliestOrderSeq + "), completed! total=" + autoSyncedMsgCount);
-            return;
-        }
-
-        // 用 getData(0, false, 0, false) 拉取更早的消息
-        // 和用户手动下拉加载更早消息走完全相同的路径，确保参数正确
-        isRefreshLoading = true;
-        lastPreviewMsgOrderSeq = 0;
-        unreadStartMsgOrderSeq = 0;
-        isSyncLastMsg = false;
-        
-        // 记录拉取前的消息数量，用来判断这次拉到了多少条
-        final int beforeCount = chatAdapter.getItemCount();
-        final long beforeFirstOrderSeq = realFirstOrderSeq;
-        
-        android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: calling getData(0) beforeCount=" + beforeCount);
-        getData(0, false, 0, false);
-        
-        // getData 是异步的，结果在 onResult 回调里
-        // 但 getData.onResult 里的自动同步逻辑已经被我们删掉了
-        // 所以我们需要在这里重新接入：用 showData 的回调时机触发下一次同步
-        // 方案：postDelayed 检查数据是否变化
-        checkAutoSyncResult(beforeFirstOrderSeq, beforeCount, 0);
-    }
-    
-    /**
-     * 检查自动同步结果，延迟等待数据返回
-     */
-    private void checkAutoSyncResult(final long beforeFirstOrderSeq, final int beforeCount, final int checkCount) {
-        if (!isAutoSyncingHistory) return;
-        
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!isAutoSyncingHistory) return;
-            
-            // 检查最早消息的 orderSeq 是否变小了（说明拉到了更早的消息）
-            long newFirstOrderSeq = 0;
-            List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
-            if (allItems != null) {
-                for (WKUIChatMsgItemEntity item : allItems) {
-                    if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
-                        && item.wkMsg.type != WKContentType.emptyView 
-                        && item.wkMsg.type != WKContentType.spanEmptyView) {
-                        if (newFirstOrderSeq == 0 || item.wkMsg.orderSeq < newFirstOrderSeq) {
-                            newFirstOrderSeq = item.wkMsg.orderSeq;
-                        }
-                    }
-                }
-            }
-            
-            int newCount = chatAdapter.getItemCount();
-            int addedCount = newCount - beforeCount;
-            android.util.Log.d("ChatHistoryFix", "checkAutoSyncResult: check=" + checkCount + " beforeSeq=" + beforeFirstOrderSeq + " newSeq=" + newFirstOrderSeq + " added=" + addedCount + " isRefreshLoading=" + isRefreshLoading);
-            
-            if (isRefreshLoading) {
-                // 还在加载中，继续等
-                if (checkCount < 20) { // 最多等10秒（20次 * 500ms）
-                    checkAutoSyncResult(beforeFirstOrderSeq, beforeCount, checkCount + 1);
-                } else {
-                    // 超时了，重试
-                    handleAutoSyncEmpty(beforeFirstOrderSeq);
-                }
-            } else if (newFirstOrderSeq > 0 && newFirstOrderSeq < beforeFirstOrderSeq) {
-                // 拉到了更早的消息
-                autoSyncRetryCount = 0;
-                autoSyncedMsgCount += Math.max(0, addedCount);
-                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: got older msgs! newFirstSeq=" + newFirstOrderSeq + " total=" + autoSyncedMsgCount);
-                
-                if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
-                    isAutoSyncingHistory = false;
-                    isRefreshLoading = false;
-                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit, paused! total=" + autoSyncedMsgCount);
-                } else if (newFirstOrderSeq <= 1000) {
-                    isAutoSyncingHistory = false;
-                    markSyncCompleted();
-                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached top! total=" + autoSyncedMsgCount);
-                } else {
-                    // 继续拉
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 200);
-                }
-            } else {
-                // 没有拉到新消息
-                handleAutoSyncEmpty(beforeFirstOrderSeq);
-            }
-        }, 500);
-    }
-    
-    /**
-     * 处理自动同步返回空的情况（可能是到顶了，也可能是失败）
-     */
-    private void handleAutoSyncEmpty(long currentFirstOrderSeq) {
-        if (currentFirstOrderSeq > 1000 && autoSyncRetryCount < 1) {
-            autoSyncRetryCount++;
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: empty result, retry " + autoSyncRetryCount + "/" + MAX_AUTO_SYNC_RETRY);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 500);
-        } else {
-            isAutoSyncingHistory = false;
-            isRefreshLoading = false;
-            if (autoSyncRetryCount >= MAX_AUTO_SYNC_RETRY) {
-                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: max retries reached, stopped! total=" + autoSyncedMsgCount);
-            } else {
-                markSyncCompleted();
-                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: no more older messages! total synced=" + autoSyncedMsgCount);
-            }
-        }
-    }
-    
-    /**
-     * 标记该频道历史消息已同步到顶，下次进入直接跳过
-     */
-    private void markSyncCompleted() {
-        String channelKey = channelId + "_" + channelType;
-        syncedToTopChannels.add(channelKey);
-        android.util.Log.d("ChatHistoryFix", "markSyncCompleted: " + channelKey);
     }
 
     private View pinnedBannerView;

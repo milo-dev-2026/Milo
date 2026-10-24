@@ -1,0 +1,346 @@
+﻿
+> Configure project :app
+WARNING: The option setting 'android.defaults.buildfeatures.buildconfig=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 9.0 of the Android Gradle plugin.
+You can resolve this warning in Android Studio via `Refactor` > `Migrate BuildConfig to Gradle Build Files`
+useNewCruncher has been deprecated. It will be removed in a future version of the gradle plugin. New cruncher is now always enabled.
+--W- 'com.huawei.agconnect.apms' plugin is disabled globally for the project by 'apmsInstrumentationEnabled=false' property defined in the 'gradle.properties' file.
+--W- The variant: debug, Use the json file: C:\Users\Administrator\Desktop\Milo\app\agconnect-services.json
+--W- The variant: release, Use the json file: C:\Users\Administrator\Desktop\Milo\app\agconnect-services.json
+WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+
+This Android Gradle plugin (8.5.1) was tested up to compileSdk = 34.
+
+You are strongly encouraged to update your project to use a newer
+Android Gradle plugin that has been tested with compileSdk = 35.
+
+If you are already using the latest version of the Android Gradle plugin,
+you may need to wait until a newer version with support for compileSdk = 35 is available.
+
+For more information refer to the compatibility table:
+https://d.android.com/r/tools/api-level-support
+
+To suppress this warning, add/update
+    android.suppressUnsupportedCompileSdk=35
+to this project's gradle.properties.
+
+> Task :app:buildKotlinToolingMetadata UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :wkbase:checkKotlinGradlePluginConfigurationErrors
+> Task :wkbase:preBuild UP-TO-DATE
+> Task :wkbase:preReleaseBuild UP-TO-DATE
+> Task :wkbase:dataBindingMergeDependencyArtifactsRelease UP-TO-DATE
+> Task :wkbase:generateReleaseResValues UP-TO-DATE
+> Task :wkbase:generateReleaseResources UP-TO-DATE
+> Task :wkbase:packageReleaseResources UP-TO-DATE
+> Task :wkbase:dataBindingGenBaseClassesRelease UP-TO-DATE
+> Task :wkbase:dataBindingTriggerRelease UP-TO-DATE
+> Task :wkbase:generateReleaseBuildConfig UP-TO-DATE
+> Task :wkbase:parseReleaseLocalResources UP-TO-DATE
+> Task :wkbase:generateReleaseRFile UP-TO-DATE
+> Task :wkbase:compileReleaseKotlin UP-TO-DATE
+> Task :wkbase:javaPreCompileRelease UP-TO-DATE
+> Task :wkbase:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :wkbase:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :wkscan:preBuild UP-TO-DATE
+> Task :wkscan:preReleaseBuild UP-TO-DATE
+> Task :wkscan:dataBindingMergeDependencyArtifactsRelease UP-TO-DATE
+> Task :wkscan:generateReleaseResValues UP-TO-DATE
+> Task :wkscan:generateReleaseResources UP-TO-DATE
+> Task :wkscan:packageReleaseResources UP-TO-DATE
+> Task :wkscan:dataBindingGenBaseClassesRelease UP-TO-DATE
+> Task :wkscan:generateReleaseBuildConfig UP-TO-DATE
+> Task :wkscan:parseReleaseLocalResources UP-TO-DATE
+> Task :wkscan:generateReleaseRFile UP-TO-DATE
+> Task :wkscan:javaPreCompileRelease UP-TO-DATE
+> Task :wkscan:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :wkscan:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :wkuikit:checkKotlinGradlePluginConfigurationErrors
+> Task :wkuikit:preBuild UP-TO-DATE
+> Task :wkuikit:preReleaseBuild UP-TO-DATE
+> Task :wkuikit:dataBindingMergeDependencyArtifactsRelease UP-TO-DATE
+> Task :wkuikit:generateReleaseResValues UP-TO-DATE
+> Task :wkuikit:generateReleaseResources UP-TO-DATE
+> Task :wkuikit:packageReleaseResources UP-TO-DATE
+> Task :wkuikit:dataBindingGenBaseClassesRelease UP-TO-DATE
+> Task :wkuikit:dataBindingTriggerRelease UP-TO-DATE
+> Task :wkuikit:generateReleaseBuildConfig UP-TO-DATE
+> Task :wkuikit:parseReleaseLocalResources UP-TO-DATE
+> Task :wkuikit:generateReleaseRFile UP-TO-DATE
+> Task :wkuikit:compileReleaseKotlin UP-TO-DATE
+> Task :wkuikit:javaPreCompileRelease UP-TO-DATE
+> Task :wkuikit:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsRelease UP-TO-DATE
+> Task :app:generateReleaseResValues UP-TO-DATE
+> Task :app:generateReleaseResources UP-TO-DATE
+> Task :app:processReleaseAGCPlugin UP-TO-DATE
+> Task :wklogin:preBuild UP-TO-DATE
+> Task :wklogin:preReleaseBuild UP-TO-DATE
+> Task :wklogin:generateReleaseResValues UP-TO-DATE
+> Task :wklogin:generateReleaseResources UP-TO-DATE
+> Task :wklogin:packageReleaseResources UP-TO-DATE
+> Task :wkpush:preBuild UP-TO-DATE
+> Task :wkpush:preReleaseBuild UP-TO-DATE
+> Task :wkpush:generateReleaseResValues UP-TO-DATE
+> Task :wkpush:generateReleaseResources UP-TO-DATE
+> Task :wkpush:packageReleaseResources UP-TO-DATE
+> Task :app:mergeReleaseResources UP-TO-DATE
+> Task :wklogin:dataBindingMergeDependencyArtifactsRelease UP-TO-DATE
+> Task :wklogin:dataBindingGenBaseClassesRelease UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesRelease UP-TO-DATE
+> Task :app:dataBindingTriggerRelease UP-TO-DATE
+> Task :app:generateReleaseBuildConfig UP-TO-DATE
+> Task :wkbase:writeReleaseAarMetadata UP-TO-DATE
+> Task :wklogin:writeReleaseAarMetadata UP-TO-DATE
+> Task :wkpush:writeReleaseAarMetadata UP-TO-DATE
+> Task :wkscan:writeReleaseAarMetadata UP-TO-DATE
+> Task :wkuikit:writeReleaseAarMetadata UP-TO-DATE
+> Task :app:checkReleaseAarMetadata UP-TO-DATE
+> Task :app:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :app:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksRelease UP-TO-DATE
+> Task :wkbase:extractDeepLinksRelease UP-TO-DATE
+> Task :wkbase:processReleaseManifest UP-TO-DATE
+> Task :wklogin:extractDeepLinksRelease UP-TO-DATE
+> Task :wklogin:processReleaseManifest UP-TO-DATE
+> Task :wkpush:extractDeepLinksRelease UP-TO-DATE
+> Task :wkpush:processReleaseManifest UP-TO-DATE
+> Task :wkscan:extractDeepLinksRelease UP-TO-DATE
+> Task :wkscan:processReleaseManifest UP-TO-DATE
+> Task :wkuikit:extractDeepLinksRelease UP-TO-DATE
+> Task :wkuikit:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :wkbase:compileReleaseLibraryResources UP-TO-DATE
+> Task :wklogin:compileReleaseLibraryResources UP-TO-DATE
+> Task :wklogin:parseReleaseLocalResources UP-TO-DATE
+> Task :wklogin:generateReleaseRFile UP-TO-DATE
+> Task :wkpush:compileReleaseLibraryResources UP-TO-DATE
+> Task :wkpush:parseReleaseLocalResources UP-TO-DATE
+> Task :wkpush:generateReleaseRFile UP-TO-DATE
+> Task :wkscan:compileReleaseLibraryResources UP-TO-DATE
+> Task :wkuikit:compileReleaseLibraryResources UP-TO-DATE
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :wklogin:checkKotlinGradlePluginConfigurationErrors
+> Task :wklogin:generateReleaseBuildConfig UP-TO-DATE
+> Task :wklogin:compileReleaseKotlin UP-TO-DATE
+> Task :wklogin:javaPreCompileRelease UP-TO-DATE
+> Task :wklogin:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :wklogin:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :wkpush:generateReleaseBuildConfig UP-TO-DATE
+> Task :wkpush:javaPreCompileRelease UP-TO-DATE
+> Task :wkpush:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :wkpush:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :wkuikit:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :app:compileReleaseKotlin NO-SOURCE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :wkbase:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :wkbase:processReleaseJavaRes UP-TO-DATE
+> Task :wkbase:createFullJarRelease UP-TO-DATE
+> Task :wkbase:extractProguardFiles UP-TO-DATE
+> Task :wkbase:generateReleaseLintModel UP-TO-DATE
+> Task :wkbase:prepareLintJarForPublish UP-TO-DATE
+> Task :wklogin:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :wklogin:processReleaseJavaRes UP-TO-DATE
+> Task :wklogin:createFullJarRelease UP-TO-DATE
+> Task :wklogin:extractProguardFiles UP-TO-DATE
+> Task :wklogin:generateReleaseLintModel UP-TO-DATE
+> Task :wklogin:prepareLintJarForPublish UP-TO-DATE
+> Task :wkpush:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :wkpush:processReleaseJavaRes NO-SOURCE
+> Task :wkpush:createFullJarRelease UP-TO-DATE
+> Task :wkpush:extractProguardFiles UP-TO-DATE
+> Task :wkpush:generateReleaseLintModel UP-TO-DATE
+> Task :wkpush:prepareLintJarForPublish UP-TO-DATE
+> Task :wkscan:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :wkscan:processReleaseJavaRes NO-SOURCE
+> Task :wkscan:createFullJarRelease UP-TO-DATE
+> Task :wkscan:extractProguardFiles UP-TO-DATE
+> Task :wkscan:generateReleaseLintModel UP-TO-DATE
+> Task :wkscan:prepareLintJarForPublish UP-TO-DATE
+> Task :wkuikit:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :wkuikit:processReleaseJavaRes UP-TO-DATE
+> Task :wkuikit:createFullJarRelease UP-TO-DATE
+> Task :wkuikit:extractProguardFiles UP-TO-DATE
+> Task :wkuikit:generateReleaseLintModel UP-TO-DATE
+> Task :wkuikit:prepareLintJarForPublish UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :wkuikit:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wkuikit:mergeReleaseNativeLibs NO-SOURCE
+> Task :wkuikit:stripReleaseDebugSymbols NO-SOURCE
+> Task :wkuikit:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :wkuikit:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :wkuikit:extractReleaseAnnotations UP-TO-DATE
+> Task :wkuikit:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :wkuikit:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :wkuikit:mergeReleaseShaders UP-TO-DATE
+> Task :wkuikit:compileReleaseShaders NO-SOURCE
+> Task :wkuikit:generateReleaseAssets UP-TO-DATE
+> Task :wkuikit:packageReleaseAssets UP-TO-DATE
+> Task :wkuikit:prepareReleaseArtProfile UP-TO-DATE
+> Task :wkuikit:mergeReleaseJavaResource UP-TO-DATE
+> Task :wkuikit:syncReleaseLibJars UP-TO-DATE
+> Task :wkuikit:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :wklogin:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wklogin:mergeReleaseNativeLibs NO-SOURCE
+> Task :wklogin:stripReleaseDebugSymbols NO-SOURCE
+> Task :wklogin:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :wklogin:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :wklogin:extractReleaseAnnotations UP-TO-DATE
+> Task :wklogin:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :wklogin:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :wklogin:mergeReleaseShaders UP-TO-DATE
+> Task :wklogin:compileReleaseShaders NO-SOURCE
+> Task :wklogin:generateReleaseAssets UP-TO-DATE
+> Task :wklogin:packageReleaseAssets UP-TO-DATE
+> Task :wklogin:prepareReleaseArtProfile UP-TO-DATE
+> Task :wklogin:mergeReleaseJavaResource UP-TO-DATE
+> Task :wklogin:syncReleaseLibJars UP-TO-DATE
+> Task :wklogin:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :wkscan:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wkscan:mergeReleaseNativeLibs NO-SOURCE
+> Task :wkscan:stripReleaseDebugSymbols NO-SOURCE
+> Task :wkscan:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :wkscan:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :wkscan:extractReleaseAnnotations UP-TO-DATE
+> Task :wkscan:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :wkscan:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :wkscan:mergeReleaseShaders UP-TO-DATE
+> Task :wkscan:compileReleaseShaders NO-SOURCE
+> Task :wkscan:generateReleaseAssets UP-TO-DATE
+> Task :wkscan:packageReleaseAssets UP-TO-DATE
+> Task :wkscan:prepareReleaseArtProfile UP-TO-DATE
+> Task :wkscan:mergeReleaseJavaResource UP-TO-DATE
+> Task :wkscan:syncReleaseLibJars UP-TO-DATE
+> Task :wkscan:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :wkpush:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wkpush:mergeReleaseNativeLibs NO-SOURCE
+> Task :wkpush:stripReleaseDebugSymbols NO-SOURCE
+> Task :wkpush:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :wkpush:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :wkpush:extractReleaseAnnotations UP-TO-DATE
+> Task :wkpush:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :wkpush:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :wkpush:mergeReleaseShaders UP-TO-DATE
+> Task :wkpush:compileReleaseShaders NO-SOURCE
+> Task :wkpush:generateReleaseAssets UP-TO-DATE
+> Task :wkpush:packageReleaseAssets UP-TO-DATE
+> Task :wkpush:prepareReleaseArtProfile UP-TO-DATE
+> Task :wkpush:mergeReleaseJavaResource UP-TO-DATE
+> Task :wkpush:syncReleaseLibJars UP-TO-DATE
+> Task :wkpush:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :wkbase:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wkbase:mergeReleaseNativeLibs NO-SOURCE
+> Task :wkbase:stripReleaseDebugSymbols NO-SOURCE
+> Task :wkbase:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :wkbase:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :wkbase:extractReleaseAnnotations UP-TO-DATE
+> Task :wkbase:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :wkbase:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :wkbase:mergeReleaseShaders UP-TO-DATE
+> Task :wkbase:compileReleaseShaders NO-SOURCE
+> Task :wkbase:generateReleaseAssets UP-TO-DATE
+> Task :wkbase:packageReleaseAssets UP-TO-DATE
+> Task :wkbase:prepareReleaseArtProfile UP-TO-DATE
+> Task :wkbase:mergeReleaseJavaResource UP-TO-DATE
+> Task :wkbase:syncReleaseLibJars UP-TO-DATE
+> Task :wkbase:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :wkbase:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wkbase:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :wklogin:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wklogin:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :wkpush:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wkpush:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :wkscan:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wkscan:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :wkuikit:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wkuikit:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :app:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :wkbase:generateReleaseLintVitalModel UP-TO-DATE
+> Task :wklogin:generateReleaseLintVitalModel UP-TO-DATE
+> Task :wkpush:generateReleaseLintVitalModel UP-TO-DATE
+> Task :wkscan:generateReleaseLintVitalModel UP-TO-DATE
+> Task :wkuikit:generateReleaseLintVitalModel UP-TO-DATE
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :wkbase:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :wklogin:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :wkpush:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :wkscan:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :wkuikit:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeReleaseNativeLibs UP-TO-DATE
+> Task :app:stripReleaseDebugSymbols UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :wkuikit:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :wklogin:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :wkscan:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :wkpush:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :wkbase:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :app:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:packageRelease UP-TO-DATE
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleRelease
+> Task :wkbase:bundleReleaseAar UP-TO-DATE
+> Task :wkbase:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :wkbase:mergeReleaseResources UP-TO-DATE
+> Task :wkbase:verifyReleaseResources UP-TO-DATE
+> Task :wkbase:assembleRelease UP-TO-DATE
+> Task :wklogin:bundleReleaseAar UP-TO-DATE
+> Task :wklogin:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :wklogin:mergeReleaseResources UP-TO-DATE
+> Task :wklogin:verifyReleaseResources UP-TO-DATE
+> Task :wklogin:assembleRelease UP-TO-DATE
+> Task :wkpush:bundleReleaseAar UP-TO-DATE
+> Task :wkpush:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :wkpush:mergeReleaseResources UP-TO-DATE
+> Task :wkpush:verifyReleaseResources UP-TO-DATE
+> Task :wkpush:assembleRelease UP-TO-DATE
+> Task :wkscan:bundleReleaseAar UP-TO-DATE
+> Task :wkscan:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :wkscan:mergeReleaseResources UP-TO-DATE
+> Task :wkscan:verifyReleaseResources UP-TO-DATE
+> Task :wkscan:assembleRelease UP-TO-DATE
+> Task :wkuikit:bundleReleaseAar UP-TO-DATE
+> Task :wkuikit:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :wkuikit:mergeReleaseResources UP-TO-DATE
+> Task :wkuikit:verifyReleaseResources UP-TO-DATE
+> Task :wkuikit:assembleRelease UP-TO-DATE
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.7/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1s
+266 actionable tasks: 6 executed, 260 up-to-date
