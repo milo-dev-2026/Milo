@@ -267,7 +267,8 @@ class ChatViewController: UIViewController {
     }
 
     private func searchChatHistory() {
-        AppUtility.showToast("查找聊天记录")
+        let vc = ChatSearchViewController(channelId: channelId, channelType: channelType)
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     private func clearChatHistory() {

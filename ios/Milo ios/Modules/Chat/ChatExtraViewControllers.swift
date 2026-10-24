@@ -1,4 +1,4 @@
-﻿import UIKit
+import UIKit
 import SnapKit
 import AVFoundation
 
@@ -130,113 +130,6 @@ extension RecordingViewController: AVAudioRecorderDelegate {
     }
 }
 
-class MessagePinViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var pinnedMessages: [(messageId: String, content: String, sender: String, time: String)] = []
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        title = "置顶消息"
-        view.backgroundColor = .themeBackground
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PinCell")
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-        loadData()
-    }
-
-    private func loadData() {
-        if let saved = UserDefaults.standard.array(forKey: "pinned_messages") as? [[String: String]] {
-            pinnedMessages = saved.map { ($0["message_id"] ?? "", $0["content"] ?? "", $0["sender"] ?? "", $0["time"] ?? "") }
-        }
-        tableView.reloadData()
-    }
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return max(pinnedMessages.count, 1)
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "PinCell", for: indexPath)
-        if pinnedMessages.isEmpty {
-            cell.textLabel?.text = "暂无置顶消息"
-            cell.textLabel?.textColor = .secondaryLabel
-            cell.textLabel?.textAlignment = .center
-            cell.selectionStyle = .none
-        } else {
-            let msg = pinnedMessages[indexPath.row]
-            cell.textLabel?.text = msg.content
-            cell.detailTextLabel?.text = "\(msg.sender)  \(msg.time)"
-            cell.imageView?.image = UIImage(systemName: "pin.fill")
-            cell.imageView?.tintColor = .themePrimary
-        }
-        return cell
-    }
-
-    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard !pinnedMessages.isEmpty else { return nil }
-        let unpin = UIContextualAction(style: .destructive, title: "取消置顶") { _, _, completion in
-            self.pinnedMessages.remove(at: indexPath.row)
-            let arr = self.pinnedMessages.map { ["message_id": $0.messageId, "content": $0.content, "sender": $0.sender, "time": $0.time] }
-            UserDefaults.standard.set(arr, forKey: "pinned_messages")
-            tableView.reloadData()
-            completion(true)
-        }
-        return UISwipeActionsConfiguration(actions: [unpin])
-    }
-}
-
-class ChatMessagePrivacyViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        title = "消息隐私"
-        view.backgroundColor = .themeBackground
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "ChatPrivCell")
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-    }
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 3 }
-
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { "会话隐私" }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ChatPrivCell", for: indexPath)
-        cell.selectionStyle = .none
-        cell.imageView?.tintColor = .themePrimary
-        let sw = UISwitch()
-        switch indexPath.row {
-        case 0:
-            cell.textLabel?.text = "防截屏"
-            cell.imageView?.image = UIImage(systemName: "camera.viewfinder")
-            sw.isOn = UserDefaults.standard.bool(forKey: "chat_screenshot_block")
-            sw.addTarget(self, action: #selector(toggleScreenshot(_:)), for: .valueChanged)
-        case 1:
-            cell.textLabel?.text = "加密消息"
-            cell.imageView?.image = UIImage(systemName: "lock.shield")
-            sw.isOn = UserDefaults.standard.bool(forKey: "chat_encrypt_msg")
-            sw.addTarget(self, action: #selector(toggleEncrypt(_:)), for: .valueChanged)
-        case 2:
-            cell.textLabel?.text = "消息防撤回提醒"
-            cell.imageView?.image = UIImage(systemName: "arrow.uturn.backward.circle")
-            sw.isOn = UserDefaults.standard.object(forKey: "chat_revoke_remind") as? Bool ?? true
-            sw.addTarget(self, action: #selector(toggleRevoke(_:)), for: .valueChanged)
-        default: break
-        }
-        cell.accessoryView = sw
-        return cell
-    }
-
-    @objc private func toggleScreenshot(_ s: UISwitch) { UserDefaults.standard.set(s.isOn, forKey: "chat_screenshot_block") }
-    @objc private func toggleEncrypt(_ s: UISwitch) { UserDefaults.standard.set(s.isOn, forKey: "chat_encrypt_msg") }
-    @objc private func toggleRevoke(_ s: UISwitch) { UserDefaults.standard.set(s.isOn, forKey: "chat_revoke_remind") }
-}
-
 class ChooseChatViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var conversations: [(channelId: String, channelType: Int, name: String, avatar: String)] = []
@@ -302,7 +195,15 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
 
 class ChatFileViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var files: [(name: String, size: String, type: String, date: String)] = []
+    private var files: [(name: String, size: String, type: String, date: String, url: String)] = []
+    private var channelId: String = ""
+    private var channelType: Int = 1
+
+    convenience init(channelId: String, channelType: Int) {
+        self.init()
+        self.channelId = channelId
+        self.channelType = channelType
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -317,12 +218,34 @@ class ChatFileViewController: UIViewController, UITableViewDataSource, UITableVi
     }
 
     private func loadData() {
-        files = [
-            ("项目文档.pdf", "2.3MB", "pdf", "2024-01-15"),
-            ("会议记录.docx", "1.1MB", "doc", "2024-01-14"),
-            ("设计稿.zip", "15.6MB", "zip", "2024-01-12"),
-        ]
-        tableView.reloadData()
+        // 从 IM SDK 获取频道历史消息，筛选文件类型
+        Task {
+            do {
+                let messages = try await IMManager.shared.syncChannelMessages(channelId: channelId, channelType: channelType, limit: 200)
+                var list: [(name: String, size: String, type: String, date: String, url: String)] = []
+                for msg in messages {
+                    if msg.contentType == .file {
+                        let content = msg.content ?? ""
+                        let parts = content.components(separatedBy: "|")
+                        let fileName = parts.count > 0 ? parts[0] : "未知文件"
+                        let fileSize = parts.count > 1 ? parts[1] : ""
+                        let fileUrl = parts.count > 2 ? parts[2] : ""
+                        let date = AppUtility.formatTimestamp(msg.timestamp)
+                        let ext = (fileName as NSString).pathExtension.lowercased()
+                        list.append((name: fileName, size: fileSize, type: ext, date: date, url: fileUrl))
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.files = list
+                    self.tableView.reloadData()
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.files = []
+                    self.tableView.reloadData()
+                }
+            }
+        }
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -340,6 +263,17 @@ class ChatFileViewController: UIViewController, UITableViewDataSource, UITableVi
             cell.imageView?.image = UIImage(systemName: "doc.fill"); cell.imageView?.tintColor = .themePrimary
         }
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard !files.isEmpty else { return }
+        let f = files[indexPath.row]
+        if let url = URL(string: f.url), !f.url.isEmpty {
+            UIApplication.shared.open(url)
+        } else {
+            AppUtility.showToast("文件不可用")
+        }
     }
 }
 
