@@ -43,15 +43,7 @@ class UserQRCodeViewController: UIViewController {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(30)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
-
-        if let avatarPath = LocalStore.shared.avatar {
-            let url = URL(string: avatarPath.hasPrefix("http") ? avatarPath : APIConfig.apiBaseURL + "/" + avatarPath)
-            if let url = url {
-                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
-        }
+        AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: name, into: avatarView)
 
         nameLabel.text = name
         nameLabel.font = ScreenAdapter.mediumFont(18)

@@ -206,24 +206,12 @@ class MySettingViewController: UIViewController {
             nameLabel.text = name.isEmpty ? "Milo用户" : name
             let shortNo = defaults.string(forKey: "short_no") ?? ""
             idLabel.text = "Milo号：\(shortNo.isEmpty ? uid : shortNo)"
-            if let avatarUrl = defaults.string(forKey: "avatar"), !avatarUrl.isEmpty {
-                let fullURLString: String
-                if avatarUrl.hasPrefix("http") {
-                    fullURLString = avatarUrl
-                } else {
-                    let path = avatarUrl.hasPrefix("/") ? avatarUrl : "/\(avatarUrl)"
-                    fullURLString = APIConfig.apiBaseURL + path
-                }
-                AppUtility.loadAvatar(URL(string: fullURLString), into: avatarImageView)
-            } else {
-                avatarImageView.image = UIImage(systemName: "person.circle.fill")
-                avatarImageView.tintColor = .systemGray5
-            }
+            // 与Android一致：通过 /v1/users/{uid}/avatar 加载自己的头像
+            AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: name, into: avatarImageView)
         } else {
             nameLabel.text = "点击登录"
             idLabel.text = ""
-            avatarImageView.image = UIImage(systemName: "person.circle.fill")
-            avatarImageView.tintColor = .systemGray5
+            avatarImageView.image = AppUtility.defaultAvatarImage(name: "", size: 96)
         }
     }
 

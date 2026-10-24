@@ -139,8 +139,6 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
 
         // 时间分隔头
         timeHeaderLabel.font = ScreenAdapter.font(12)
@@ -212,9 +210,8 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
         // 设置图标和颜色
         configureCallIcon(content: content)
 
-        // 设置头像（与其他消息 Cell 保持一致，使用默认占位图）
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
 
         // 更新布局（左右方向）
         updateLayoutForFromMe()

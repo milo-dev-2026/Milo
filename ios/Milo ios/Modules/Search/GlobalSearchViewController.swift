@@ -441,8 +441,7 @@ private class GlobalChannelCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(20)
         avatarView.layer.masksToBounds = true
         avatarView.backgroundColor = .systemGray5
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray3
+        avatarView.image = AppUtility.defaultAvatarImage(name: "", size: 40)
 
         nameLabel.font = ScreenAdapter.font(16)
         nameLabel.textColor = .label
@@ -466,17 +465,7 @@ private class GlobalChannelCell: UITableViewCell {
 
     func configure(channel: GlobalChannel, keyword: String) {
         nameLabel.attributedText = highlightKeyword(channel.name, keyword: keyword)
-
-        if let avatarStr = channel.avatar, !avatarStr.isEmpty {
-            let urlStr = avatarStr.hasPrefix("http") ? avatarStr : APIConfig.apiBaseURL + "/" + avatarStr
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
-        } else {
-            let iconName = channel.channelType == 2 ? "person.3.fill" : "person.circle.fill"
-            avatarView.image = UIImage(systemName: iconName)
-            avatarView.tintColor = .systemGray3
-        }
+        AppUtility.loadChannelAvatar(channelId: channel.channelId, channelType: channel.channelType, name: channel.name, into: avatarView)
     }
 }
 
@@ -493,8 +482,7 @@ private class GlobalMessageCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(20)
         avatarView.layer.masksToBounds = true
         avatarView.backgroundColor = .systemGray5
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray3
+        avatarView.image = AppUtility.defaultAvatarImage(name: "", size: 40)
 
         nameLabel.font = ScreenAdapter.mediumFont(15)
         nameLabel.textColor = .label
@@ -538,13 +526,7 @@ private class GlobalMessageCell: UITableViewCell {
         nameLabel.text = msg.fromName.isEmpty ? msg.channelName : msg.fromName
         timeLabel.text = msg.createdAt
         contentLabel.attributedText = highlightKeyword(msg.content, keyword: keyword)
-
-        if let avatarStr = msg.avatar, !avatarStr.isEmpty {
-            let urlStr = avatarStr.hasPrefix("http") ? avatarStr : APIConfig.apiBaseURL + "/" + avatarStr
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
-        }
+        AppUtility.loadChannelAvatar(channelId: msg.fromUID.isEmpty ? msg.channelId : msg.fromUID, channelType: 1, name: msg.fromName, into: avatarView)
     }
 }
 

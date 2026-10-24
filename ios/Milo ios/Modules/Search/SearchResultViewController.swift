@@ -19,6 +19,7 @@ struct SearchMessageResult {
     let messageId: String
     let channelId: String
     let channelName: String
+    let fromUID: String
     let fromName: String
     let avatar: String?
     let content: String
@@ -401,6 +402,7 @@ class SearchResultViewController: UIViewController {
                 messageId: dict["message_id"] as? String ?? "",
                 channelId: dict["channel_id"] as? String ?? "",
                 channelName: dict["channel_name"] as? String ?? "",
+                fromUID: dict["from_uid"] as? String ?? "",
                 fromName: dict["from_name"] as? String ?? "",
                 avatar: dict["avatar"] as? String,
                 content: content,
@@ -468,9 +470,9 @@ class SearchResultViewController: UIViewController {
         }
         if messages.isEmpty {
             messages = [
-                SearchMessageResult(messageId: "sim_msg_1", channelId: "sim_conv_1", channelName: "\(k)的会话", fromName: "阿明", avatar: nil, content: "今天分享一份\(k)相关资料", timeString: "10:20", messageType: .text),
-                SearchMessageResult(messageId: "sim_msg_2", channelId: "sim_conv_2", channelName: "项目\(k)群", fromName: "小琳", avatar: nil, content: "[图片] \(k).png", timeString: "09:15", messageType: .image),
-                SearchMessageResult(messageId: "sim_msg_3", channelId: "sim_conv_1", channelName: "\(k)的会话", fromName: "阿明", avatar: nil, content: "\(k)-需求文档.pdf|102400", timeString: "昨天", messageType: .file)
+                SearchMessageResult(messageId: "sim_msg_1", channelId: "sim_conv_1", channelName: "\(k)的会话", fromUID: "", fromName: "阿明", avatar: nil, content: "今天分享一份\(k)相关资料", timeString: "10:20", messageType: .text),
+                SearchMessageResult(messageId: "sim_msg_2", channelId: "sim_conv_2", channelName: "项目\(k)群", fromUID: "", fromName: "小琳", avatar: nil, content: "[图片] \(k).png", timeString: "09:15", messageType: .image),
+                SearchMessageResult(messageId: "sim_msg_3", channelId: "sim_conv_1", channelName: "\(k)的会话", fromUID: "", fromName: "阿明", avatar: nil, content: "\(k)-需求文档.pdf|102400", timeString: "昨天", messageType: .file)
             ]
         }
         if contacts.isEmpty {
@@ -799,16 +801,8 @@ private class SearchResultConversationCell: UITableViewCell {
         nameLabel.attributedText = highlightKeywordYellow(item.name, keyword: keyword)
         lastMessageLabel.attributedText = highlightKeywordYellow(item.lastMessage ?? "", keyword: keyword)
         timeLabel.text = item.timeString
-        AppUtility.loadAvatar(nil, into: avatarView)
-        if let avatar = item.avatar, !avatar.isEmpty {
-            let urlStr = avatar.hasPrefix("http") ? avatar : APIConfig.apiBaseURL + "/" + avatar
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: ThemeIcon.contacts.image)
-            }
-        } else {
-            avatarView.image = item.channelType == 2 ? ThemeIcon.group.image : ThemeIcon.contacts.image
-            avatarView.tintColor = .themeTextHint
-        }
+        // 与Android一致：通过频道ID构造头像URL
+        AppUtility.loadChannelAvatar(channelId: item.channelId, channelType: item.channelType, name: item.name, into: avatarView)
     }
 }
 
@@ -897,12 +891,7 @@ private class SearchResultMessageCell: UITableViewCell {
         typeIcon.image = icon.image
         contentLabel.attributedText = highlightKeywordYellow(displayText, keyword: keyword)
 
-        if let avatar = item.avatar, !avatar.isEmpty {
-            let urlStr = avatar.hasPrefix("http") ? avatar : APIConfig.apiBaseURL + "/" + avatar
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: ThemeIcon.contacts.image)
-            }
-        }
+        AppUtility.loadChannelAvatar(channelId: item.fromUID.isEmpty ? item.channelId : item.fromUID, channelType: 1, name: item.fromName.isEmpty ? item.channelName : item.fromName, into: avatarView)
     }
 }
 
@@ -939,15 +928,7 @@ private class SearchResultContactCell: UITableViewCell {
 
     func configure(item: SearchContactResult, keyword: String) {
         nameLabel.attributedText = highlightKeywordYellow(item.name, keyword: keyword)
-        if let avatar = item.avatar, !avatar.isEmpty {
-            let urlStr = avatar.hasPrefix("http") ? avatar : APIConfig.apiBaseURL + "/" + avatar
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: ThemeIcon.contacts.image)
-            }
-        } else {
-            avatarView.image = ThemeIcon.contacts.image
-            avatarView.tintColor = .themeTextHint
-        }
+        AppUtility.loadChannelAvatar(channelId: item.uid, channelType: 1, name: item.name, into: avatarView)
     }
 }
 

@@ -10,6 +10,8 @@ class VideoMessageCell: UITableViewCell {
     private let playIcon = UIImageView()
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
+    private let senderNameLabel = UILabel()
+    private var currentMessageID = ""
     private var isFromMe = false
     private var videoURL: URL?
 
@@ -38,8 +40,9 @@ class VideoMessageCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
+
+        senderNameLabel.font = ScreenAdapter.font(12)
+        senderNameLabel.textColor = .secondaryLabel
 
         thumbnailView.contentMode = .scaleAspectFill
         thumbnailView.clipsToBounds = true
@@ -51,7 +54,7 @@ class VideoMessageCell: UITableViewCell {
 
         bubbleView.addSubview(thumbnailView)
         bubbleView.addSubview(playIcon)
-        contentView.addSubviews(avatarView, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
 
         avatarView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(vPad)
@@ -70,7 +73,23 @@ class VideoMessageCell: UITableViewCell {
 
     func configure(with message: Message) {
         isFromMe = message.isFromMe
+        currentMessageID = message.messageID
         timeLabel.text = message.timeString
+
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
+
+        // 群聊且他人消息时显示发送者昵称（与Android一致）
+        let showName = message.channelType == 2 && !isFromMe
+        senderNameLabel.isHidden = !showName
+        if showName {
+            let mid = message.messageID
+            senderNameLabel.text = nil
+            AppUtility.displayName(for: message.fromUID) { [weak self] name in
+                guard let self = self, self.currentMessageID == mid else { return }
+                self.senderNameLabel.text = name
+            }
+        }
 
         let parts = message.content.split(separator: "|")
         let thumbPath: String
@@ -132,10 +151,22 @@ class VideoMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
-            bubbleView.snp.remakeConstraints { make in
-                make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.height.equalTo(imgSize)
+            if showName {
+                senderNameLabel.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                }
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
+                    make.width.height.equalTo(imgSize)
+                }
+            } else {
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                    make.width.height.equalTo(imgSize)
+                }
             }
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)

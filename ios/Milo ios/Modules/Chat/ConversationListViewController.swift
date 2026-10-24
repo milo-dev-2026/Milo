@@ -305,7 +305,11 @@ class ConversationListViewController: UIViewController {
             do {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConversations = syncResp.conversations ?? []
-                conversations = wkConversations.map { Conversation(from: $0) }
+                // 按 lastMsgSeq 降序排序（其次按时间戳），与Android会话顺序一致
+                conversations = wkConversations.map { Conversation(from: $0) }.sorted {
+                    if $0.lastMsgSeq != $1.lastMsgSeq { return $0.lastMsgSeq > $1.lastMsgSeq }
+                    return ($0.lastMessageTimestamp ?? 0) > ($1.lastMessageTimestamp ?? 0)
+                }
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                 }
@@ -317,18 +321,22 @@ class ConversationListViewController: UIViewController {
     }
 
     private func fetchChannelInfoForConversations() {
-        for (index, conv) in conversations.enumerated() {
+        // 拷贝快照，避免并发修改导致索引错乱
+        let snapshot = conversations
+        for conv in snapshot {
             Task {
                 do {
                     let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
                         .getChannelInfo(channelId: conv.channelID, channelType: conv.channelType)
                     )
                     DispatchQueue.main.async {
-                        if index < self.conversations.count {
-                            self.conversations[index].name = channelInfo.displayName
-                            self.conversations[index].avatar = channelInfo.logo ?? channelInfo.avatar
-                            self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
-                        }
+                        // 通过 channelID 定位，避免索引竞态导致名字/头像错配
+                        guard let idx = self.conversations.firstIndex(where: {
+                            $0.channelID == conv.channelID && $0.channelType == conv.channelType
+                        }) else { return }
+                        self.conversations[idx].name = channelInfo.displayName
+                        self.conversations[idx].avatar = channelInfo.logo ?? channelInfo.avatar
+                        self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
                     }
                 } catch { }
             }
@@ -603,10 +611,16 @@ class ConversationCell: UITableViewCell {
 
     func configure(with conversation: Conversation) {
         nameLabel.text = conversation.name
-        lastMessageLabel.text = conversation.lastMessage ?? ""
+        lastMessageLabel.text = conversation.lastMessageDisplay
         timeLabel.text = conversation.timeString
 
-        AppUtility.loadAvatar(conversation.avatarURL, into: avatarView)
+        // 与Android一致：通过 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar 加载
+        AppUtility.loadChannelAvatar(
+            channelId: conversation.channelID,
+            channelType: conversation.channelType,
+            name: conversation.name,
+            into: avatarView
+        )
 
         if conversation.unreadCount > 0 {
             unreadBadge.isHidden = false

@@ -295,12 +295,7 @@ class GroupDetailViewController: UIViewController {
             if i < displayMembers.count {
                 let member = displayMembers[i]
                 nameLabel.text = member.name
-                if let url = member.avatarURL {
-                    avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-                } else {
-                    avatarView.image = UIImage(systemName: "person.circle.fill")
-                    avatarView.tintColor = .systemGray4
-                }
+                AppUtility.loadChannelAvatar(channelId: member.uid, channelType: 1, name: member.name, into: avatarView)
             } else {
                 // 添加按钮
                 avatarView.image = UIImage(systemName: "plus")
@@ -353,9 +348,8 @@ class GroupDetailViewController: UIViewController {
             headerCache?.noticeLabel?.text = "点击编辑群公告"
             headerCache?.noticeLabel?.textColor = .secondaryLabel
         }
-        if let url = group.avatar, !url.isEmpty,
-           let avatarURL = URL(string: url.hasPrefix("http") ? url : APIConfig.apiBaseURL + "/" + url) {
-            headerCache?.avatar?.kf.setImage(with: avatarURL, placeholder: UIImage(systemName: "person.3.fill"))
+        if let avatarView = headerCache?.avatar {
+            AppUtility.loadChannelAvatar(channelId: groupId, channelType: 2, name: group.name, into: avatarView)
         }
         setupMemberGrid()
     }
@@ -1083,12 +1077,7 @@ class GroupMemberCell: UITableViewCell {
 
     func configure(with member: GroupMember) {
         nameLabel.text = member.name
-        if let url = member.avatarURL {
-            avatarImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-        } else {
-            avatarImageView.image = UIImage(systemName: "person.circle.fill")
-            avatarImageView.tintColor = .systemGray4
-        }
+        AppUtility.loadChannelAvatar(channelId: member.uid, channelType: 1, name: member.name, into: avatarImageView)
 
         if let role = member.role, role > 0 {
             roleLabel.isHidden = false

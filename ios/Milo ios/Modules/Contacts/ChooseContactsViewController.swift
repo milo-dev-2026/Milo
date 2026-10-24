@@ -99,15 +99,7 @@ class ChooseContactsViewController: UIViewController, UITableViewDataSource, UIT
         let c = filteredContacts[indexPath.row]
         cell.textLabel?.text = c.name
         cell.textLabel?.textColor = .label
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill")
-        cell.imageView?.tintColor = .lightGray
-
-        if let avatarStr = c.avatar, !avatarStr.isEmpty {
-            let urlStr = avatarStr.hasPrefix("http") ? avatarStr : APIConfig.apiBaseURL + "/" + avatarStr
-            if let url = URL(string: urlStr) {
-                cell.imageView?.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
-        }
+        AppUtility.loadChannelAvatar(channelId: c.uid, channelType: 1, name: c.name, into: cell.imageView!)
 
         cell.accessoryType = selectedUids.contains(c.uid) ? .checkmark : .none
         return cell

@@ -136,17 +136,13 @@ class CallViewController: UIViewController {
     private func setupBackground() {
         // 背景图片
         backgroundImageView.contentMode = .scaleAspectFill
-        backgroundImageView.image = UIImage(systemName: "person.circle.fill")
-        backgroundImageView.tintColor = .systemGray5
         view.addSubview(backgroundImageView)
         backgroundImageView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
 
         // 加载头像作为背景
-        if let avatar = remoteAvatar, let url = URL(string: avatar) {
-            backgroundImageView.kf.setImage(with: url)
-        }
+        AppUtility.loadChannelAvatar(channelId: remoteUid, channelType: 1, name: remoteName, into: backgroundImageView)
 
         // 渐变叠加层
         let gradientLayer = CAGradientLayer()
@@ -354,13 +350,9 @@ class CallViewController: UIViewController {
         largeAvatarView.layer.cornerRadius = 50
         largeAvatarView.layer.borderWidth = 3
         largeAvatarView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
-        largeAvatarView.image = UIImage(systemName: "person.circle.fill")
-        largeAvatarView.tintColor = .systemGray4
         largeAvatarView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
 
-        if let avatar = remoteAvatar, let url = URL(string: avatar) {
-            largeAvatarView.kf.setImage(with: url)
-        }
+        AppUtility.loadChannelAvatar(channelId: remoteUid, channelType: 1, name: remoteName, into: largeAvatarView)
 
         avatarContainer.addSubview(largeAvatarView)
         largeAvatarView.snp.makeConstraints { make in

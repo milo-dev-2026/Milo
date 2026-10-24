@@ -241,31 +241,75 @@ struct WKMessageData: Codable {
         return client_msg_no ?? UUID().uuidString
     }
 
-    var decodedPayload: (type: Int, content: String) {
-        // 优先尝试从 payloadDict 解析（字典格式）
-        if let dict = payloadDict {
-            let type = dict["type"] as? Int ?? 1
-            let content = dict["content"] as? String ?? ""
-            return (type, content)
-        }
-        guard let payload = payload, !payload.isEmpty else {
-            return (1, "")
-        }
-        // 尝试 base64 解码 → JSON 解析
+    /// 将payload字典归一化为 [String: Any]
+    private var payloadJSONDict: [String: Any]? {
+        if let dict = payloadDict { return dict }
+        guard let payload = payload, !payload.isEmpty else { return nil }
         if let data = Data(base64Encoded: payload),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            let type = json["type"] as? Int ?? 1
-            let content = json["content"] as? String ?? ""
-            return (type, content)
+            return json
         }
-        // 尝试直接 JSON 解析（payload 本身就是 JSON 字符串）
         if let data = payload.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            let type = json["type"] as? Int ?? 1
-            let content = json["content"] as? String ?? ""
-            return (type, content)
+            return json
         }
-        return (1, "")
+        return nil
+    }
+
+    private static func anyToInt(_ v: Any?) -> Int {
+        if let i = v as? Int { return i }
+        if let n = v as? NSNumber { return n.intValue }
+        if let s = v as? String { return Int(s) ?? 0 }
+        return 0
+    }
+
+    private static func anyToDouble(_ v: Any?) -> Double {
+        if let d = v as? Double { return d }
+        if let n = v as? NSNumber { return n.doubleValue }
+        if let s = v as? String { return Double(s) ?? 0 }
+        return 0
+    }
+
+    /// 解析payload为 (type, content)，content格式与各消息Cell约定一致
+    var decodedPayload: (type: Int, content: String) {
+        guard let dict = payloadJSONDict else { return (1, "") }
+        let type = WKMessageData.anyToInt(dict["type"])
+        let str = { (key: String) -> String in dict[key] as? String ?? "" }
+        switch type {
+        case 1: // 文本
+            return (type, str("content"))
+        case 2: // 图片: content = url
+            return (type, str("url"))
+        case 3: // 语音: "duration|url"
+            let duration = WKMessageData.anyToInt(dict["duration"] ?? dict["second"] ?? dict["time_tradition"])
+            return (type, "\(duration)|\(str("url"))")
+        case 4: // 视频: "thumbURL|videoURL"
+            let thumb = dict["thumb_url"] as? String ?? dict["thumb"] as? String ?? ""
+            let video = dict["video_url"] as? String ?? str("url")
+            return (type, "\(thumb)|\(video)")
+        case 5: // 文件: "fileName|fileSize|url"
+            let name = dict["file_name"] as? String ?? str("name")
+            let size = WKMessageData.anyToInt(dict["file_size"] ?? dict["size"])
+            return (type, "\(name)|\(size)|\(str("url"))")
+        case 6: // 位置: "name|lat,lng"
+            let name = str("name")
+            let lat = WKMessageData.anyToDouble(dict["latitude"] ?? dict["lat"])
+            let lng = WKMessageData.anyToDouble(dict["longitude"] ?? dict["lng"])
+            return (type, "\(name)|\(lat),\(lng)")
+        case 7: // 名片: "uid|name|avatar|vercode"
+            return (type, "\(str("uid"))|\(str("name"))|\(str("avatar"))|\(str("vercode"))")
+        case 100: // 笔记: 优先note_json，否则整体JSON
+            if let noteJSON = dict["note_json"] as? String, !noteJSON.isEmpty {
+                return (type, noteJSON)
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: dict),
+               let s = String(data: data, encoding: .utf8) {
+                return (type, s)
+            }
+            return (type, "")
+        default:
+            return (type, str("content"))
+        }
     }
 }
 
@@ -326,6 +370,7 @@ struct Message: Codable {
     var type: MessageType
     var timestamp: Int64
     var status: Int
+    var messageSeq: Int
 
     enum CodingKeys: String, CodingKey {
         case messageID = "message_id"
@@ -336,13 +381,14 @@ struct Message: Codable {
         case type
         case timestamp
         case status
+        case messageSeq = "message_seq"
     }
 
     var isFromMe: Bool {
         return fromUID == UserDefaults.standard.string(forKey: "uid")
     }
 
-    init(messageID: String, channelID: String, channelType: Int, fromUID: String, content: String, type: MessageType, timestamp: Int64, status: Int) {
+    init(messageID: String, channelID: String, channelType: Int, fromUID: String, content: String, type: MessageType, timestamp: Int64, status: Int, messageSeq: Int = 0) {
         self.messageID = messageID
         self.channelID = channelID
         self.channelType = channelType
@@ -351,6 +397,7 @@ struct Message: Codable {
         self.type = type
         self.timestamp = timestamp
         self.status = status
+        self.messageSeq = messageSeq
     }
 
     init(from wk: WKMessageData) {
@@ -363,6 +410,7 @@ struct Message: Codable {
         self.type = MessageType(rawValue: decoded.type) ?? .text
         self.timestamp = (wk.timestamp ?? 0) * 1000
         self.status = 1
+        self.messageSeq = wk.message_seq ?? 0
     }
 
     var timeString: String {
@@ -382,6 +430,8 @@ struct Conversation: Codable {
     var lastMessage: String?
     var lastMessageTimestamp: Int64?
     var unreadCount: Int
+    var lastMsgSeq: Int
+    var lastMessageType: Int
 
     enum CodingKeys: String, CodingKey {
         case channelID = "channel_id"
@@ -391,6 +441,8 @@ struct Conversation: Codable {
         case lastMessage = "last_message"
         case lastMessageTimestamp = "last_message_timestamp"
         case unreadCount = "unread_count"
+        case lastMsgSeq = "last_msg_seq"
+        case lastMessageType = "last_message_type"
     }
 
     var isGroup: Bool {
@@ -420,7 +472,22 @@ struct Conversation: Codable {
         return formatter.string(from: date)
     }
 
-    init(channelID: String, channelType: Int, name: String, avatar: String?, lastMessage: String?, lastMessageTimestamp: Int64?, unreadCount: Int) {
+    /// 会话列表显示的最后一条消息（带类型前缀，与Android一致）
+    var lastMessageDisplay: String {
+        guard let msg = lastMessage, !msg.isEmpty else { return "" }
+        switch lastMessageType {
+        case MessageType.image.rawValue: return "[图片]"
+        case MessageType.voice.rawValue: return "[语音]"
+        case MessageType.video.rawValue: return "[视频]"
+        case MessageType.file.rawValue: return "[文件]"
+        case MessageType.location.rawValue: return "[位置]"
+        case MessageType.card.rawValue: return "[名片]"
+        case MessageType.note.rawValue: return "[笔记]"
+        default: return msg
+        }
+    }
+
+    init(channelID: String, channelType: Int, name: String, avatar: String?, lastMessage: String?, lastMessageTimestamp: Int64?, unreadCount: Int, lastMsgSeq: Int = 0, lastMessageType: Int = 1) {
         self.channelID = channelID
         self.channelType = channelType
         self.name = name
@@ -428,6 +495,8 @@ struct Conversation: Codable {
         self.lastMessage = lastMessage
         self.lastMessageTimestamp = lastMessageTimestamp
         self.unreadCount = unreadCount
+        self.lastMsgSeq = lastMsgSeq
+        self.lastMessageType = lastMessageType
     }
 
     init(from wk: WKConversation) {
@@ -439,11 +508,14 @@ struct Conversation: Codable {
         if let r = recent {
             let decoded = r.decodedPayload
             self.lastMessage = decoded.content
+            self.lastMessageType = decoded.type
         } else {
             self.lastMessage = nil
+            self.lastMessageType = 1
         }
         self.lastMessageTimestamp = wk.timestamp.map { $0 * 1000 }
         self.unreadCount = wk.unread ?? 0
+        self.lastMsgSeq = wk.last_msg_seq ?? 0
     }
 }
 

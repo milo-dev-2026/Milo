@@ -42,29 +42,77 @@ class AppUtility {
 
     // MARK: - 加载头像
     static func loadAvatar(_ url: URL?, into imageView: UIImageView, placeholder: String? = nil) {
+        let defaultImg = defaultAvatarImage(name: placeholder ?? "", size: 96)
         guard let url = url else {
-            imageView.image = UIImage(systemName: "person.circle.fill")
-            imageView.tintColor = UIColor.systemGray5
+            imageView.image = defaultImg
             return
         }
-        print("[Avatar] 加载头像: \(url.absoluteString)")
         imageView.kf.setImage(
             with: url,
-            placeholder: UIImage(systemName: "person.circle.fill"),
+            placeholder: defaultImg,
             options: [
                 .transition(.fade(0.2)),
                 .cacheOriginalImage
             ]
         ) { result in
-            switch result {
-            case .failure(let error):
-                print("[Avatar] 加载失败: \(url.absoluteString) - \(error.localizedDescription)")
-                imageView.image = UIImage(systemName: "person.circle.fill")
-                imageView.tintColor = UIColor.systemGray5
-            case .success:
-                print("[Avatar] 加载成功: \(url.absoluteString)")
-                break
+            if case .failure = result {
+                imageView.image = defaultImg
             }
+        }
+    }
+
+    // MARK: - 头像URL构造（与Android一致：/v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar）
+    static func avatarURL(forChannelId channelId: String, channelType: Int) -> URL? {
+        let path = channelType == 2 ? "/v1/groups/\(channelId)/avatar" : "/v1/users/\(channelId)/avatar"
+        return URL(string: APIConfig.apiBaseURL + path)
+    }
+
+    // MARK: - 加载频道头像（与Android AvatarView一致，失败显示首字符彩色头像）
+    static func loadChannelAvatar(channelId: String, channelType: Int, name: String, into imageView: UIImageView) {
+        let placeholder = defaultAvatarImage(name: name, size: 96)
+        guard let url = avatarURL(forChannelId: channelId, channelType: channelType) else {
+            imageView.image = placeholder
+            return
+        }
+        imageView.kf.setImage(
+            with: url,
+            placeholder: placeholder,
+            options: [
+                .transition(.fade(0.2)),
+                .cacheOriginalImage
+            ]
+        ) { result in
+            if case .failure = result {
+                imageView.image = placeholder
+            }
+        }
+    }
+
+    // MARK: - 默认头像（名字首字符 + 彩色背景，对齐Android AvatarView）
+    static func defaultAvatarImage(name: String, size: CGFloat) -> UIImage {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstChar = trimmed.isEmpty ? "?" : String(trimmed.prefix(1)).uppercased()
+        let colors: [UInt32] = [0xE07A9F, 0xA97FD6, 0x7F92D6, 0x7FC8D6, 0x7FD69F, 0xD6C87F, 0xD6977F, 0xD67F7F]
+        let colorIndex = abs(trimmed.hashValue) % colors.count
+        let bgColor = UIColor.hex(String(format: "%06X", colors[colorIndex]))
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { context in
+            bgColor.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            let font = UIFont.boldSystemFont(ofSize: size * 0.42)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: UIColor.white
+            ]
+            let text = firstChar as NSString
+            let textSize = text.size(withAttributes: attrs)
+            let rect = CGRect(
+                x: (size - textSize.width) / 2,
+                y: (size - textSize.height) / 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            text.draw(in: rect, withAttributes: attrs)
         }
     }
 
@@ -72,6 +120,25 @@ class AppUtility {
     static func isValidPhone(_ phone: String) -> Bool {
         let predicate = NSPredicate(format: "SELF MATCHES %@", "^1[3-9]\\d{9}$")
         return predicate.evaluate(with: phone)
+    }
+
+    // MARK: - 获取用户显示名（优先SDK缓存，缺失时触发拉取）
+    static func displayName(for uid: String, completion: @escaping (String) -> Void) {
+        if let cached = IMManager.shared.getChannelInfo(channelId: uid, channelType: 1) {
+            let remark = cached.remark ?? ""
+            let name = cached.name ?? ""
+            let display = remark.isEmpty ? name : remark
+            if !display.isEmpty {
+                DispatchQueue.main.async { completion(display) }
+                return
+            }
+        }
+        IMManager.shared.fetchChannelInfo(channelId: uid, channelType: 1) { info in
+            let remark = info?.remark ?? ""
+            let name = info?.name ?? ""
+            let display = remark.isEmpty ? name : remark
+            completion(display.isEmpty ? uid : display)
+        }
     }
 
     // MARK: - 时间格式化

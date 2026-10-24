@@ -249,11 +249,48 @@ class IMManager: NSObject {
                             var wkMessages = [WKMessage]()
                             for msgDict in messages {
                                 let msg = WKMessage()
-                                msg.messageId = UInt64(msgDict["message_id"] as? Int ?? 0)
+                                if let mid = msgDict["message_id"] as? Int {
+                                    msg.messageId = UInt64(mid)
+                                } else if let midStr = msgDict["message_id"] as? String, let mid = UInt64(midStr) {
+                                    msg.messageId = mid
+                                }
                                 msg.timestamp = msgDict["timestamp"] as? Int ?? 0
                                 msg.fromUid = msgDict["from_uid"] as? String ?? ""
                                 msg.clientMsgNo = msgDict["client_msg_no"] as? String ?? ""
-                                msg.messageSeq = UInt32(msgDict["seq"] as? Int ?? 0)
+                                if let seq = msgDict["message_seq"] as? Int {
+                                    msg.messageSeq = UInt32(seq)
+                                } else if let seq = msgDict["seq"] as? Int {
+                                    msg.messageSeq = UInt32(seq)
+                                }
+                                msg.channel = channel
+                                msg.status = WKMessageStatus(rawValue: 1) ?? msg.status
+
+                                // 解析payload为消息正文（与SDK网络收包路径一致）
+                                var payloadDict: [String: Any]?
+                                if let payloadStr = msgDict["payload"] as? String {
+                                    if let data = Data(base64Encoded: payloadStr),
+                                       let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                        payloadDict = j
+                                    } else if let data = payloadStr.data(using: .utf8),
+                                              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                        payloadDict = j
+                                    }
+                                } else if let pDict = msgDict["payload"] as? [String: Any] {
+                                    payloadDict = pDict
+                                }
+                                if let payloadDict = payloadDict {
+                                    let contentType: Int
+                                    if let t = payloadDict["type"] as? Int { contentType = t }
+                                    else if let t = payloadDict["type"] as? NSNumber { contentType = t.intValue }
+                                    else { contentType = 1 }
+                                    if let cls = WKSDK.shared().getMessageContent(contentType) as? WKMessageContent.Type {
+                                        let content = cls.init()
+                                        content.decode(withJSON: payloadDict)
+                                        msg.content = content
+                                    } else {
+                                        msg.content = WKTextContent(content: payloadDict["content"] as? String ?? "")
+                                    }
+                                }
                                 wkMessages.append(msg)
                             }
                             syncModel.messages = wkMessages
@@ -560,7 +597,8 @@ extension IMManager: WKChatManagerDelegate {
             content: content,
             type: msgType,
             timestamp: Int64(wkMsg.timestamp * 1000),
-            status: status
+            status: status,
+            messageSeq: Int(wkMsg.messageSeq)
         )
     }
 }

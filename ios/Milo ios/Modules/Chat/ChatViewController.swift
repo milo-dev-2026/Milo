@@ -162,7 +162,7 @@ class ChatViewController: UIViewController {
             make.centerY.equalToSuperview()
         }
 
-        // 加载头像
+        // 加载头像（与Android一致：通过频道ID构造头像URL）
         Task {
             do {
                 let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
@@ -170,9 +170,23 @@ class ChatViewController: UIViewController {
                 )
                 DispatchQueue.main.async {
                     navTitleLabel.text = channelInfo.displayName
-                    AppUtility.loadAvatar(channelInfo.avatarURL, into: navAvatar)
+                    AppUtility.loadChannelAvatar(
+                        channelId: channelId,
+                        channelType: channelType,
+                        name: channelInfo.displayName,
+                        into: navAvatar
+                    )
                 }
-            } catch { }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.loadChannelAvatar(
+                        channelId: channelId,
+                        channelType: channelType,
+                        name: titleText,
+                        into: navAvatar
+                    )
+                }
+            }
         }
 
         navigationItem.titleView = titleView
@@ -311,7 +325,11 @@ class ChatViewController: UIViewController {
                 )
                 if let msgs = response.messages {
                     print("[Chat] 加载到 \(msgs.count) 条消息")
-                    messages = msgs.map { Message(from: $0) }.sorted { $0.timestamp < $1.timestamp }
+                    // 按 messageSeq 升序（服务端权威顺序），其次按时间戳，避免同秒消息乱序
+                    messages = msgs.map { Message(from: $0) }.sorted {
+                        if $0.messageSeq != $1.messageSeq { return $0.messageSeq < $1.messageSeq }
+                        return $0.timestamp < $1.timestamp
+                    }
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
                         self.scrollToBottom()
@@ -1063,7 +1081,9 @@ class TextMessageCell: UITableViewCell {
     private let messageLabel = UILabel()
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
+    private let senderNameLabel = UILabel()
     private var isFromMe = false
+    private var currentMessageID = ""
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -1078,7 +1098,6 @@ class TextMessageCell: UITableViewCell {
         selectionStyle = .none
 
         let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
         let vPad = ScreenAdapter.scaleH(12)
         let bubblePad = ScreenAdapter.scaleW(10)
         let bubbleInner = ScreenAdapter.scaleW(12)
@@ -1090,16 +1109,17 @@ class TextMessageCell: UITableViewCell {
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .center
 
+        senderNameLabel.font = ScreenAdapter.font(12)
+        senderNameLabel.textColor = .secondaryLabel
+
         bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
 
-        contentView.addSubviews(avatarView, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
         bubbleView.addSubview(messageLabel)
 
         avatarView.snp.makeConstraints { make in
@@ -1117,14 +1137,31 @@ class TextMessageCell: UITableViewCell {
 
     func configure(with message: Message) {
         isFromMe = message.isFromMe
+        currentMessageID = message.messageID
         messageLabel.text = message.content
         timeLabel.text = message.timeString
+
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
+
+        // 群聊且他人消息时显示发送者昵称（与Android一致）
+        let showName = message.channelType == 2 && !isFromMe
+        senderNameLabel.isHidden = !showName
+        if showName {
+            let mid = message.messageID
+            senderNameLabel.text = nil
+            AppUtility.displayName(for: message.fromUID) { [weak self] name in
+                guard let self = self, self.currentMessageID == mid else { return }
+                self.senderNameLabel.text = name
+            }
+        }
 
         let avatarSize = ScreenAdapter.scaleW(36)
         let hPad = ScreenAdapter.scaleW(12)
         let vPad = ScreenAdapter.scaleH(12)
         let bubbleGap = ScreenAdapter.scaleW(8)
         let timeGap = ScreenAdapter.scaleH(4)
+        let nameGap = ScreenAdapter.scaleH(2)
         let maxWidth = ScreenAdapter.screenWidth * 0.6
         let font = ScreenAdapter.font(15)
         let size = message.content.size(withAttributes: [.font: font])
@@ -1156,10 +1193,22 @@ class TextMessageCell: UITableViewCell {
             }
             bubbleView.backgroundColor = .themeBubbleIncoming
             messageLabel.textColor = .label
-            bubbleView.snp.remakeConstraints { make in
-                make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
+            if showName {
+                senderNameLabel.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                }
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(senderNameLabel.snp.bottom).offset(nameGap)
+                    make.width.equalTo(bubbleWidth)
+                }
+            } else {
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                    make.width.equalTo(bubbleWidth)
+                }
             }
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)

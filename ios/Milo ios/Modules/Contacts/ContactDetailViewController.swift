@@ -302,9 +302,7 @@ class ContactDetailViewController: UIViewController {
                 DispatchQueue.main.async {
                     self.nameLabel.text = info.displayName
                     self.idLabel.text = "Milo号：\(info.channel_id ?? "")"
-                    if let avatar = info.logo ?? info.avatar, let url = URL(string: avatar) {
-                        AppUtility.loadAvatar(url, into: self.avatarImageView)
-                    }
+                    AppUtility.loadChannelAvatar(channelId: self.uid, channelType: 1, name: info.displayName, into: self.avatarImageView)
                     if let remark = info.remark, !remark.isEmpty {
                         self.remarkLabel.text = "备注：\(remark)"
                     } else {

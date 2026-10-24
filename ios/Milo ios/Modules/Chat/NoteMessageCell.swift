@@ -7,6 +7,8 @@ class NoteMessageCell: UITableViewCell {
     private let bubbleView = UIView()
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
+    private let senderNameLabel = UILabel()
+    private var currentMessageID = ""
     private var isFromMe = false
 
     // 笔记内容
@@ -48,8 +50,9 @@ class NoteMessageCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
+
+        senderNameLabel.font = ScreenAdapter.font(12)
+        senderNameLabel.textColor = .secondaryLabel
 
         // 笔记卡片容器
         noteContainer.backgroundColor = .white
@@ -84,7 +87,7 @@ class NoteMessageCell: UITableViewCell {
 
         noteContainer.addSubviews(noteIconView, noteTitleLabel, notePreviewLabel, noteArrowView)
         bubbleView.addSubview(noteContainer)
-        contentView.addSubviews(timeHeaderLabel, avatarView, bubbleView, timeLabel)
+        contentView.addSubviews(timeHeaderLabel, avatarView, senderNameLabel, bubbleView, timeLabel)
 
         timeHeaderLabel.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(8)
@@ -168,7 +171,23 @@ class NoteMessageCell: UITableViewCell {
 
     func configure(with message: Message) {
         isFromMe = message.isFromMe
+        currentMessageID = message.messageID
         timeLabel.text = message.timeString
+
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
+
+        // 群聊且他人消息时显示发送者昵称（与Android一致）
+        let showName = message.channelType == 2 && !isFromMe
+        senderNameLabel.isHidden = !showName
+        if showName {
+            let mid = message.messageID
+            senderNameLabel.text = nil
+            AppUtility.displayName(for: message.fromUID) { [weak self] name in
+                guard let self = self, self.currentMessageID == mid else { return }
+                self.senderNameLabel.text = name
+            }
+        }
 
         // 解析笔记消息内容
         if let data = message.content.data(using: .utf8),
@@ -215,10 +234,22 @@ class NoteMessageCell: UITableViewCell {
             bubbleView.backgroundColor = .themeBubbleIncoming
             noteTitleLabel.textColor = .label
             notePreviewLabel.textColor = .secondaryLabel
-            bubbleView.snp.remakeConstraints { make in
-                make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
+            if showName {
+                senderNameLabel.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                }
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
+                    make.width.equalTo(bubbleWidth)
+                }
+            } else {
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                    make.width.equalTo(bubbleWidth)
+                }
             }
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)

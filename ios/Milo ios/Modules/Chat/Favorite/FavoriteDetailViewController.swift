@@ -137,12 +137,9 @@ class FavoriteDetailViewController: UIViewController {
     private func setupContent() {
         senderNameLabel.text = item.fromUser?.name ?? "未知"
         timeLabel.text = item.timeString
-        
-        if let avatarStr = item.fromUser?.avatar, !avatarStr.isEmpty {
-            let urlStr = avatarStr.hasPrefix("http") ? avatarStr : APIConfig.apiBaseURL + "/" + avatarStr
-            if let url = URL(string: urlStr) {
-                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
+
+        if let fromUser = item.fromUser {
+            AppUtility.loadChannelAvatar(channelId: fromUser.uid, channelType: 1, name: fromUser.name, into: avatarView)
         }
         
         // 根据类型设置内容

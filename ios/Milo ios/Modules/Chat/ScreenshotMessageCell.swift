@@ -139,8 +139,6 @@ class ScreenshotMessageCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
 
         imageView_.contentMode = .scaleAspectFill
         imageView_.clipsToBounds = true
@@ -473,6 +471,9 @@ class ScreenshotMessageCell: UITableViewCell {
     func configure(with message: Message) {
         isFromMe = message.isFromMe
         timeLabel.text = message.timeString
+
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
 
         let avatarSize = ScreenAdapter.scaleW(36)
         let hPad = ScreenAdapter.scaleW(12)

@@ -49,7 +49,7 @@ class SearchUserViewController: UIViewController, UITableViewDataSource, UITable
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "SUCell", for: indexPath)
         if results.isEmpty { cell.textLabel?.text = "输入关键词搜索"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let r = results[indexPath.row]; cell.textLabel?.text = r.name; cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray; cell.accessoryType = .disclosureIndicator }
+        else { let r = results[indexPath.row]; cell.textLabel?.text = r.name; AppUtility.loadChannelAvatar(channelId: r.uid, channelType: 1, name: r.name, into: cell.imageView!); cell.accessoryType = .disclosureIndicator }
         return cell
     }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -242,7 +242,7 @@ class ChatWithFromUIDViewController: UIViewController, UITableViewDataSource, UI
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CWUCell", for: indexPath)
         if contacts.isEmpty { cell.textLabel?.text = "暂无联系人"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let c = contacts[indexPath.row]; cell.textLabel?.text = c.name; cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray; cell.accessoryType = .disclosureIndicator }
+        else { let c = contacts[indexPath.row]; cell.textLabel?.text = c.name; AppUtility.loadChannelAvatar(channelId: c.uid, channelType: 1, name: c.name, into: cell.imageView!); cell.accessoryType = .disclosureIndicator }
         return cell
     }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -367,7 +367,7 @@ class SearchAllMembersViewController: UIViewController, UITableViewDataSource, U
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "SAMCell", for: indexPath)
         if members.isEmpty { cell.textLabel?.text = "输入关键词搜索"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let m = members[indexPath.row]; cell.textLabel?.text = m.name; cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray; cell.accessoryType = .disclosureIndicator }
+        else { let m = members[indexPath.row]; cell.textLabel?.text = m.name; AppUtility.loadChannelAvatar(channelId: m.uid, channelType: 1, name: m.name, into: cell.imageView!); cell.accessoryType = .disclosureIndicator }
         return cell
     }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

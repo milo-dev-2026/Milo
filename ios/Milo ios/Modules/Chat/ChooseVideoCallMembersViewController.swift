@@ -62,8 +62,7 @@ class ChooseVideoCallMembersViewController: UIViewController, UITableViewDataSou
         let m = members[indexPath.row]
         cell.textLabel?.text = m.name
         cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill")
-        cell.imageView?.tintColor = .lightGray
+        AppUtility.loadChannelAvatar(channelId: m.uid, channelType: 1, name: m.name, into: cell.imageView!)
         cell.accessoryType = selectedUids.contains(m.uid) ? .checkmark : .none
         return cell
     }

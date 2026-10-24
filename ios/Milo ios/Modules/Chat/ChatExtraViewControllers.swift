@@ -239,7 +239,7 @@ class ChatMessagePrivacyViewController: UIViewController, UITableViewDataSource,
 
 class ChooseChatViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var conversations: [(channelId: String, name: String, avatar: String)] = []
+    private var conversations: [(channelId: String, channelType: Int, name: String, avatar: String)] = []
     var onSelected: ((String, String) -> Void)?
 
     override func viewDidLoad() {
@@ -259,7 +259,7 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
             do {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConvs = syncResp.conversations ?? []
-                conversations = wkConvs.map { (channelId: $0.channel_id ?? "", name: "", avatar: "") }
+                conversations = wkConvs.map { (channelId: $0.channel_id ?? "", channelType: $0.channel_type ?? 0, name: "", avatar: "") }
                 DispatchQueue.main.async { self.tableView.reloadData() }
                 for (index, conv) in conversations.enumerated() {
                     Task {
@@ -286,8 +286,7 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
         let cell = tableView.dequeueReusableCell(withIdentifier: "ChooseChatCell", for: indexPath)
         let conv = conversations[indexPath.row]
         cell.textLabel?.text = conv.name
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill")
-        cell.imageView?.tintColor = .lightGray
+        AppUtility.loadChannelAvatar(channelId: conv.channelId, channelType: conv.channelType, name: conv.name, into: cell.imageView!)
         cell.accessoryType = .disclosureIndicator
         return cell
     }

@@ -3294,8 +3294,7 @@ class ProfileEditViewController: UIViewController, UIImagePickerControllerDelega
         }
 
         // 头像
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .lightGray
+        avatarView.image = AppUtility.defaultAvatarImage(name: nameField.text ?? "", size: 120)
         avatarView.contentMode = .scaleAspectFill
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(60)
         avatarView.layer.masksToBounds = true

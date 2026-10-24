@@ -61,9 +61,8 @@ class WaitingAnswerViewController: UIViewController {
         avatarView.layer.cornerRadius = avatarSize / 2
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray
         avatarView.backgroundColor = .systemGray5
+        AppUtility.loadChannelAvatar(channelId: channelId, channelType: 1, name: callerName, into: avatarView)
 
         nameLabel.text = callerName
         nameLabel.font = ScreenAdapter.mediumFont(24)

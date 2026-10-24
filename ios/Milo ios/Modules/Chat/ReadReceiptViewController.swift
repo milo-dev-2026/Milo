@@ -324,12 +324,7 @@ class ReadReceiptCell: UITableViewCell {
             statusLabel.textColor = .themeTextHint
         }
 
-        // 加载头像
-        if let url = receipt.avatarURL {
-            avatarImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-        } else {
-            avatarImageView.image = UIImage(systemName: "person.circle.fill")
-            avatarImageView.tintColor = .systemGray4
-        }
+        // 加载头像（与Android一致：通过uid构造头像URL）
+        AppUtility.loadChannelAvatar(channelId: receipt.uid, channelType: 1, name: receipt.name, into: avatarImageView)
     }
 }

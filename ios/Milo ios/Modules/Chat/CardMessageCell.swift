@@ -50,6 +50,8 @@ class CardMessageCell: UITableViewCell {
     private let bubbleView = UIView()
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
+    private let senderNameLabel = UILabel()
+    private var currentMessageID = ""
     private var isFromMe = false
     
     // 名片内容
@@ -87,9 +89,10 @@ class CardMessageCell: UITableViewCell {
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.image = UIImage(systemName: "person.circle.fill")
-        avatarView.tintColor = .systemGray5
-        
+
+        senderNameLabel.font = ScreenAdapter.font(12)
+        senderNameLabel.textColor = .secondaryLabel
+
         // 名片卡片
         cardContainer.backgroundColor = .white
         cardContainer.layer.cornerRadius = ScreenAdapter.scaleW(10)
@@ -127,7 +130,7 @@ class CardMessageCell: UITableViewCell {
         
         cardContainer.addSubviews(cardAvatarView, cardNameLabel, cardTagLabel, cardVercodeLabel, cardArrowView)
         bubbleView.addSubview(cardContainer)
-        contentView.addSubviews(avatarView, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
         
         avatarView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(vPad)
@@ -169,7 +172,23 @@ class CardMessageCell: UITableViewCell {
     
     func configure(with message: Message) {
         isFromMe = message.isFromMe
+        currentMessageID = message.messageID
         timeLabel.text = message.timeString
+
+        // 发送者头像（与Android一致）
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
+
+        // 群聊且他人消息时显示发送者昵称（与Android一致）
+        let showName = message.channelType == 2 && !isFromMe
+        senderNameLabel.isHidden = !showName
+        if showName {
+            let mid = message.messageID
+            senderNameLabel.text = nil
+            AppUtility.displayName(for: message.fromUID) { [weak self] name in
+                guard let self = self, self.currentMessageID == mid else { return }
+                self.senderNameLabel.text = name
+            }
+        }
         
         // 解析名片信息
         let cardInfo = CardMessageInfo.parse(from: message.content)
@@ -180,15 +199,11 @@ class CardMessageCell: UITableViewCell {
             cardVercodeLabel.text = "ID: \(cardInfo?.uid ?? "")"
         }
         
-        // 设置名片头像
-        if let avatarStr = cardInfo?.avatar, !avatarStr.isEmpty {
-            let urlStr = avatarStr.hasPrefix("http") ? avatarStr : APIConfig.apiBaseURL + "/" + avatarStr
-            if let url = URL(string: urlStr) {
-                cardAvatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-            }
+        // 设置名片头像（与Android一致：通过uid构造头像URL）
+        if let cardInfo = cardInfo, !cardInfo.uid.isEmpty {
+            AppUtility.loadChannelAvatar(channelId: cardInfo.uid, channelType: 1, name: cardInfo.name, into: cardAvatarView)
         } else {
-            cardAvatarView.image = UIImage(systemName: "person.circle.fill")
-            cardAvatarView.tintColor = .systemGray5
+            cardAvatarView.image = AppUtility.defaultAvatarImage(name: cardInfo?.name ?? "", size: 88)
         }
         
         let avatarSize = ScreenAdapter.scaleW(36)
@@ -222,10 +237,22 @@ class CardMessageCell: UITableViewCell {
                 make.width.height.equalTo(avatarSize)
             }
             bubbleView.backgroundColor = .themeBubbleIncoming
-            bubbleView.snp.remakeConstraints { make in
-                make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
+            if showName {
+                senderNameLabel.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                }
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
+                    make.width.equalTo(bubbleWidth)
+                }
+            } else {
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                    make.width.equalTo(bubbleWidth)
+                }
             }
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)

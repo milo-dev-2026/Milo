@@ -151,8 +151,9 @@ extension ForbiddenGroupMembersViewController: UITableViewDataSource, UITableVie
         cell.textLabel?.text = member.name
         cell.textLabel?.font = ThemeFont.body(16)
         cell.textLabel?.textColor = .themeTextPrimary
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill")
-        cell.imageView?.tintColor = .systemGray5
+        if let imageView = cell.imageView {
+            AppUtility.loadChannelAvatar(channelId: member.uid, channelType: 1, name: member.name, into: imageView)
+        }
         cell.backgroundColor = .themeBgWhite
         cell.contentView.backgroundColor = .themeBgWhite
 

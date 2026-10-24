@@ -626,6 +626,6 @@ class ContactCell: UITableViewCell {
 
     func configure(with user: User) {
         nameLabel.text = user.name
-        AppUtility.loadAvatar(user.avatarURL, into: avatarView)
+        AppUtility.loadChannelAvatar(channelId: user.uid, channelType: 1, name: user.name, into: avatarView)
     }
 }

@@ -297,13 +297,8 @@ class MentionMemberCell: UITableViewCell {
     }
 
     func configure(with member: GroupMember) {
-        nameLabel.text = member.nickname ?? member.name
-
-        if let avatar = member.avatar, let url = URL(string: avatar) {
-            avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
-        } else {
-            avatarView.image = UIImage(systemName: "person.circle.fill")
-            avatarView.tintColor = .systemGray5
-        }
+        let displayName = member.nickname ?? member.name
+        nameLabel.text = displayName
+        AppUtility.loadChannelAvatar(channelId: member.uid, channelType: 1, name: displayName, into: avatarView)
     }
 }

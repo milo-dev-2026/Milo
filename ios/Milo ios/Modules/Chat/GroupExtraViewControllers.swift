@@ -263,8 +263,7 @@ class OutGroupMembersViewController: UIViewController, UITableViewDataSource, UI
         let cell = tableView.dequeueReusableCell(withIdentifier: "OGMCell", for: indexPath)
         let m = members[indexPath.row]
         cell.textLabel?.text = m.name
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill")
-        cell.imageView?.tintColor = .lightGray
+        AppUtility.loadChannelAvatar(channelId: m.uid, channelType: 1, name: m.name, into: cell.imageView!)
         cell.accessoryType = .disclosureIndicator
         return cell
     }
@@ -302,7 +301,7 @@ class DeleteGroupMemberViewController: UIViewController, UITableViewDataSource, 
         let cell = tableView.dequeueReusableCell(withIdentifier: "DGMCell", for: indexPath)
         let m = members[indexPath.row]
         cell.textLabel?.text = m.name
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray
+        AppUtility.loadChannelAvatar(channelId: m.uid, channelType: 1, name: m.name, into: cell.imageView!)
         cell.accessoryType = selectedUids.contains(m.uid) ? .checkmark : .none
         return cell
     }
@@ -373,7 +372,7 @@ class AllMembersViewController: UIViewController, UITableViewDataSource, UITable
         let cell = tableView.dequeueReusableCell(withIdentifier: "AMCell", for: indexPath)
         let m = members[indexPath.row]
         cell.textLabel?.text = m.name
-        cell.imageView?.image = UIImage(systemName: "person.circle.fill"); cell.imageView?.tintColor = .lightGray
+        AppUtility.loadChannelAvatar(channelId: m.uid, channelType: 1, name: m.name, into: cell.imageView!)
         switch m.role {
         case 1: cell.detailTextLabel?.text = "群主"; cell.detailTextLabel?.textColor = .themePrimary
         case 2: cell.detailTextLabel?.text = "管理员"; cell.detailTextLabel?.textColor = .systemOrange
