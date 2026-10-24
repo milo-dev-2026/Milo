@@ -231,6 +231,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     // 定时同步消息扩展（撤回/已读状态）
     private final Handler extraSyncHandler = new Handler(Looper.getMainLooper());
     private boolean isExtraDataChanged = false;
+    private int hiddenPageRetryCount = 0;
     private final Runnable extraSyncRunnable = new Runnable() {
         @Override
         public void run() {
@@ -1327,6 +1328,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 if (isShowPinnedView) {
                     EndpointManager.getInstance().invoke("is_syncing_message", 0);
                 }
+                // 该群某一页可能全是系统通知（已隐藏），跳过空页继续向上拉，避免列表位置错乱
+                if (pullMode == 0 && isPageAllHidden(list) && hiddenPageRetryCount < 5) {
+                    hiddenPageRetryCount++;
+                    isRefreshLoading = true;
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> getData(0, false, 0, false), 200);
+                    return;
+                }
+                hiddenPageRetryCount = 0;
                 if (pullMode == 0) {
                     if (WKReader.isEmpty(list)) {
                         isCanRefresh = false;
@@ -1616,7 +1625,18 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 if (WKReader.isNotEmpty(list) && WKReader.isNotEmpty(chatAdapter.getData())) {
                     list.get(list.size() - 1).nextMsg = chatAdapter.getData().get(0).wkMsg;
                 }
+                // 记录用户当前正在看的位置，插入更早消息后复原，避免列表跳回底部
+                String anchorMsgNo = null;
+                int anchorOffset = 0;
+                int firstVisiblePos = linearLayoutManager.findFirstVisibleItemPosition();
+                if (firstVisiblePos >= 0 && firstVisiblePos < chatAdapter.getData().size()) {
+                    WKMsg anchorMsg = chatAdapter.getData().get(firstVisiblePos).wkMsg;
+                    if (anchorMsg != null) anchorMsgNo = anchorMsg.clientMsgNO;
+                    View anchorView = linearLayoutManager.findViewByPosition(firstVisiblePos);
+                    if (anchorView != null) anchorOffset = anchorView.getTop();
+                }
                 chatAdapter.addData(0, list);
+                keepScrollPosition(anchorMsgNo, anchorOffset);
             }
         }
         if (tipsOrderSeq != 0 || lastPreviewMsgOrderSeq != 0) {
@@ -1861,6 +1881,37 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
         return isRefresh;
+    }
+
+    /**
+     * 一页消息是否全部为已隐藏的系统通知（时间戳占位不算）
+     */
+    private boolean isPageAllHidden(List<WKMsg> list) {
+        if (WKReader.isEmpty(list)) return false;
+        if (!HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) || channelType != WKChannelType.GROUP) return false;
+        int realCount = 0;
+        int hiddenCount = 0;
+        for (WKMsg msg : list) {
+            if (msg == null || msg.type == WKContentType.msgPromptTime) continue;
+            realCount++;
+            if (isHideSystemNotifyMsg(msg)) hiddenCount++;
+        }
+        return realCount > 0 && realCount == hiddenCount;
+    }
+
+    /**
+     * 插入更早消息后恢复用户当前查看的位置
+     */
+    private void keepScrollPosition(String anchorMsgNo, int anchorOffset) {
+        if (TextUtils.isEmpty(anchorMsgNo)) return;
+        List<WKUIChatMsgItemEntity> data = chatAdapter.getData();
+        for (int i = 0, size = data.size(); i < size; i++) {
+            WKMsg msg = data.get(i).wkMsg;
+            if (msg != null && anchorMsgNo.equals(msg.clientMsgNO)) {
+                linearLayoutManager.scrollToPositionWithOffset(i, anchorOffset);
+                return;
+            }
+        }
     }
 
     private void scrollToPosition(int index) {
