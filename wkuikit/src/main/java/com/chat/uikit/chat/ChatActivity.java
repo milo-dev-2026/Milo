@@ -1431,6 +1431,17 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 return Long.compare(a.orderSeq, b.orderSeq);
             });
         }
+        // 指定群不展示系统通知消息
+        if (HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) && channelType == WKChannelType.GROUP && WKReader.isNotEmpty(msgList)) {
+            List<WKMsg> visibleList = new ArrayList<>(msgList.size());
+            for (WKMsg msg : msgList) {
+                if (!WKContentType.isSystemMsg(msg.type)) {
+                    visibleList.add(msg);
+                }
+            }
+            msgList.clear();
+            msgList.addAll(visibleList);
+        }
         // 新成员查看历史消息控制：群聊且不允许查看历史消息时，过滤掉入群时间之前的消息
         if (channelType == WKChannelType.GROUP && !isAllowViewHistoryMsg && memberJoinTimestamp > 0 && WKReader.isNotEmpty(msgList)) {
             List<WKMsg> filteredList = new ArrayList<>();
@@ -3064,6 +3075,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 // 命令消息和撤回消息不显示在聊天
                 if (msg.type == WKContentType.WK_INSIDE_MSG || msg.type == WKContentType.withdrawSystemInfo || msg.isDeleted == 1 || (msg.header != null && msg.header.noPersist))
                     continue;
+                // 指定群不显示系统通知消息
+                if (isHideSystemNotifyMsg(msg))
+                    continue;
 
                 // 收到视频消息立即触发预下载（比等UI渲染更早，用户点击时大概率已下完）
                 if (msg.type == WKContentType.WK_VIDEO && msg.baseContentMsgModel instanceof com.xinbida.wukongim.msgmodel.WKVideoContent) {
@@ -3298,6 +3312,19 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
             }
         }
+    }
+
+    // 该群不展示任何系统通知消息（入群/退群/管理员变更/群信息变更/群公告等）
+    private static final String HIDE_SYSTEM_NOTIFY_CHANNEL_ID = "ab8d2a8ed49747658ca5682abd593ca5";
+
+    /**
+     * 是否为需要隐藏的系统通知消息（仅针对指定群）
+     */
+    private boolean isHideSystemNotifyMsg(WKMsg msg) {
+        return msg != null
+                && HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId)
+                && channelType == WKChannelType.GROUP
+                && WKContentType.isSystemMsg(msg.type);
     }
 
     private synchronized void refreshMsg(WKMsg wkMsg) {
