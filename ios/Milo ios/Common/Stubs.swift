@@ -7,8 +7,6 @@ class NoteSelectViewController: UIViewController {
     var onNoteSelected: ((NoteEntity) -> Void)?
 }
 
-class SettingMainViewController: UIViewController {}
-
 class BlacklistViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
