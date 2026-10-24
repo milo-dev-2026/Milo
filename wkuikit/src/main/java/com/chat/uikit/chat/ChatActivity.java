@@ -715,6 +715,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 resetRemindView();
                 resetGroupApproveView();
 
+                // 上翻接近顶部时预加载更早的消息
+                if (dy < 0 && linearLayoutManager.findFirstVisibleItemPosition() <= 2) {
+                    showRefreshLoading();
+                }
+
                 View lastChildView = linearLayoutManager.findViewByPosition(lastItemPosition);
                 if (lastChildView != null) {
                     int bottom = lastChildView.getBottom();
@@ -1618,7 +1623,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     if (anchorView != null) anchorOffset = anchorView.getTop();
                 }
                 chatAdapter.addData(0, list);
-                keepScrollPosition(anchorMsgNo, anchorOffset);
+                // 进入会话首次渲染时不做锚点恢复（否则会停在最新一页的最上面），
+                // 只有用户已在上翻浏览时才恢复其所在位置
+                if (!isScrollToEnd || userScrolledSinceEnter) {
+                    keepScrollPosition(anchorMsgNo, anchorOffset);
+                }
             }
         }
         if (tipsOrderSeq != 0 || lastPreviewMsgOrderSeq != 0) {
