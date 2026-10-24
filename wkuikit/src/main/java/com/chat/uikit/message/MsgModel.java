@@ -780,7 +780,14 @@ public class MsgModel extends WKBaseModel {
         }
         // 循环同步：服务端按version升序+LIMIT 100，需要循环拉取直到拿完所有数据
         List<WKSyncExtraMsgEntity> allData = new ArrayList<>();
-        syncExtraMsgLoop(syncChannelId, channelID, channelType, 0, allData, callback, onComplete);
+        // 增量同步：从本地已同步到的最大version开始，避免每轮都全量重拉
+        String extraVersionKey = "sync_extra_version_" + channelID + "_" + channelType;
+        long localExtraVersion = 0;
+        try {
+            localExtraVersion = Long.parseLong(WKSharedPreferencesUtil.getInstance().getSPWithUID(extraVersionKey));
+        } catch (Exception ignored) {
+        }
+        syncExtraMsgLoop(syncChannelId, channelID, channelType, localExtraVersion, allData, callback, onComplete);
     }
 
     private void syncExtraMsgLoop(String syncChannelId, String originalChannelId, byte channelType, long startVersion,
@@ -795,7 +802,7 @@ public class MsgModel extends WKBaseModel {
         String deviceUUID = WKConstants.getDeviceUUID();
         jsonObject.put("source", deviceUUID);
         final long[] maxVersion = {startVersion};
-        android.util.Log.d("WKReceiptDebug", "syncExtraMsg loop: channel_id=" + syncChannelId + ", startVersion=" + startVersion);
+
         request(createService(MsgService.class).syncExtraMsg(jsonObject), new IRequestResultListener<String>() {
             @Override
             public void onSuccess(String result) {
@@ -808,7 +815,7 @@ public class MsgModel extends WKBaseModel {
                     android.util.Log.e("WKReceiptDebug", "syncExtraMsg parse error: " + e.getMessage());
                 }
                 int count = list != null ? list.size() : 0;
-                android.util.Log.d("WKReceiptDebug", "syncExtraMsg batch: count=" + count + ", startVersion=" + startVersion);
+
                 if (count > 0 && list != null) {
                     allData.addAll(list);
                     for (WKSyncExtraMsgEntity extra : list) {
@@ -846,13 +853,14 @@ public class MsgModel extends WKBaseModel {
                     }
                     // 服务端LIMIT 100，如果返回了100条，说明还有更多数据，继续同步
                     if (count >= 100 && maxVersion[0] > startVersion) {
-                        android.util.Log.d("WKReceiptDebug", "syncExtraMsg continue from version=" + maxVersion[0]);
+
                         syncExtraMsgLoop(syncChannelId, originalChannelId, channelType, maxVersion[0], allData, callback, onComplete);
                         return;
                     }
                 }
                 // 同步完成
-                android.util.Log.d("WKReceiptDebug", "syncExtraMsg all done, total=" + allData.size() + ", maxVersion=" + maxVersion[0]);
+                // 记录已同步到的版本，下次只做增量拉取
+                WKSharedPreferencesUtil.getInstance().putSPWithUID("sync_extra_version_" + originalChannelId + "_" + channelType, String.valueOf(maxVersion[0]));
                 // 保存到SDK数据库（下次进入聊天页直接显示）
                 if (!allData.isEmpty()) {
                     try {

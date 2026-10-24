@@ -230,6 +230,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private boolean isTypingShowing = false;
     // 定时同步消息扩展（撤回/已读状态）
     private final Handler extraSyncHandler = new Handler(Looper.getMainLooper());
+    private boolean isExtraDataChanged = false;
     private final Runnable extraSyncRunnable = new Runnable() {
         @Override
         public void run() {
@@ -237,12 +238,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 MsgModel.getInstance().syncExtraMsg(channelId, channelType,
                     allExtraList -> {
                         // 直接更新adapter列表中的消息对象（确保修改的就是UI绑定的对象）
-                        applyExtraToAdapter(allExtraList);
+                        isExtraDataChanged = applyExtraToAdapter(allExtraList);
                     },
                     () -> {
-                        if (chatAdapter != null) {
+                        // 只有状态真正变化时才全量刷新，避免每 10 秒无谓重绑列表
+                        if (chatAdapter != null && isExtraDataChanged) {
                             chatAdapter.notifyDataSetChanged();
-                            android.util.Log.d("WKReceiptDebug", "extraSync complete, adapter refreshed");
+                            isExtraDataChanged = false;
                         }
                         extraSyncHandler.postDelayed(this, 10000);
                     });
@@ -254,10 +256,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      * 将同步到的消息扩展应用到adapter列表中的消息对象
      * 直接修改adapter里的对象引用，确保notifyDataSetChanged后UI能正确刷新
      */
-    private void applyExtraToAdapter(List<com.chat.uikit.message.entity.WKSyncExtraMsgEntity> extraList) {
-        if (extraList == null || extraList.isEmpty() || chatAdapter == null) return;
+    private boolean applyExtraToAdapter(List<com.chat.uikit.message.entity.WKSyncExtraMsgEntity> extraList) {
+        if (extraList == null || extraList.isEmpty() || chatAdapter == null) return false;
         List<com.chat.base.msgitem.WKUIChatMsgItemEntity> data = chatAdapter.getData();
-        if (data == null || data.isEmpty()) return;
+        if (data == null || data.isEmpty()) return false;
 
         int updatedCount = 0;
         int revokeUpdated = 0;
@@ -296,10 +298,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
 
-        android.util.Log.d("WKReceiptDebug", "applyExtraToAdapter: total=" + extraList.size()
-                + ", updated=" + updatedCount
-                + ", revokeUpdated=" + revokeUpdated
-                + ", readedUpdated=" + readedUpdated);
+        return updatedCount > 0;
     }
     // 连接状态显示控制
     private boolean isShowingConnectionStatus = false;
@@ -3307,12 +3306,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             wkVBinding.recyclerView.post(() -> refreshMsg(wkMsg));
             return;
         }
-        android.util.Log.d("WKReceiptDebug", "refreshMsg: msgID=" + wkMsg.messageID
-                + ", clientMsgNO=" + wkMsg.clientMsgNO
-                + ", status=" + wkMsg.status
-                + ", setting.receipt=" + (wkMsg.setting != null ? wkMsg.setting.receipt : "null")
-                + ", readedCount=" + (wkMsg.remoteExtra != null ? wkMsg.remoteExtra.readedCount : "null")
-                + ", readed=" + (wkMsg.remoteExtra != null ? wkMsg.remoteExtra.readed : "null"));
+
         WKIMUtils.getInstance().resetMsgProhibitWord(wkMsg);
         List<WKUIChatMsgItemEntity> list = chatAdapter.getData();
         chatAdapter.refreshReplyMsg(wkMsg);
