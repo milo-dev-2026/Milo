@@ -224,6 +224,56 @@ def get_device_token_by_uid(uid):
     return get_device_token_from_mysql(uid)
 
 
+# 用户昵称缓存（避免频繁查询数据库）
+_user_nickname_cache = {}
+_USER_NICKNAME_CACHE_TTL = 300  # 缓存5分钟
+
+
+def get_user_nickname(uid):
+    """从 MySQL 查询用户昵称（带缓存）"""
+    if not uid:
+        return "好友"
+    
+    now = time.time()
+    cached = _user_nickname_cache.get(uid)
+    if cached and (now - cached["time"]) < _USER_NICKNAME_CACHE_TTL:
+        return cached["name"]
+    
+    conn = None
+    try:
+        conn = get_mysql_conn()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM user WHERE uid = %s LIMIT 1",
+            (uid,)
+        )
+        row = cursor.fetchone()
+        name = "好友"
+        if row and row.get("name"):
+            name = row["name"]
+        _user_nickname_cache[uid] = {"name": name, "time": now}
+        return name
+    except Exception as e:
+        logger.warning(f"查询用户昵称失败: uid={uid}, error={e}")
+        # 缓存默认值，避免反复查询
+        _user_nickname_cache[uid] = {"name": "好友", "time": now}
+        return "好友"
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def get_group_name(channel_id):
+    """从 MySQL 查询群聊名称（带缓存）"""
+    if not channel_id:
+        return "群聊"
+    # TODO: 从数据库查询群名称，暂时返回 channel_id
+    return channel_id or "群聊"
+
+
 # ==================== 华为推送（JWT鉴权） ====================
 
 def _generate_huawei_jwt():
@@ -305,6 +355,9 @@ def send_xiaomi_push(device_token, title, text, extras=None, package_name=None, 
     """通过小米推送 API 发送推送（2026新规：私信消息必须使用模板）
     template_params: 模板变量字典，如 {"keywords1": "张三", "keywords2": "吃了吗"}
     template_id: 指定模板ID，不传则用好友聊天默认模板
+    
+    注意：pass_through=0 表示通知栏消息，即使APP进程被杀也能收到（由小米SDK自动显示）
+          pass_through=1 表示透传消息，APP被杀则收不到
     """
     if not XIAOMI_APP_SECRET:
         return False, "小米推送配置未完善"
@@ -317,11 +370,14 @@ def send_xiaomi_push(device_token, title, text, extras=None, package_name=None, 
         "title": title,
         "description": text,
         "payload": json.dumps(extras or {}),
-        "notify_type": 1,
+        "pass_through": 0,  # 0=通知栏消息（杀进程也能收到），1=透传消息
+        "notify_type": 1,   # 1=声音+振动
         "restricted_package_name": package_name or "com.xian.leihuhu",
         "extra.channel_id": ch_id,
         "extra.template_id": tpl_id,
-        "extra.template_param": json.dumps(tp, ensure_ascii=False) if tp else "{}"
+        "extra.template_params": json.dumps(tp, ensure_ascii=False) if tp else "{}",
+        "time_to_live": 86400000,  # 消息有效期24小时（毫秒）
+        "notify_id": int(time.time()) % 100000
     }
     headers = {
         "X-XIAOMI-PUSH-APP-ID": XIAOMI_APP_ID,
@@ -332,10 +388,10 @@ def send_xiaomi_push(device_token, title, text, extras=None, package_name=None, 
         resp = requests.post(XIAOMI_PUSH_URL, data=params, headers=headers, timeout=10)
         result = resp.json()
         if resp.status_code == 200 and result.get("code") == 0:
-            logger.info(f"小米推送成功: template={tpl_id}, token={device_token[:20]}...")
+            logger.info(f"小米推送成功: template={tpl_id}, channel={ch_id}, token={device_token[:20]}..., params={json.dumps(tp, ensure_ascii=False)}")
             return True, result
         else:
-            logger.error(f"小米推送失败: template={tpl_id}, code={result.get('code')}, reason={result.get('reason')}")
+            logger.error(f"小米推送失败: template={tpl_id}, channel={ch_id}, code={result.get('code')}, reason={result.get('reason')}, result={result}")
             return False, json.dumps(result, ensure_ascii=False)
     except Exception as e:
         logger.error(f"小米推送异常: {e}")
@@ -628,9 +684,9 @@ def send_offline_push_for_uids(to_uids, from_uid, payload_b64, channel_id, chann
             if len(content) > 50:
                 content = content[:50] + "..."
 
-            # 获取发送者名称
-            from_name = "好友"
-            group_name = channel_id or "群聊"
+            # 获取发送者昵称（从MySQL查询，带缓存）
+            from_name = get_user_nickname(from_uid)
+            group_name = get_group_name(channel_id)
 
             extras = {
                 "uid": uid,
@@ -647,6 +703,10 @@ def send_offline_push_for_uids(to_uids, from_uid, payload_b64, channel_id, chann
                     "keywords2": from_name,
                     "keywords3": content
                 }
+                # 小米模板推送要求 title/description 包含模板固定文案
+                # 群聊模板格式：群聊:{group_name} 发送者:{from_name} 内容:{content}
+                xiaomi_title = f"群聊:{group_name}"
+                xiaomi_desc = f"{from_name}: {content}"
                 alert_text = f"{from_name}: {content}"
             else:  # 单聊 -> M12762
                 tpl_id = XIAOMI_TPL_FRIEND
@@ -654,10 +714,24 @@ def send_offline_push_for_uids(to_uids, from_uid, payload_b64, channel_id, chann
                     "keywords1": from_name,
                     "keywords2": content
                 }
+                # 小米模板推送要求 title 必须包含固定文案"您有一条消息来自"
+                # M12762模板格式：您有一条消息来自{$keywords1$}，内容{$keywords2$}
+                xiaomi_title = f"您有一条消息来自{from_name}"
+                xiaomi_desc = content
                 alert_text = f"{from_name}: {content}"
 
+            # 为不同推送类型使用不同的标题
+            # 小米推送：使用模板要求的完整文案（含固定段）
+            # 其他推送：使用 APP_NAME 作为标题
+            if device_type.upper() == "MI":
+                push_title = xiaomi_title
+                push_desc = xiaomi_desc
+            else:
+                push_title = APP_NAME
+                push_desc = alert_text
+
             success, result = send_push_by_device_type(
-                device_token, device_type, APP_NAME, alert_text, extras, bundle_id, template_params, tpl_id
+                device_token, device_type, push_title, push_desc, extras, bundle_id, template_params, tpl_id
             )
             results.append({
                 "uid": uid,

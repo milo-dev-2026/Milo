@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.chad.library.adapter.base.viewholder.BaseViewHolder
 import com.chat.base.R
+import com.chat.base.config.WKConfig
 import com.chat.base.msg.ChatAdapter
 import com.chat.base.msgitem.WKChatBaseProvider
 import com.chat.base.msgitem.WKChatIteMsgFromType
@@ -15,6 +16,7 @@ import com.chat.base.msgitem.WKContentType
 import com.chat.base.msgitem.WKUIChatMsgItemEntity
 import com.chat.base.ui.components.SystemMsgBackgroundColorSpan
 import com.chat.base.utils.AndroidUtilities
+import com.xinbida.wukongim.entity.WKChannelType
 import org.json.JSONObject
 
 /**
@@ -52,6 +54,15 @@ class WKScreenshotProvider : WKChatBaseProvider() {
         }
         if (TextUtils.isEmpty(content)) {
             content = item.wkMsg.baseContentMsgModel?.getDisplayContent() ?: ""
+        }
+        // 单聊时根据发送者动态显示文本：自己发的显示"你已截图"，对方发的显示"对方已截图"
+        if (item.wkMsg.channelType == WKChannelType.PERSONAL) {
+            val myUid = WKConfig.getInstance().uid
+            if (!TextUtils.isEmpty(myUid) && myUid == item.wkMsg.fromUID) {
+                content = context.getString(R.string.screenshot_single_self)
+            } else {
+                content = context.getString(R.string.screenshot_single_text)
+            }
         }
         val rootView = helper.getView<View>(R.id.systemRootView)
         rootView?.setOnClickListener {

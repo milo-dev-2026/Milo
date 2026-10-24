@@ -68,7 +68,7 @@ public class NoteStorageManager {
      */
     public List<NoteEntity> getAllNotes() {
         List<NoteEntity> list = new ArrayList<>();
-        String json = WKSharedPreferencesUtil.getInstance().getSP(SP_KEY_NOTES);
+        String json = WKSharedPreferencesUtil.getInstance().getSPWithUID(SP_KEY_NOTES);
         if (json != null && !json.isEmpty()) {
             try {
                 JSONArray array = new JSONArray(json);
@@ -147,6 +147,6 @@ public class NoteStorageManager {
                 e.printStackTrace();
             }
         }
-        WKSharedPreferencesUtil.getInstance().putSP(SP_KEY_NOTES, array.toString());
+        WKSharedPreferencesUtil.getInstance().putSPWithUID(SP_KEY_NOTES, array.toString());
     }
 }

@@ -86,42 +86,18 @@ class WKImageProvider : WKChatBaseProvider() {
         val ints = ImageUtils.getInstance()
             .getImageWidthAndHeightToTalk(imgMsgModel.width, imgMsgModel.height)
 
-        blurView.visibility = if (uiChatMsgItemEntity.wkMsg.flame == 1)
-            View.VISIBLE
-        else View.GONE
-        if (uiChatMsgItemEntity.wkMsg.flame == 1) {
-            otherLayout.visibility = View.VISIBLE
-            deleteTimer.setSize(35)
-            if (uiChatMsgItemEntity.wkMsg.viewedAt > 0 && uiChatMsgItemEntity.wkMsg.flameSecond > 0) {
-                deleteTimer.setDestroyTime(
-                    uiChatMsgItemEntity.wkMsg.clientMsgNO,
-                    uiChatMsgItemEntity.wkMsg.flameSecond,
-                    uiChatMsgItemEntity.wkMsg.viewedAt,
-                    false
-                )
-            }
-        } else {
-            otherLayout.visibility = View.GONE
-        }
+        blurView.visibility = View.GONE
+        otherLayout.visibility = View.GONE
         val showUrl = getShowURL(uiChatMsgItemEntity)
         GlideUtils.getInstance().showImg(context, showUrl, ints[0], ints[1], imageView)
 
         val layoutParams1 = imageLayout.layoutParams as LinearLayout.LayoutParams
-        if (uiChatMsgItemEntity.wkMsg.flame == 1) {
-            layoutParams.height = AndroidUtilities.dp(150f)
-            layoutParams.width = AndroidUtilities.dp(150f)
-            blurViewLayoutParams.height = AndroidUtilities.dp(150f)
-            blurViewLayoutParams.width = AndroidUtilities.dp(150f)
-            layoutParams1.height = AndroidUtilities.dp(150f)
-            layoutParams1.width = AndroidUtilities.dp(150f)
-        } else {
-            layoutParams.height = ints[1]
-            layoutParams.width = ints[0]
-            blurViewLayoutParams.height = ints[1]
-            blurViewLayoutParams.width = ints[0]
-            layoutParams1.height = ints[1]
-            layoutParams1.width = ints[0]
-        }
+        layoutParams.height = ints[1]
+        layoutParams.width = ints[0]
+        blurViewLayoutParams.height = ints[1]
+        blurViewLayoutParams.width = ints[0]
+        layoutParams1.height = ints[1]
+        layoutParams1.width = ints[0]
         imageView.layoutParams = layoutParams
         blurView.layoutParams = blurViewLayoutParams
 //        if (uiChatMsgItemEntity.wkMsg.channelType != WKChannelType.PERSONAL && from != WKChatIteMsgFromType.SEND) {
@@ -144,11 +120,9 @@ class WKImageProvider : WKChatBaseProvider() {
                                 if (progress >= 100) {
                                     progressTv.visibility = View.GONE
                                     progressView.visibility = View.GONE
-                                    deleteTimer.visibility = View.VISIBLE
                                 } else {
                                     progressView.visibility = View.VISIBLE
                                     progressTv.visibility = View.VISIBLE
-                                    deleteTimer.visibility = View.GONE
                                 }
                             }
                         }
@@ -158,7 +132,6 @@ class WKImageProvider : WKChatBaseProvider() {
                     override fun onSuccess(tag: Any?, path: String?) {
                         progressTv.visibility = View.GONE
                         progressView.visibility = View.GONE
-                        deleteTimer.visibility = View.VISIBLE
                         if (tag != null) {
                             WKProgressManager.instance.unregisterProgress(tag)
                         }

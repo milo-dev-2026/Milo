@@ -45,7 +45,7 @@ class WKRevokeProvider : WKChatBaseProvider() {
         super.convert(helper, item)
         val isReEdit: Boolean
         var content: String = showRevokeMsg(item.wkMsg)
-        if (!TextUtils.isEmpty(item.wkMsg.fromUID) && !TextUtils.isEmpty(
+        if (!TextUtils.isEmpty(item.wkMsg.fromUID) && item.wkMsg.remoteExtra != null && !TextUtils.isEmpty(
                 item.wkMsg.remoteExtra.revoker
             ) && item.wkMsg.fromUID == WKConfig.getInstance().uid && item.wkMsg.remoteExtra.revoker == WKConfig.getInstance().uid
         ) {
@@ -109,7 +109,7 @@ class WKRevokeProvider : WKChatBaseProvider() {
         fun showRevokeMsg(mMsg: WKMsg?): String {
             val content: String
             if (mMsg == null) return ""
-            if (!TextUtils.isEmpty(mMsg.remoteExtra.revoker) && !TextUtils.isEmpty(mMsg.fromUID)) {
+            if (mMsg.remoteExtra != null && !TextUtils.isEmpty(mMsg.remoteExtra.revoker) && !TextUtils.isEmpty(mMsg.fromUID)) {
                 if (mMsg.remoteExtra.revoker == mMsg.fromUID) {
                     if (mMsg.fromUID == WKConfig.getInstance().uid) {
                         content =

@@ -732,6 +732,7 @@
     <string name="screenshot_notify">截屏提醒</string>
     <string name="screenshot_group_suffix">截图了页面</string>
     <string name="screenshot_single_text">对方已截图</string>
+    <string name="screenshot_single_self">你已截图</string>
     <string name="pinned_messages">群置顶消息</string>
     <string name="confirm_cancel_all_pins">确定要取消所有置顶消息吗？</string>
     <string name="unpin_single">取消置顶</string>

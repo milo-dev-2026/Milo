@@ -383,12 +383,14 @@ public class WKDialogUtils {
         contentTv.setText(versionEntity.update_desc);
         versionTv.setText(String.format("%s：%s", context.getString(R.string.new_version), versionEntity.app_version));
         TextView cancelTv = view.findViewById(R.id.cancelTv);
-        Button sureBtn = view.findViewById(R.id.sureBtn);
+        TextView sureBtn = view.findViewById(R.id.sureBtn);
         //ProgressBar progressBar = view.findViewById(R.id.progressBar);
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context, R.style.AlertDialog);
         view.setBackgroundColor(ContextCompat.getColor(context, R.color.transparent));
-//        builder.setCancelable(versionEntity.is_force == 0);
+        // 【关键修复】强制更新时禁止通过返回键关闭对话框
+        builder.setCancelable(versionEntity.is_force == 0);
         android.app.AlertDialog alertDialog = builder.create();
+        // 强制更新时禁止点击外部关闭
         alertDialog.setCanceledOnTouchOutside(versionEntity.is_force == 0);
         alertDialog.show();
         alertDialog.setContentView(view);
@@ -398,6 +400,8 @@ public class WKDialogUtils {
         param.width = AndroidUtilities.getScreenWidth() / 5 * 4;
         if (versionEntity.is_force == 1) {
             cancelTv.setVisibility(GONE);
+            // 强制更新时，按钮文字改为"立即更新"更明确
+            sureBtn.setText("立即更新");
         }
 //        param.height = WindowUtil.getInstance().getScreenHeight()/3;
         window.setAttributes(param);
@@ -415,8 +419,15 @@ public class WKDialogUtils {
             DownloadApkUtils.getInstance().downloadAPK(WKBaseApplication.getInstance().getContext(),
                     versionEntity.app_version,
                     WKApiConfig.getShowUrl(versionEntity.download_url));
-            alertDialog.dismiss();
-
+            // 强制更新时不关闭对话框，让用户知道正在下载
+            if (versionEntity.is_force == 0) {
+                alertDialog.dismiss();
+            } else {
+                // 强制更新时，改变按钮文字提示下载中
+                sureBtn.setText("下载中...");
+                sureBtn.setEnabled(false);
+                cancelTv.setVisibility(GONE);
+            }
         });
 
     }

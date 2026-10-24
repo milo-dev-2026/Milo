@@ -2371,10 +2371,187 @@ def get_countries():
 
 @app.route('/v1/common/appconfig', methods=['GET'])
 def get_app_config():
+    """
+    获取App配置
+    【重要】字段类型必须与客户端WKAPPConfig实体类完全一致，否则FastJson/Gson解析失败会导致崩溃
+    客户端定义：
+        public int version;
+        public String web_url;
+        public int phone_search_off;
+        public int shortno_edit_off;
+        public int revoke_second;
+        public int register_invite_on;
+        public int send_welcome_message_on;
+        public int invite_system_account_join_group_on;
+        public int register_user_must_complete_info_on;
+        public int can_modify_api_url;
+    """
+    try:
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE, charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM app_config WHERE id = 1 LIMIT 1")
+                row = cursor.fetchone()
+                if row:
+                    # 严格按照客户端期望的字段和类型返回
+                    return make_success({
+                        "version": int(row.get('version', 1)) if row.get('version') else 1,
+                        "web_url": "",
+                        "phone_search_off": int(row.get('search_by_phone', 0)) if row.get('search_by_phone') is not None else 0,
+                        "shortno_edit_off": 0,
+                        "revoke_second": int(row.get('revoke_second', 300)) if row.get('revoke_second') else 300,
+                        "register_invite_on": int(row.get('register_invite_on', 0)) if row.get('register_invite_on') is not None else 0,
+                        "send_welcome_message_on": int(row.get('send_welcome_message_on', 1)) if row.get('send_welcome_message_on') is not None else 1,
+                        "invite_system_account_join_group_on": int(row.get('invite_system_account_join_group_on', 0)) if row.get('invite_system_account_join_group_on') is not None else 0,
+                        "register_user_must_complete_info_on": int(row.get('register_user_must_complete_info_on', 0)) if row.get('register_user_must_complete_info_on') is not None else 0,
+                        "can_modify_api_url": int(row.get('can_modify_api_url', 0)) if row.get('can_modify_api_url') is not None else 0,
+                    })
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"获取app_config失败: {e}")
+
+    # 兜底返回（确保字段类型正确，绝不返回string类型的version）
     return make_success({
+        "version": 1,
+        "web_url": "",
+        "phone_search_off": 0,
+        "shortno_edit_off": 0,
+        "revoke_second": 300,
         "register_invite_on": 0,
-        "version": "1.0.0",
+        "send_welcome_message_on": 1,
+        "invite_system_account_join_group_on": 0,
+        "register_user_must_complete_info_on": 0,
+        "can_modify_api_url": 0,
     })
+
+
+# ==================== APP版本检测 ====================
+
+def _compare_version(v1, v2):
+    """比较两个版本号，1: v1>v2, -1: v1<v2, 0: 相等"""
+    v1_parts = [int(x) for x in v1.split('.') if x.isdigit()]
+    v2_parts = [int(x) for x in v2.split('.') if x.isdigit()]
+    max_len = max(len(v1_parts), len(v2_parts))
+    for i in range(max_len):
+        n1 = v1_parts[i] if i < len(v1_parts) else 0
+        n2 = v2_parts[i] if i < len(v2_parts) else 0
+        if n1 > n2:
+            return 1
+        if n1 < n2:
+            return -1
+    return 0
+
+
+@app.route('/v1/common/appversion/android/<version>', methods=['GET'])
+def get_android_app_version(version):
+    """
+    Android版本检测接口
+    传入当前版本号，返回最新版本信息（如果有更新）
+    """
+    try:
+        import pymysql
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE,
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                # 查询最新版本（按id倒序取第一条）
+                cursor.execute(
+                    "SELECT * FROM app_version WHERE os = 'android' ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+
+                if not row:
+                    # 没有配置版本，返回空表示已是最新
+                    return make_success(None)
+
+                latest_version = str(row.get('app_version', ''))
+                current_version = version.strip() if version else ''
+
+                # 如果最新版本 > 当前版本，返回更新信息
+                if _compare_version(latest_version, current_version) > 0:
+                    created_at = row.get('created_at', '')
+                    if hasattr(created_at, 'strftime'):
+                        created_at = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                    result = {
+                        "os": str(row.get('os', 'android')),
+                        "app_version": latest_version,
+                        "is_force": int(row.get('is_force', 0)),
+                        "update_desc": str(row.get('update_desc', '')),
+                        "download_url": str(row.get('download_url', '')),
+                        "created_at": str(created_at)
+                    }
+                    return make_success(result)
+                else:
+                    # 已是最新版本，返回空
+                    return make_success(None)
+
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"获取Android版本信息异常: {e}")
+        return make_error("获取版本信息失败")
+
+
+@app.route('/v1/common/appversion/ios/<version>', methods=['GET'])
+def get_ios_app_version(version):
+    """iOS版本检测接口"""
+    try:
+        import pymysql
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE,
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT * FROM app_version WHERE os = 'ios' ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+
+                if not row:
+                    return make_success(None)
+
+                latest_version = str(row.get('app_version', ''))
+                current_version = version.strip() if version else ''
+
+                if _compare_version(latest_version, current_version) > 0:
+                    created_at = row.get('created_at', '')
+                    if hasattr(created_at, 'strftime'):
+                        created_at = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                    result = {
+                        "os": str(row.get('os', 'ios')),
+                        "app_version": latest_version,
+                        "is_force": int(row.get('is_force', 0)),
+                        "update_desc": str(row.get('update_desc', '')),
+                        "download_url": str(row.get('download_url', '')),
+                        "created_at": str(created_at)
+                    }
+                    return make_success(result)
+                else:
+                    return make_success(None)
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"获取iOS版本信息异常: {e}")
+        return make_error("获取版本信息失败")
 
 
 # ==================== Token 验证 ====================
@@ -4516,6 +4693,124 @@ def get_trtc_usersig():
     except Exception as e:
         logger.error(f"生成TRTC UserSig异常: {e}")
         return make_error(f"生成签名失败: {str(e)}", 500)
+
+
+# ==================== 消息扩展同步（兼容性修复） ====================
+
+@app.route('/v1/message/extra/sync', methods=['POST'])
+def message_extra_sync():
+    """
+    消息扩展同步接口
+    【兼容性修复】WuKongIM SDK会调用此接口同步消息扩展数据（已读、删除等）
+    老版本客户端可能将此请求发到业务后端(5001)，这里转发到TangSeng(8091)处理
+    避免404导致SDK异常
+    """
+    uid = get_current_uid()
+    if not uid:
+        return make_error("登录已过期，请重新登录", 401)
+
+    try:
+        data = request.get_json(silent=True) or {}
+        # 转发到TangSeng(8091)处理
+        resp = requests.post(
+            "http://127.0.0.1:8091/v1/message/extra/sync",
+            json=data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": request.headers.get("Authorization", ""),
+            },
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            # TangSeng返回非200，直接返回空结果避免客户端异常
+            logger.warning(f"message/extra/sync 转发失败: status={resp.status_code}, body={resp.text[:200]}")
+            return make_success({"last_max_seq": 0, "items": []})
+    except Exception as e:
+        logger.error(f"message/extra/sync 转发异常: {e}")
+        # 异常时返回空结果，确保客户端不崩溃
+        return make_success({"last_max_seq": 0, "items": []})
+
+
+# ==================== 撤回消息（兼容性修复） ====================
+
+@app.route('/v1/message/revoke', methods=['POST'])
+def message_revoke():
+    """
+    撤回消息接口
+    【兼容性修复】WuKongIM SDK会调用此接口撤回消息
+    老版本客户端可能将此请求发到业务后端(5001)，这里转发到TangSeng(8091)处理
+    避免404导致撤回失败
+    """
+    uid = get_current_uid()
+    if not uid:
+        return make_error("登录已过期，请重新登录", 401)
+
+    try:
+        # 获取query参数
+        message_id = request.args.get("message_id", "")
+        channel_id = request.args.get("channel_id", "")
+        channel_type = request.args.get("channel_type", "")
+        client_msg_no = request.args.get("client_msg_no", "")
+
+        logger.info(f"message/revoke 转发: message_id={message_id}, channel_id={channel_id}")
+
+        # 转发到TangSeng(8091)处理
+        resp = requests.post(
+            f"http://127.0.0.1:8091/v1/message/revoke?message_id={message_id}&channel_id={channel_id}&channel_type={channel_type}&client_msg_no={client_msg_no}",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": request.headers.get("Authorization", ""),
+            },
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            logger.warning(f"message/revoke 转发失败: status={resp.status_code}, body={resp.text[:200]}")
+            return make_error("撤回失败", resp.status_code)
+    except Exception as e:
+        logger.error(f"message/revoke 转发异常: {e}")
+        return make_error(f"撤回失败: {str(e)}", 500)
+
+
+# ==================== 消息已读上报（兼容性修复） ====================
+
+@app.route('/v1/message/readed', methods=['POST'])
+def message_readed():
+    """
+    消息已读上报接口
+    【兼容性修复】WuKongIM SDK会调用此接口上报已读消息
+    老版本客户端可能将此请求发到业务后端(5001)，这里转发到TangSeng(8091)处理
+    避免404导致已读回执不生效
+    """
+    uid = get_current_uid()
+    if not uid:
+        return make_error("登录已过期，请重新登录", 401)
+
+    try:
+        data = request.get_json(silent=True) or {}
+        logger.info(f"message/readed 转发: data={str(data)[:200]}")
+
+        # 转发到TangSeng(8091)处理
+        resp = requests.post(
+            "http://127.0.0.1:8091/v1/message/readed",
+            json=data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": request.headers.get("Authorization", ""),
+            },
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            logger.warning(f"message/readed 转发失败: status={resp.status_code}, body={resp.text[:200]}")
+            return make_error("已读上报失败", resp.status_code)
+    except Exception as e:
+        logger.error(f"message/readed 转发异常: {e}")
+        return make_error(f"已读上报失败: {str(e)}", 500)
 
 
 # ==================== 消息搜索 ====================

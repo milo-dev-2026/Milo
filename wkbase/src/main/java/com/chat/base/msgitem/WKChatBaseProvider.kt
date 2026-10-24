@@ -75,6 +75,7 @@ import com.xinbida.wukongim.WKIM
 import com.xinbida.wukongim.entity.WKChannel
 import com.xinbida.wukongim.entity.WKChannelType
 import com.xinbida.wukongim.entity.WKMsg
+import com.xinbida.wukongim.entity.WKMsgExtra
 import com.xinbida.wukongim.entity.WKSendOptions
 import com.xinbida.wukongim.message.type.WKSendMsgResult
 import com.xinbida.wukongim.msgmodel.WKVoiceContent
@@ -410,13 +411,13 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         var nextBubble = false
         val previousIsSystem = previousMsg != null && WKContentType.isSystemMsg(previousMsg.type)
         val nextIsSystem = nextMsg != null && WKContentType.isSystemMsg(nextMsg.type)
-        if (previousMsg != null && previousMsg.remoteExtra.revoke == 0 && previousMsg.isDeleted == 0 && !previousIsSystem
+        if (previousMsg != null && previousMsg.remoteExtra != null && previousMsg.remoteExtra.revoke == 0 && previousMsg.isDeleted == 0 && !previousIsSystem
             && !TextUtils.isEmpty(previousMsg.fromUID)
             && previousMsg.fromUID == nowMsg.fromUID
         ) {
             previousBubble = true
         }
-        if (nextMsg != null && nextMsg.remoteExtra.revoke == 0 && nextMsg.isDeleted == 0 && !nextIsSystem
+        if (nextMsg != null && nextMsg.remoteExtra != null && nextMsg.remoteExtra.revoke == 0 && nextMsg.isDeleted == 0 && !nextIsSystem
             && !TextUtils.isEmpty(nextMsg.fromUID)
             && nextMsg.fromUID == nowMsg.fromUID
         ) {
@@ -441,12 +442,12 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         var nowUID = ""
         var nextUID = ""
         if (nowMsg != null && !TextUtils.isEmpty(nowMsg.fromUID)
-            && nowMsg.remoteExtra.revoke == 0 && !WKContentType.isSystemMsg(nowMsg.type)
+            && nowMsg.remoteExtra != null && nowMsg.remoteExtra.revoke == 0 && !WKContentType.isSystemMsg(nowMsg.type)
         ) {
             nowUID = nowMsg.fromUID
         }
         if (nextMsg != null && !TextUtils.isEmpty(nextMsg.fromUID)
-            && nextMsg.remoteExtra.revoke == 0 && !WKContentType.isSystemMsg(nextMsg.type)
+            && nextMsg.remoteExtra != null && nextMsg.remoteExtra.revoke == 0 && !WKContentType.isSystemMsg(nextMsg.type)
         ) {
             nextUID = nextMsg.fromUID
         }
@@ -1213,6 +1214,18 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                         context.getString(R.string.base_withdraw),
                         R.mipmap.msg_withdraw, object : PopupMenuItem.IClick {
                             override fun onClick() {
+                                // 乐观更新：立即更新本地消息UI为已撤回状态
+                                if (mMsg.remoteExtra == null) {
+                                    mMsg.remoteExtra = WKMsgExtra()
+                                }
+                                mMsg.remoteExtra.revoke = 1
+                                mMsg.remoteExtra.revoker = WKConfig.getInstance().uid
+                                // 保存到SDK，触发数据库更新和全局刷新
+                                WKIM.getInstance().msgManager.setRefreshMsg(mMsg, true)
+                                // 立即刷新当前adapter（确保item type变化生效）
+                                val chatAdapter = getAdapter() as ChatAdapter?
+                                chatAdapter?.notifyDataSetChanged()
+                                // 发起网络请求
                                 val withdrawMsgMenu = WithdrawMsgMenu(
                                     mMsg.messageID,
                                     mMsg.channelID,

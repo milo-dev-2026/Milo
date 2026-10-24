@@ -137,6 +137,7 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKMsg;
+import com.xinbida.wukongim.entity.WKMsgExtra;
 import com.xinbida.wukongim.entity.WKChannelMember;
 import com.chat.base.msgitem.WKChannelMemberRole;
 import com.xinbida.wukongim.msgmodel.WKImageContent;
@@ -833,11 +834,27 @@ public class WKUIKitApplication {
         EndpointManager.getInstance().setMethod("chat_withdraw_msg", object -> {
             final WithdrawMsgMenu withdrawMsgMenu = (WithdrawMsgMenu) object;
             if (withdrawMsgMenu != null) {
+                android.util.Log.d("WKReceiptDebug", "chat_withdraw_msg: message_id=" + withdrawMsgMenu.message_id
+                    + ", channel_id=" + withdrawMsgMenu.channel_id
+                    + ", client_msg_no=" + withdrawMsgMenu.client_msg_no);
                 MsgModel.getInstance().revokeMsg(withdrawMsgMenu.message_id, withdrawMsgMenu.channel_id, withdrawMsgMenu.channel_type, withdrawMsgMenu.client_msg_no, (code, msg) -> {
-                    if (code != HttpResponseCode.success) {
+                    android.util.Log.d("WKReceiptDebug", "revokeMsg result: code=" + code + ", msg=" + msg);
+                    if (code == HttpResponseCode.success) {
+                        // 撤回成功：先立即更新本地消息状态，再同步服务端确保一致
+                        WKMsg wkMsg = WKIM.getInstance().getMsgManager().getWithMessageID(withdrawMsgMenu.message_id);
+                        if (wkMsg != null) {
+                            if (wkMsg.remoteExtra == null) {
+                                wkMsg.remoteExtra = new WKMsgExtra();
+                            }
+                            wkMsg.remoteExtra.revoke = 1;
+                            wkMsg.remoteExtra.revoker = WKConfig.getInstance().getUid();
+                            // 保存并刷新（触发数据库更新 + 全局刷新回调）
+                            WKIM.getInstance().getMsgManager().setRefreshMsg(wkMsg, true);
+                        }
+                        // 主动同步消息扩展，走正常流程触发UI刷新（包括item type变化）
+                        MsgModel.getInstance().syncExtraMsg(withdrawMsgMenu.channel_id, withdrawMsgMenu.channel_type);
+                    } else {
                         WKToastUtils.getInstance().showToastNormal(msg);
-                        //  WKIM.getInstance().getMsgManager().updateMsgRevokeWithMessageID(withdrawMsgMenu.message_id, 1);
-//                        WKIM.getInstance().getMessageManager().deleteMsgByClientMsgNo(client_msg_no);
                     }
                 });
             }

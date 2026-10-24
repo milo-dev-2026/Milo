@@ -6,10 +6,10 @@ import com.chat.base.net.entity.CommonResponse;
 import com.chat.uikit.enity.WKSyncReminder;
 import com.chat.uikit.enity.ProhibitWord;
 import com.chat.uikit.enity.SensitiveWords;
+import com.chat.uikit.message.entity.WKSyncExtraMsgEntity;
 import com.xinbida.wukongim.entity.WKSyncChannelMsg;
 import com.xinbida.wukongim.entity.WKSyncChat;
 import com.xinbida.wukongim.entity.WKSyncConvMsgExtra;
-import com.xinbida.wukongim.entity.WKSyncExtraMsg;
 import com.xinbida.wukongim.entity.WKSyncMsgReaction;
 
 import java.util.List;
@@ -60,7 +60,7 @@ public interface MsgService {
     Observable<WKSyncChannelMsg> syncChannelMsg(@Body JSONObject jsonObject);
 
     @POST("message/extra/sync")
-    Observable<List<WKSyncExtraMsg>> syncExtraMsg(@Body JSONObject jsonObject);
+    Observable<String> syncExtraMsg(@Body JSONObject jsonObject);
 
 
     @POST("message/offset")

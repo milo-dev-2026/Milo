@@ -10,6 +10,7 @@ import com.chat.base.WKBaseApplication;
 /**
  * 2019-11-13 10:30
  * 临时缓存数据
+ * 【优化】使用apply()替代commit()，避免App崩溃时XML文件损坏导致数据全部丢失
  */
 public class WKSharedPreferencesUtil {
 
@@ -23,10 +24,6 @@ public class WKSharedPreferencesUtil {
         mPreferences = context.getSharedPreferences(mTAG, Context.MODE_PRIVATE);
         mEditor = mPreferences.edit();
     }
-
-//    private static class SharedPreferencesUtilBinder {
-//        private static final WKSharedPreferencesUtil sharedPreferencesUtil = new WKSharedPreferencesUtil(WKBaseApplication.getInstance().getContext());
-//    }
 
     enum SingletonEnum {
         INSTANCE;
@@ -57,7 +54,8 @@ public class WKSharedPreferencesUtil {
     // 存入数据
     public void putSP(String key, String value) {
         mEditor.putString(key, value);
-        mEditor.commit();
+        // 使用apply()异步写入，避免同步写入过程中崩溃导致XML文件损坏
+        mEditor.apply();
     }
 
     // 获取数据
@@ -79,7 +77,7 @@ public class WKSharedPreferencesUtil {
 
     public void putBoolean(String key, boolean value) {
         mEditor.putBoolean(key, value);
-        mEditor.commit();
+        mEditor.apply();
     }
 
     // 获取数据
@@ -97,7 +95,7 @@ public class WKSharedPreferencesUtil {
 
     public void putInt(String key, int value) {
         mEditor.putInt(key, value);
-        mEditor.commit();
+        mEditor.apply();
     }
 
     public int getInt(String key) {
@@ -110,7 +108,7 @@ public class WKSharedPreferencesUtil {
 
     public void putFloat(String key, float value) {
         mEditor.putFloat(key, value);
-        mEditor.commit();
+        mEditor.apply();
     }
 
     public float getFloat(String key, float defValue) {
@@ -131,7 +129,7 @@ public class WKSharedPreferencesUtil {
 
     public void putLong(String key, long value) {
         mEditor.putLong(key, value);
-        mEditor.commit();
+        mEditor.apply();
     }
 
     public long getLong(String key) {

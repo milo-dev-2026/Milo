@@ -1539,6 +1539,7 @@ XXXXXXX网络科技有限公司 版权所有"</string>
   <string name="one_month">1 月</string>
   <string name="one_week">1 周</string>
   <string name="online">在线</string>
+  <string name="offline">离线</string>
   <string name="online_count">%d人在线</string>
   <string name="open">开启</string>
   <string name="open_camera_microphone">请在系统设置页面，打开摄像头和麦克风权限后在使用</string>
@@ -1837,6 +1838,8 @@ XXXXXXX网络科技有限公司 版权所有"</string>
   <string name="screenshot_inchat4">%s在聊天中截屏了</string>
   <string name="screenshot_notice">截屏通知</string>
   <string name="screenshot_notice_desc">关闭后，你将不会在聊天页中收到该功能的操作通知</string>
+  <string name="screenshot_single_self">你已截图</string>
+  <string name="screenshot_single_text">对方已截图</string>
   <string name="search_by_id">允许ID号搜索</string>
   <string name="search_by_phone">允许手机号搜索</string>
   <string name="search_me_set">可以通过以下方式搜索好友</string>

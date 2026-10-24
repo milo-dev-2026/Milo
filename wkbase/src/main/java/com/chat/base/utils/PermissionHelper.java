@@ -1,36 +1,50 @@
 package com.chat.base.utils;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.text.TextUtils;
 
 import androidx.core.app.NotificationManagerCompat;
 
+import com.chat.base.config.WKConstants;
 import com.chat.base.utils.systembar.WKOSUtils;
 
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * 权限检测工具类
- * 检测：通知权限、电池优化白名单、自启动权限
+ * 全部采用系统API真实检测，无手动确认、无弹窗、无跳转标记fallback
  */
 public class PermissionHelper {
 
     /**
-     * 检测通知权限是否开启
+     * 确保通知渠道存在（跳转设置页前调用，确保用户进去能看到）
      */
+    public static void ensureNotificationChannel(Context context, String channelId, String channelName, int importance) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                NotificationChannel channel = manager.getNotificationChannel(channelId);
+                if (channel == null) {
+                    channel = new NotificationChannel(channelId, channelName, importance);
+                    channel.enableVibration(true);
+                    channel.enableLights(true);
+                    channel.setShowBadge(true);
+                    manager.createNotificationChannel(channel);
+                }
+            }
+        }
+    }
+
+    // ==================== 通知权限 ====================
+
     public static boolean isNotificationEnabled(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -43,14 +57,7 @@ public class PermissionHelper {
         }
     }
 
-    /**
-     * 跳转到通知权限设置页
-     */
     public static void openNotificationSetting(Context context) {
-        context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("permission_notification_opened", true)
-                .apply();
         try {
             Intent intent = new Intent();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -67,32 +74,20 @@ public class PermissionHelper {
         }
     }
 
-    /**
-     * 检测电池优化白名单（是否已忽略电池优化）
-     * 优先用系统API检测，如果系统检测不到再用跳转标记
-     */
+    // ==================== 电池优化白名单 ====================
+
     public static boolean isBatteryOptimizationIgnored(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            if (pm != null && pm.isIgnoringBatteryOptimizations(context.getPackageName())) {
-                return true;
+            if (pm != null) {
+                return pm.isIgnoringBatteryOptimizations(context.getPackageName());
             }
-            // 系统API未检测到，检查用户是否已跳转过设置页
-            return context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                    .getBoolean("permission_battery_opened", false);
+            return false;
         }
-        return true; // 6.0以下默认返回true
+        return true;
     }
 
-    /**
-     * 跳转到电池优化设置页
-     */
     public static void openBatteryOptimizationSetting(Context context) {
-        // 标记用户已跳转过电池优化设置页
-        context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("permission_battery_opened", true)
-                .apply();
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
@@ -107,27 +102,21 @@ public class PermissionHelper {
         }
     }
 
-    /**
-     * 检测自启动权限是否开启
-     * 不同ROM检测方式不同，由于系统API限制，采用"用户已跳转过设置页"的标记方式
-     * 一旦用户跳转过自启动设置页，即视为已开启
-     */
+    // ==================== 自启动权限 ====================
+
     public static boolean isAutoStartEnabled(Context context) {
-        // 自启动权限无法通过标准API可靠检测
-        // 采用标记方式：用户跳转过设置页即视为已处理
-        return context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                .getBoolean("permission_auto_start_opened", false);
+        if (WKOSUtils.isMiui()) {
+            return checkAppOpsMode(context, 10008); // MIUI自启动权限op码（已验证）
+        } else if (WKOSUtils.isEmui()) {
+            return checkAppOpsMode(context, 10020);
+        } else if (WKOSUtils.isVivo() || WKOSUtils.isOppo()) {
+            return checkAppOpsMode(context, 10001);
+        } else {
+            return checkAppOpsMode(context, 10001);
+        }
     }
 
-    /**
-     * 跳转到自启动权限设置页
-     */
     public static void openAutoStartSetting(Context context) {
-        // 标记用户已跳转过自启动设置页
-        context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("permission_auto_start_opened", true)
-                .apply();
         Intent intent = getAutoStartIntent(context);
         try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -142,52 +131,30 @@ public class PermissionHelper {
             String[][] miuiTargets = {
                 {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
                 {"com.miui.securitycenter", "com.miui.permcenter.startup.AutoStartManagementActivity"},
-                {"com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity"},
             };
-            Intent miuiIntent = tryComponents(context, miuiTargets);
-            if (miuiIntent != null) return miuiIntent;
+            Intent intent = tryComponents(context, miuiTargets);
+            if (intent != null) return intent;
         } else if (WKOSUtils.isEmui()) {
             String[][] huaweiTargets = {
                 {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.StartupManagementActivity"},
                 {"com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"},
-                {"com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.HidingAppListActivity"},
             };
-            Intent huaweiIntent = tryComponents(context, huaweiTargets);
-            if (huaweiIntent != null) return huaweiIntent;
+            Intent intent = tryComponents(context, huaweiTargets);
+            if (intent != null) return intent;
         } else if (WKOSUtils.isVivo()) {
             String[][] vivoTargets = {
                 {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"},
                 {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
-                {"com.iqoo.secure", "com.iqoo.secure.safeguard.FakeTopActivity"},
             };
-            Intent vivoIntent = tryComponents(context, vivoTargets);
-            if (vivoIntent != null) return vivoIntent;
+            Intent intent = tryComponents(context, vivoTargets);
+            if (intent != null) return intent;
         } else if (WKOSUtils.isOppo()) {
             String[][] oppoTargets = {
                 {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
                 {"com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"},
-                {"com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"},
-                {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
             };
-            Intent oppoIntent = tryComponents(context, oppoTargets);
-            if (oppoIntent != null) return oppoIntent;
-        } else {
-            String manufacturer = android.os.Build.MANUFACTURER.toLowerCase();
-            if (manufacturer.contains("samsung")) {
-                String[][] samsungTargets = {
-                    {"com.samsung.android.sm", "com.samsung.android.sm.ui.battery.BatteryActivity"},
-                    {"com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"},
-                };
-                Intent samsungIntent = tryComponents(context, samsungTargets);
-                if (samsungIntent != null) return samsungIntent;
-            } else if (manufacturer.contains("meizu")) {
-                String[][] meizuTargets = {
-                    {"com.meizu.safe", "com.meizu.safe.security.SHOW_APPSEC"},
-                    {"com.meizu.privacy", "com.meizu.privacy.AppSecActivity"},
-                };
-                Intent meizuIntent = tryComponents(context, meizuTargets);
-                if (meizuIntent != null) return meizuIntent;
-            }
+            Intent intent = tryComponents(context, oppoTargets);
+            if (intent != null) return intent;
         }
         Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         intent.setData(Uri.fromParts("package", context.getPackageName(), null));
@@ -214,98 +181,123 @@ public class PermissionHelper {
         }
     }
 
-    // 小米自启动检测
-    private static boolean isMiuiAutoStartEnabled(Context context) {
-        try {
-            // MIUI 9+ 通过AppOpsManager检测
-            return checkAppOpsMode(context, 10001); // OP_BACKGROUND_START
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
-    // 华为自启动检测
-    private static boolean isEmuiAutoStartEnabled(Context context) {
-        try {
-            return checkAppOpsMode(context, 10020); // OP_BOOT_BROADCAST
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
-    // Vivo自启动检测
-    private static boolean isVivoAutoStartEnabled(Context context) {
-        try {
-            return checkAppOpsMode(context, 10001);
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
-    // OPPO自启动检测
-    private static boolean isOppoAutoStartEnabled(Context context) {
-        try {
-            return checkAppOpsMode(context, 10001);
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
     /**
      * 通过AppOpsManager检测权限状态
-     * @param op 操作码
-     * @return true表示允许
+     * @return true表示允许，false表示拒绝或检测失败
      */
     private static boolean checkAppOpsMode(Context context, int op) {
         try {
             Class<?> appOpsClass = Class.forName("android.app.AppOpsManager");
             Object appOps = context.getSystemService(Context.APP_OPS_SERVICE);
-            if (appOps == null) return true;
+            if (appOps == null) return false;
 
             int uid = context.getApplicationInfo().uid;
             String pkg = context.getPackageName();
 
-            // 尝试调用 checkOpNoThrow (int op, int uid, String packageName)
             Method checkOpMethod = appOpsClass.getMethod("checkOpNoThrow", int.class, int.class, String.class);
             int result = (int) checkOpMethod.invoke(appOps, op, uid, pkg);
 
-            // MODE_ALLOWED = 0, MODE_IGNORED = 1, MODE_ERRORED = 2
-            return result == 0;
+            return result == 0; // MODE_ALLOWED = 0
         } catch (Exception e) {
-            // 反射失败，默认返回true（不阻断用户流程）
-            return true;
+            return false;
         }
     }
 
+    // ==================== 锁屏显示权限 ====================
+
     /**
-     * 检测语音通知渠道是否开启
-     * 检查RTC通知渠道的importance是否为HIGH，如果渠道不存在或检测不到则用跳转标记
+     * 检测锁屏显示权限是否开启
+     * MIUI手机：通过AppOps检测op=10020（MIUI自定义锁屏显示权限）
+     * 其他手机：检测通知渠道的lockscreenVisibility
      */
-    public static boolean isVoiceNotificationEnabled(Context context, String rtcChannelId) {
+    public static boolean isLockScreenNotificationEnabled(Context context, String channelId) {
+        if (WKOSUtils.isMiui()) {
+            // MIUI：用AppOps op=10020 检测锁屏显示权限
+            return checkAppOpsMode(context, 10020);
+        }
+        // 其他手机：检测通知渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
-                android.app.NotificationChannel channel = manager.getNotificationChannel(rtcChannelId);
+                NotificationChannel channel = manager.getNotificationChannel(channelId);
                 if (channel != null) {
-                    return channel.getImportance() >= NotificationManager.IMPORTANCE_HIGH;
+                    int visibility = channel.getLockscreenVisibility();
+                    return visibility == android.app.Notification.VISIBILITY_PUBLIC
+                            || visibility == android.app.Notification.VISIBILITY_PRIVATE;
                 }
-                // 渠道不存在，检查用户是否已跳转过设置页
-                return context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                        .getBoolean("permission_voice_opened", false);
             }
             return false;
         }
-        return true; // 8.0以下默认true
+        return true;
     }
 
     /**
-     * 跳转到语音通知渠道设置页
+     * 跳转到锁屏显示权限设置页
+     * 小米手机：跳转到权限管理页（用户在里面点"其他权限"→"锁屏显示"设置）
+     * 注：更深的页面（OtherPermissionsActivity/PermissionAppsModifyActivity）不是公开的，第三方APP无法直接跳转
+     * 其他手机：跳转到通知渠道设置页
+     */
+    public static void openLockScreenNotificationSetting(Context context, String channelId) {
+        if (WKOSUtils.isMiui()) {
+            // 小米：跳转到权限管理页（这是最深的公开页面）
+            try {
+                Intent intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.permissions.PermissionsEditorActivity"));
+                intent.putExtra("extra_pkgname", context.getPackageName());
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+                return;
+            } catch (Exception e) {
+                // fallback到下面
+            }
+        }
+
+        // fallback：跳转通知渠道设置页
+        ensureNotificationChannel(context, channelId, "新消息通知", NotificationManager.IMPORTANCE_HIGH);
+        try {
+            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            openNotificationSetting(context);
+        }
+    }
+
+    // ==================== 语音通知权限 ====================
+
+    /**
+     * 检测语音通知权限是否开启
+     * 真实检测：通知总开关 + RTC渠道importance >= HIGH
+     * 注意：检测时不创建渠道，渠道不存在返回false
+     */
+    public static boolean isVoiceNotificationEnabled(Context context, String rtcChannelId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // 先检查通知总开关
+            if (!isNotificationEnabled(context)) {
+                return false;
+            }
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                NotificationChannel channel = manager.getNotificationChannel(rtcChannelId);
+                if (channel != null) {
+                    return channel.getImportance() >= NotificationManager.IMPORTANCE_HIGH;
+                }
+            }
+            return false; // 渠道不存在，视为未开启
+        }
+        return true;
+    }
+
+    /**
+     * 跳转到语音通知设置页
      */
     public static void openVoiceNotificationSetting(Context context, String rtcChannelId) {
-        context.getSharedPreferences("wkSharedPreferences", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("permission_voice_opened", true)
-                .apply();
+        // 跳转前确保渠道存在
+        ensureNotificationChannel(context, rtcChannelId, "语音通话通知", NotificationManager.IMPORTANCE_HIGH);
         try {
             Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
@@ -317,13 +309,13 @@ public class PermissionHelper {
         }
     }
 
-    /**
-     * 检测所有权限是否都已开启
-     */
+    // ==================== 综合检测 ====================
+
     public static boolean areAllPermissionsEnabled(Context context, String rtcChannelId) {
         return isNotificationEnabled(context)
                 && isBatteryOptimizationIgnored(context)
                 && isAutoStartEnabled(context)
-                && isVoiceNotificationEnabled(context, rtcChannelId);
+                && isVoiceNotificationEnabled(context, rtcChannelId)
+                && isLockScreenNotificationEnabled(context, WKConstants.newMsgChannelID);
     }
 }

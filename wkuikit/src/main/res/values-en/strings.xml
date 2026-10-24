@@ -289,5 +289,6 @@
     <string name="invitation_sent">Invitation sent</string>
     <string name="screenshot_group_suffix">screenshot the page</string>
     <string name="screenshot_single_text">The other party took a screenshot</string>
+    <string name="screenshot_single_self">You took a screenshot</string>
 </resources>
 

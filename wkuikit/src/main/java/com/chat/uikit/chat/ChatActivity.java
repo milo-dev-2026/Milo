@@ -58,6 +58,7 @@ import com.chat.base.emoji.MoonUtil;
 import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.EndpointSID;
+import com.chat.base.utils.PermissionHelper;
 import com.chat.base.endpoint.entity.AvatarOtherViewMenu;
 import com.chat.base.endpoint.entity.RTCMenu;
 import com.chat.base.endpoint.entity.ReadMsgMenu;
@@ -97,6 +98,7 @@ import com.chat.base.views.swipeback.SwipeBackActivity;
 import com.chat.base.views.swipeback.SwipeBackLayout;
 import com.chat.uikit.R;
 import com.chat.uikit.WKUIKitApplication;
+import com.chat.uikit.chat.manager.ChatMsgCacheManager;
 import com.chat.uikit.chat.manager.SendMsgEntity;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.chat.manager.WKSendMsgUtils;
@@ -183,11 +185,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private boolean isUploadReadMsg = true;
     //    boolean isUpdateCoverMsg = false;
     private boolean isCanLoadMore;
-    // 自动全量同步历史消息相关 - 已优化：移除进入页面自动全量同步，改为按需加载
+    // 自动全量同步历史消息相关
     private boolean isAutoSyncingHistory = false;  // 是否正在自动同步历史消息
     private int autoSyncedMsgCount = 0;            // 已自动同步的消息数量
+    private int autoSyncRetryCount = 0;            // 自动同步失败重试次数
     private boolean isFirstDataLoad = true;        // 是否首次加载数据
-    private static final int MAX_AUTO_SYNC_MSG = 500; // 最大自动同步消息数（进入页面预加载数量）
+    private static final int MAX_AUTO_SYNC_MSG = 500; // 最大自动同步消息数
+    private static final int MAX_AUTO_SYNC_RETRY = 3; // 最大重试次数
+    // 记录每个频道是否已同步到顶（key: channelId_channelType）
+    private static final java.util.HashSet<String> syncedToTopChannels = new java.util.HashSet<>();
     boolean isRefreshLoading = false;
     boolean isMoreLoading = false;
     boolean isCanRefresh = true;
@@ -198,8 +204,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private final List<Long> reminderIds = new ArrayList<>();
     private long browseTo = 0;
     private boolean isUpdateRedDot = true;
-    //查询聊天数据偏移量 - 增大首次加载数量，避免频繁分页加载
-    private final int limit = 200;
+    //查询聊天数据偏移量 - 首屏50条快速显示，加载更多100条
+    private final int limit = 50;
+    private final int loadMoreLimit = 100;
     private boolean isShowPinnedView = false;
     private boolean isMultipleChoiceMode = false;
     private boolean isTipMessage = false;
@@ -207,9 +214,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     // 新成员查看历史消息控制
     private boolean isAllowViewHistoryMsg = true; // 是否允许查看历史消息（群设置）
     private long memberJoinTimestamp = 0; // 当前用户入群时间戳（秒级）
+    private long friendAddTimestamp = 0; // 单聊加好友时间戳（秒级），只显示加好友后的消息
     private PanelSwitchHelper mHelper; // nullable, PanelSwitchLayout may not be available
     private ChatPanelManager chatPanelManager;
     private ActChatLayoutBinding wkVBinding;
+    private View lockScreenTipView; // 锁屏通知权限提示条
     private int unfilledHeight = 0;
     private int keyboardHeight = 0;
     private boolean isKeyboardVisible = false;
@@ -219,6 +228,79 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private final Handler typingHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideTypingRunnable = () -> hideTypingInTitle();
     private boolean isTypingShowing = false;
+    // 定时同步消息扩展（撤回/已读状态）
+    private final Handler extraSyncHandler = new Handler(Looper.getMainLooper());
+    private final Runnable extraSyncRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isShowChatActivity) {
+                MsgModel.getInstance().syncExtraMsg(channelId, channelType,
+                    allExtraList -> {
+                        // 直接更新adapter列表中的消息对象（确保修改的就是UI绑定的对象）
+                        applyExtraToAdapter(allExtraList);
+                    },
+                    () -> {
+                        if (chatAdapter != null) {
+                            chatAdapter.notifyDataSetChanged();
+                            android.util.Log.d("WKReceiptDebug", "extraSync complete, adapter refreshed");
+                        }
+                        extraSyncHandler.postDelayed(this, 10000);
+                    });
+            }
+        }
+    };
+
+    /**
+     * 将同步到的消息扩展应用到adapter列表中的消息对象
+     * 直接修改adapter里的对象引用，确保notifyDataSetChanged后UI能正确刷新
+     */
+    private void applyExtraToAdapter(List<com.chat.uikit.message.entity.WKSyncExtraMsgEntity> extraList) {
+        if (extraList == null || extraList.isEmpty() || chatAdapter == null) return;
+        List<com.chat.base.msgitem.WKUIChatMsgItemEntity> data = chatAdapter.getData();
+        if (data == null || data.isEmpty()) return;
+
+        int updatedCount = 0;
+        int revokeUpdated = 0;
+        int readedUpdated = 0;
+
+        for (com.chat.base.msgitem.WKUIChatMsgItemEntity item : data) {
+            if (item.wkMsg == null || TextUtils.isEmpty(item.wkMsg.messageID)) continue;
+            for (com.chat.uikit.message.entity.WKSyncExtraMsgEntity extra : extraList) {
+                if (TextUtils.isEmpty(extra.message_id)) continue;
+                if (item.wkMsg.messageID.equals(extra.message_id)) {
+                    if (item.wkMsg.remoteExtra == null) {
+                        item.wkMsg.remoteExtra = new com.xinbida.wukongim.entity.WKMsgExtra();
+                    }
+                    boolean changed = false;
+                    if (item.wkMsg.remoteExtra.revoke != extra.revoke) {
+                        item.wkMsg.remoteExtra.revoke = extra.revoke;
+                        if (extra.revoke == 1) revokeUpdated++;
+                        changed = true;
+                    }
+                    if (extra.revoker != null && !extra.revoker.equals(item.wkMsg.remoteExtra.revoker)) {
+                        item.wkMsg.remoteExtra.revoker = extra.revoker;
+                        changed = true;
+                    }
+                    if (item.wkMsg.remoteExtra.readedCount != extra.readed_count) {
+                        item.wkMsg.remoteExtra.readedCount = extra.readed_count;
+                        if (extra.readed_count > 0) readedUpdated++;
+                        changed = true;
+                    }
+                    item.wkMsg.remoteExtra.readed = extra.readed;
+                    if (changed) {
+                        item.isUpdateStatus = true;
+                        updatedCount++;
+                    }
+                    break;
+                }
+            }
+        }
+
+        android.util.Log.d("WKReceiptDebug", "applyExtraToAdapter: total=" + extraList.size()
+                + ", updated=" + updatedCount
+                + ", revokeUpdated=" + revokeUpdated
+                + ", readedUpdated=" + readedUpdated);
+    }
     // 连接状态显示控制
     private boolean isShowingConnectionStatus = false;
     private int currentConnectionStatus = WKConnectStatus.success;
@@ -295,6 +377,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         channelType = getIntent().getByteExtra("channelType", WKChannelType.PERSONAL);
         maxMsgOrderSeq = WKIM.getInstance().getMsgManager().getMaxOrderSeqWithChannel(channelId, channelType);
         maxMsgSeq = WKIM.getInstance().getMsgManager().getMaxMessageSeqWithChannel(channelId, channelType);
+        android.util.Log.d("ChatHistoryFix", "onCreate: channel=" + channelId + " type=" + channelType + " maxOrderSeq=" + maxMsgOrderSeq + " maxMsgSeq=" + maxMsgSeq);
         resetHideChannelAllPinnedMessage();
         // 是否含有带转发的消息
         if (getIntent().hasExtra("msgContentList")) {
@@ -374,8 +457,20 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         isUploadReadMsg = true;
         chatPanelManager.initRefreshListener();
         EndpointManager.getInstance().invoke("start_screen_shot", this);
-        MsgModel.getInstance().syncExtraMsg(channelId, channelType, () -> restorePinnedBanner());
+        MsgModel.getInstance().syncExtraMsg(channelId, channelType,
+            allExtraList -> applyExtraToAdapter(allExtraList),
+            () -> {
+                restorePinnedBanner();
+                if (chatAdapter != null) {
+                    chatAdapter.notifyDataSetChanged();
+                }
+            });
+        // 启动定时同步消息扩展（撤回/已读状态）
+        extraSyncHandler.removeCallbacks(extraSyncRunnable);
+        extraSyncHandler.postDelayed(extraSyncRunnable, 10000);
         restorePinnedBanner();
+        // 检查锁屏显示权限，未开启则显示顶部提示
+        checkLockScreenNotificationTip();
     }
 
     @Override
@@ -797,9 +892,20 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         // 命令消息监听
         WKIM.getInstance().getCMDManager().addCmdListener(channelId, wkCmd -> {
             if (wkCmd == null || TextUtils.isEmpty(wkCmd.cmdKey)) return;
+            android.util.Log.d("WKReceiptDebug", "CMD received: " + wkCmd.cmdKey);
             // 监听正在输入
             if (wkCmd.cmdKey.equals(WKCMDKeys.wk_typing)) {
                 typing(wkCmd);
+            }
+            // 监听消息撤回
+            else if (wkCmd.cmdKey.equals("wk_messageRevoke")) {
+                android.util.Log.d("WKReceiptDebug", "Revoke CMD received, syncing extra msg");
+                MsgModel.getInstance().syncExtraMsg(channelId, channelType);
+            }
+            // 监听消息已读
+            else if (wkCmd.cmdKey.equals("wk_messageReaded")) {
+                android.util.Log.d("WKReceiptDebug", "Readed CMD received, syncing extra msg");
+                MsgModel.getInstance().syncExtraMsg(channelId, channelType);
             }
         });
 
@@ -1085,6 +1191,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (channel != null) {
                 setOnlineView(channel);
                 showChannelName(channel);
+                // 获取加好友时间，只显示加好友后的消息
+                if (!TextUtils.isEmpty(channel.createdAt)) {
+                    friendAddTimestamp = WKTimeUtils.getInstance().date2TimeStamp(channel.createdAt, "yyyy-MM-dd HH:mm:ss");
+                    android.util.Log.d("ChatHistoryFix", "单聊channel.createdAt=" + channel.createdAt + " friendAddTs=" + friendAddTimestamp);
+                }
             }
         }
 
@@ -1135,7 +1246,27 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (aroundMsgSeq == 0 && getIntent().hasExtra("aroundMsgSeq")) {
             aroundMsgSeq = getIntent().getLongExtra("aroundMsgSeq", 0);
         }
-        getData(lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
+
+        // 内存缓存：如果有缓存且无需定位到特定消息，先显示缓存快速呈现，再同步最新消息
+        boolean useCache = isFirstDataLoad && aroundMsgSeq == 0 && lastPreviewMsgOrderSeq == 0
+                && ChatMsgCacheManager.getInstance().hasCache(channelId, channelType);
+        if (useCache) {
+            List<WKUIChatMsgItemEntity> cacheList = ChatMsgCacheManager.getInstance().getCache(channelId, channelType);
+            if (cacheList != null && !cacheList.isEmpty()) {
+                chatAdapter.setNewInstance(cacheList);
+                if (isScrollToEnd) {
+                    wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
+                }
+                // 标记非首次加载，getData时用loadMoreLimit同步更新的消息
+                isFirstDataLoad = false;
+                // 同步最新消息（往新的方向拉）
+                getData(1, false, 0, false);
+            } else {
+                getData(lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
+            }
+        } else {
+            getData(lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
+        }
 
         //查询高光内容
         WKConversationMsgExtra extra = WKIM.getInstance().getConversationManager().getMsgExtraWithChannel(channelId, channelType);
@@ -1173,8 +1304,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             oldestOrderSeq = lastPreviewMsgOrderSeq;
         }
         if (unreadStartMsgOrderSeq != 0) contain = true;
-        android.util.Log.d("ChatHistoryFix", "getData: channel=" + channelId + " pullMode=" + pullMode + " limit=" + limit + " oldestOrderSeq=" + oldestOrderSeq + " isFirstDataLoad=" + isFirstDataLoad + " isAutoSyncingHistory=" + isAutoSyncingHistory + " autoSyncedMsgCount=" + autoSyncedMsgCount);
-        WKIM.getInstance().getMsgManager().getOrSyncHistoryMessages(channelId, channelType, oldestOrderSeq, contain, pullMode, limit, aroundMsgOrderSeq, new IGetOrSyncHistoryMsgBack() {
+        // 首屏50条快速显示，加载更多100条
+        int currentLimit = isFirstDataLoad ? limit : loadMoreLimit;
+        android.util.Log.d("ChatHistoryFix", "getData: channel=" + channelId + " pullMode=" + pullMode + " limit=" + currentLimit + " oldestOrderSeq=" + oldestOrderSeq + " isFirstDataLoad=" + isFirstDataLoad + " isAutoSyncingHistory=" + isAutoSyncingHistory + " autoSyncedMsgCount=" + autoSyncedMsgCount);
+        WKIM.getInstance().getMsgManager().getOrSyncHistoryMessages(channelId, channelType, oldestOrderSeq, contain, pullMode, currentLimit, aroundMsgOrderSeq, new IGetOrSyncHistoryMsgBack() {
             @Override
             public void onSyncing() {
                 android.util.Log.d("ChatHistoryFix", "getData.onSyncing: channel=" + channelId);
@@ -1196,16 +1329,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     EndpointManager.getInstance().invoke("is_syncing_message", 0);
                 }
                 if (pullMode == 0) {
-                    if (WKReader.isEmpty(list))
+                    if (WKReader.isEmpty(list)) {
                         isCanRefresh = false;
+                    }
                 } else {
                     if (WKReader.isEmpty(list)) {
                         isCanLoadMore = false;
-                        // 自动同步历史消息结束
-                        if (isAutoSyncingHistory) {
-                            isAutoSyncingHistory = false;
-                            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: completed! total synced=" + autoSyncedMsgCount + " messages");
-                        }
                     }
                 }
                 isSyncLastMsg = false;
@@ -1223,9 +1352,38 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
                 isRefreshLoading = false;
                 isMoreLoading = false;
+                // 自动同步历史消息：每次进入页面都检查是否需要继续同步
+                // 已同步到顶的频道直接跳过
+                String channelKey = channelId + "_" + channelType;
+                if (!syncedToTopChannels.contains(channelKey) && !isAutoSyncingHistory) {
+                    // 检查本地最早的消息是否还有更早的（orderSeq > 1 说明还有更早的）
+                    long realFirstOrderSeq = 0;
+                    List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
+                    if (allItems != null) {
+                        for (WKUIChatMsgItemEntity item : allItems) {
+                            if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
+                                && item.wkMsg.type != WKContentType.emptyView 
+                                && item.wkMsg.type != WKContentType.spanEmptyView) {
+                                if (realFirstOrderSeq == 0 || item.wkMsg.orderSeq < realFirstOrderSeq) {
+                                    realFirstOrderSeq = item.wkMsg.orderSeq;
+                                }
+                            }
+                        }
+                    }
+                    // 如果还有更早的消息，启动同步
+                    if (realFirstOrderSeq > 1) {
+                        isAutoSyncingHistory = true;
+                        autoSyncedMsgCount = 0;
+                        autoSyncRetryCount = 0;
+                        android.util.Log.d("ChatHistoryFix", "autoSyncHistory: start! channel=" + channelId + " firstOrderSeq=" + realFirstOrderSeq);
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 300);
+                    } else {
+                        // 已经到顶了，标记
+                        syncedToTopChannels.add(channelKey);
+                        android.util.Log.d("ChatHistoryFix", "autoSyncHistory: already at top, skip! channel=" + channelId);
+                    }
+                }
                 isFirstDataLoad = false;
-                // 移除进入页面自动全量同步历史消息的逻辑
-                // 用户下拉刷新时才主动加载更早的消息，避免进入页面卡顿和重复加载
             }
         });
 
@@ -1241,6 +1399,30 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      * @param isScrollToEnd 是否滚动到底部
      */
     private void showData(List<WKMsg> msgList, int pullMode, boolean isSetNewData, boolean isScrollToEnd) {
+        // 打印消息范围用于调试
+        if (WKReader.isNotEmpty(msgList)) {
+            long minMsgSeq = 0, maxMsgSeq = 0, minOrderSeq = 0, maxOrderSeq = 0;
+            int realMsgCount = 0;
+            int zeroMsgSeqCount = 0;
+            for (WKMsg msg : msgList) {
+                if (msg.type != WKContentType.emptyView && msg.type != WKContentType.spanEmptyView && msg.type != WKContentType.msgPromptTime) {
+                    realMsgCount++;
+                    if (msg.messageSeq > 0) {
+                        if (minMsgSeq == 0 || msg.messageSeq < minMsgSeq) minMsgSeq = msg.messageSeq;
+                        if (msg.messageSeq > maxMsgSeq) maxMsgSeq = msg.messageSeq;
+                    } else {
+                        zeroMsgSeqCount++;
+                    }
+                    if (msg.orderSeq > 0) {
+                        if (minOrderSeq == 0 || msg.orderSeq < minOrderSeq) minOrderSeq = msg.orderSeq;
+                        if (msg.orderSeq > maxOrderSeq) maxOrderSeq = msg.orderSeq;
+                    }
+                }
+            }
+            android.util.Log.d("ChatHistoryFix", "showData beforeFilter: channel=" + channelId + " type=" + channelType + " pullMode=" + pullMode + " totalSize=" + msgList.size() + " realMsgCount=" + realMsgCount + " zeroMsgSeqCount=" + zeroMsgSeqCount + " msgSeq=[" + minMsgSeq + "," + maxMsgSeq + "] orderSeq=[" + minOrderSeq + "," + maxOrderSeq + "] isAllowViewHistory=" + isAllowViewHistoryMsg + " memberJoinTs=" + memberJoinTimestamp);
+        } else {
+            android.util.Log.d("ChatHistoryFix", "showData beforeFilter: channel=" + channelId + " type=" + channelType + " pullMode=" + pullMode + " msgList is empty");
+        }
         // 按timestamp和orderSeq严格排序，确保聊天记录按时间顺序显示
         if (WKReader.isNotEmpty(msgList)) {
             Collections.sort(msgList, (a, b) -> {
@@ -1264,6 +1446,24 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
             msgList.clear();
             msgList.addAll(filteredList);
+        }
+        // 单聊加好友时间过滤：只显示加好友后的消息
+        // 临时关闭过滤，先打印日志确认时间
+        if (channelType == WKChannelType.PERSONAL && friendAddTimestamp > 0 && WKReader.isNotEmpty(msgList)) {
+            // 打印第一条和最后一条消息的时间戳，对比加好友时间
+            long firstMsgTs = 0;
+            long lastMsgTs = 0;
+            for (WKMsg msg : msgList) {
+                if (msg.timestamp > 0 && msg.type != WKContentType.emptyView && msg.type != WKContentType.spanEmptyView) {
+                    if (firstMsgTs == 0 || msg.timestamp < firstMsgTs) firstMsgTs = msg.timestamp;
+                    if (msg.timestamp > lastMsgTs) lastMsgTs = msg.timestamp;
+                }
+            }
+            android.util.Log.d("ChatHistoryFix", "单聊时间对比: friendAddTs=" + friendAddTimestamp + " firstMsgTs=" + firstMsgTs + " lastMsgTs=" + lastMsgTs);
+            android.util.Log.d("ChatHistoryFix", "  friendAddTime=" + new java.util.Date(friendAddTimestamp * 1000));
+            if (firstMsgTs > 0) {
+                android.util.Log.d("ChatHistoryFix", "  firstMsgTime=" + new java.util.Date(firstMsgTs * 1000));
+            }
         }
         boolean isAddEmptyView = WKReader.isNotEmpty(msgList) && msgList.size() < limit;
         if (isAddEmptyView) {
@@ -1682,33 +1882,152 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     /**
-     * 自动全量同步历史消息 - 使用 getData(0,...) 让 showData 正确处理排序和插入位置
+     * 自动全量同步历史消息
      * 进入聊天页面后自动循环拉取历史消息，直到拉取完所有消息
+     * 加固：失败自动重试、同步到顶后标记（下次进入直接跳过）
+     * 注意：使用 getData(0, false, 0, false) 和用户手动下拉走同样的路径，确保参数正确
      */
     private void autoSyncMoreHistory() {
         if (!isAutoSyncingHistory) return;
         if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
             isAutoSyncingHistory = false;
+            markSyncCompleted();
             android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit " + MAX_AUTO_SYNC_MSG + ", stopped");
             return;
         }
 
-        long firstOrderSeq = chatAdapter.getFirstMsgOrderSeq();
-        android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: firstOrderSeq=" + firstOrderSeq + " total synced=" + autoSyncedMsgCount);
+        // 跳过emptyView等占位消息，找到真正最早的消息orderSeq
+        long realFirstOrderSeq = 0;
+        List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
+        if (allItems != null) {
+            for (WKUIChatMsgItemEntity item : allItems) {
+                if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
+                    && item.wkMsg.type != WKContentType.emptyView 
+                    && item.wkMsg.type != WKContentType.spanEmptyView) {
+                    if (realFirstOrderSeq == 0 || item.wkMsg.orderSeq < realFirstOrderSeq) {
+                        realFirstOrderSeq = item.wkMsg.orderSeq;
+                    }
+                }
+            }
+        }
+        android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: realFirstOrderSeq=" + realFirstOrderSeq + " total synced=" + autoSyncedMsgCount + " retry=" + autoSyncRetryCount);
 
-        if (firstOrderSeq <= 1) {
+        if (realFirstOrderSeq <= 1) {
             isAutoSyncingHistory = false;
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + firstOrderSeq + "), completed! total=" + autoSyncedMsgCount);
+            markSyncCompleted();
+            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + realFirstOrderSeq + "), completed! total=" + autoSyncedMsgCount);
             return;
         }
 
-        // 使用 getData(0, false, 0, false) 加载更早的历史消息
-        // getData 会自动用 chatAdapter.getFirstMsgOrderSeq() 作为起点
-        // showData 会正确排序并插入到列表顶部
+        // 用 getData(0, false, 0, false) 拉取更早的消息
+        // 和用户手动下拉加载更早消息走完全相同的路径，确保参数正确
         isRefreshLoading = true;
         lastPreviewMsgOrderSeq = 0;
         unreadStartMsgOrderSeq = 0;
+        isSyncLastMsg = false;
+        
+        // 记录拉取前的消息数量，用来判断这次拉到了多少条
+        final int beforeCount = chatAdapter.getItemCount();
+        final long beforeFirstOrderSeq = realFirstOrderSeq;
+        
+        android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: calling getData(0) beforeCount=" + beforeCount);
         getData(0, false, 0, false);
+        
+        // getData 是异步的，结果在 onResult 回调里
+        // 但 getData.onResult 里的自动同步逻辑已经被我们删掉了
+        // 所以我们需要在这里重新接入：用 showData 的回调时机触发下一次同步
+        // 方案：postDelayed 检查数据是否变化
+        checkAutoSyncResult(beforeFirstOrderSeq, beforeCount, 0);
+    }
+    
+    /**
+     * 检查自动同步结果，延迟等待数据返回
+     */
+    private void checkAutoSyncResult(final long beforeFirstOrderSeq, final int beforeCount, final int checkCount) {
+        if (!isAutoSyncingHistory) return;
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (!isAutoSyncingHistory) return;
+            
+            // 检查最早消息的 orderSeq 是否变小了（说明拉到了更早的消息）
+            long newFirstOrderSeq = 0;
+            List<WKUIChatMsgItemEntity> allItems = chatAdapter.getData();
+            if (allItems != null) {
+                for (WKUIChatMsgItemEntity item : allItems) {
+                    if (item != null && item.wkMsg != null && item.wkMsg.orderSeq > 0 
+                        && item.wkMsg.type != WKContentType.emptyView 
+                        && item.wkMsg.type != WKContentType.spanEmptyView) {
+                        if (newFirstOrderSeq == 0 || item.wkMsg.orderSeq < newFirstOrderSeq) {
+                            newFirstOrderSeq = item.wkMsg.orderSeq;
+                        }
+                    }
+                }
+            }
+            
+            int newCount = chatAdapter.getItemCount();
+            int addedCount = newCount - beforeCount;
+            android.util.Log.d("ChatHistoryFix", "checkAutoSyncResult: check=" + checkCount + " beforeSeq=" + beforeFirstOrderSeq + " newSeq=" + newFirstOrderSeq + " added=" + addedCount + " isRefreshLoading=" + isRefreshLoading);
+            
+            if (isRefreshLoading) {
+                // 还在加载中，继续等
+                if (checkCount < 20) { // 最多等10秒（20次 * 500ms）
+                    checkAutoSyncResult(beforeFirstOrderSeq, beforeCount, checkCount + 1);
+                } else {
+                    // 超时了，重试
+                    handleAutoSyncEmpty(beforeFirstOrderSeq);
+                }
+            } else if (newFirstOrderSeq > 0 && newFirstOrderSeq < beforeFirstOrderSeq) {
+                // 拉到了更早的消息
+                autoSyncRetryCount = 0;
+                autoSyncedMsgCount += Math.max(0, addedCount);
+                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: got older msgs! newFirstSeq=" + newFirstOrderSeq + " total=" + autoSyncedMsgCount);
+                
+                if (autoSyncedMsgCount >= MAX_AUTO_SYNC_MSG) {
+                    isAutoSyncingHistory = false;
+                    markSyncCompleted();
+                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit! total=" + autoSyncedMsgCount);
+                } else if (newFirstOrderSeq <= 1) {
+                    isAutoSyncingHistory = false;
+                    markSyncCompleted();
+                    android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached top! total=" + autoSyncedMsgCount);
+                } else {
+                    // 继续拉
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 200);
+                }
+            } else {
+                // 没有拉到新消息
+                handleAutoSyncEmpty(beforeFirstOrderSeq);
+            }
+        }, 500);
+    }
+    
+    /**
+     * 处理自动同步返回空的情况（可能是到顶了，也可能是失败）
+     */
+    private void handleAutoSyncEmpty(long currentFirstOrderSeq) {
+        if (currentFirstOrderSeq > 100 && autoSyncRetryCount < MAX_AUTO_SYNC_RETRY) {
+            autoSyncRetryCount++;
+            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: empty result, retry " + autoSyncRetryCount + "/" + MAX_AUTO_SYNC_RETRY);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 500);
+        } else {
+            isAutoSyncingHistory = false;
+            isCanRefresh = false;
+            if (autoSyncRetryCount >= MAX_AUTO_SYNC_RETRY) {
+                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: max retries reached, stopped! total=" + autoSyncedMsgCount);
+            } else {
+                markSyncCompleted();
+                android.util.Log.d("ChatHistoryFix", "autoSyncHistory: no more older messages! total synced=" + autoSyncedMsgCount);
+            }
+        }
+    }
+    
+    /**
+     * 标记该频道历史消息已同步到顶，下次进入直接跳过
+     */
+    private void markSyncCompleted() {
+        String channelKey = channelId + "_" + channelType;
+        syncedToTopChannels.add(channelKey);
+        android.util.Log.d("ChatHistoryFix", "markSyncCompleted: " + channelKey);
     }
 
     private View pinnedBannerView;
@@ -1866,6 +2185,100 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
         currentPinnedMsg = null;
+    }
+
+    /**
+     * 检查锁屏显示权限，未开启则显示顶部提示条
+     */
+    private void checkLockScreenNotificationTip() {
+        boolean isEnabled = PermissionHelper.isLockScreenNotificationEnabled(this, WKConstants.newMsgChannelID);
+        if (isEnabled) {
+            hideLockScreenTip();
+            return;
+        }
+        // 检查用户是否已手动关闭过提示（24小时内不再显示）
+        String key = "lock_screen_tip_dismissed_" + channelId + "_" + channelType;
+        String lastDismissStr = WKSharedPreferencesUtil.getInstance().getSP(key, "0");
+        long lastDismissTime = 0;
+        try {
+            lastDismissTime = Long.parseLong(lastDismissStr);
+        } catch (Exception e) {
+            // ignore
+        }
+        if (System.currentTimeMillis() - lastDismissTime < 24 * 60 * 60 * 1000) {
+            return; // 24小时内已关闭过，不再显示
+        }
+        showLockScreenTip();
+    }
+
+    /**
+     * 显示锁屏通知权限提示条
+     */
+    private void showLockScreenTip() {
+        if (lockScreenTipView != null && lockScreenTipView.getParent() != null) {
+            lockScreenTipView.setVisibility(View.VISIBLE);
+            return;
+        }
+        // 动态创建提示条
+        android.widget.LinearLayout tipLayout = new android.widget.LinearLayout(this);
+        tipLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        tipLayout.setGravity(Gravity.CENTER_VERTICAL);
+        tipLayout.setBackgroundColor(0xFFFFF8E1); // 浅黄色背景
+        int padding = (int) (14 * getResources().getDisplayMetrics().density);
+        tipLayout.setPadding(padding, padding / 2, padding, padding / 2);
+
+        // 图标
+        ImageView iconIv = new ImageView(this);
+        iconIv.setImageResource(R.mipmap.ic_launcher);
+        int iconSize = (int) (20 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout.LayoutParams iconLp = new android.widget.LinearLayout.LayoutParams(iconSize, iconSize);
+        tipLayout.addView(iconIv, iconLp);
+
+        // 文字
+        TextView tipTv = new TextView(this);
+        tipTv.setText("锁屏时可能收不到消息通知，点击开启");
+        tipTv.setTextColor(0xFFFF8F00);
+        tipTv.setTextSize(13);
+        android.widget.LinearLayout.LayoutParams textLp = new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        textLp.setMargins(padding / 2, 0, 0, 0);
+        tipLayout.addView(tipTv, textLp);
+
+        // 关闭按钮
+        TextView closeTv = new TextView(this);
+        closeTv.setText("×");
+        closeTv.setTextColor(0xFF999999);
+        closeTv.setTextSize(20);
+        closeTv.setPadding(padding / 2, 0, 0, 0);
+        tipLayout.addView(closeTv);
+
+        // 点击提示条跳转设置
+        tipLayout.setOnClickListener(v -> {
+            PermissionHelper.openLockScreenNotificationSetting(ChatActivity.this, WKConstants.newMsgChannelID);
+        });
+
+        // 点击关闭按钮
+        closeTv.setOnClickListener(v -> {
+            hideLockScreenTip();
+            String key = "lock_screen_tip_dismissed_" + channelId + "_" + channelType;
+            WKSharedPreferencesUtil.getInstance().putSP(key, String.valueOf(System.currentTimeMillis()));
+        });
+
+        lockScreenTipView = tipLayout;
+
+        // 添加到 topView 的最顶部
+        if (wkVBinding != null && wkVBinding.topView != null) {
+            wkVBinding.topView.addView(lockScreenTipView, 0);
+        }
+    }
+
+    /**
+     * 隐藏锁屏通知权限提示条
+     */
+    private void hideLockScreenTip() {
+        if (lockScreenTipView != null && lockScreenTipView.getParent() != null) {
+            lockScreenTipView.setVisibility(View.GONE);
+        }
     }
 
     private List<PopupMenuItem> getGroupApprovePopupItems() {
@@ -2144,7 +2557,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     wkVBinding.topLayout.subtitleTv.setText(showTime);
                     wkVBinding.topLayout.subtitleView.setVisibility(View.VISIBLE);
                 }
-            } else wkVBinding.topLayout.subtitleView.setVisibility(View.GONE);
+            } else {
+                wkVBinding.topLayout.subtitleTv.setText(R.string.offline);
+                wkVBinding.topLayout.subtitleView.setVisibility(View.VISIBLE);
+            }
         }
     }
 
@@ -2515,6 +2931,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private void saveEditContent() {
         //停止语音播放
         //AudioPlaybackManager.getInstance().stopAudio();
+        if (linearLayoutManager == null || chatAdapter == null || wkVBinding == null || chatPanelManager == null) {
+            return;
+        }
         int firstItemPosition = linearLayoutManager.findFirstVisibleItemPosition();
         int endItemPosition = linearLayoutManager.findLastVisibleItemPosition();
         long keepMsgSeq = 0;
@@ -2556,6 +2975,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         WKPlayVoiceUtils.getInstance().stopPlay();
         MsgModel.getInstance().doneReminder(reminderIds);
         EndpointManager.getInstance().invoke("stop_screen_shot", this);
+        // 停止定时同步
+        extraSyncHandler.removeCallbacks(extraSyncRunnable);
+        // 保存消息列表到内存缓存，下次进入快速显示
+        if (chatAdapter != null && chatAdapter.getData() != null && !chatAdapter.getData().isEmpty()) {
+            ChatMsgCacheManager.getInstance().putCache(channelId, channelType, chatAdapter.getData());
+        }
     }
 
 
@@ -2741,6 +3166,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (needScrollToEnd) {
                 scrollToEnd();
             }
+            // 收到新消息后立即同步消息扩展（更新撤回/已读状态）
+            MsgModel.getInstance().syncExtraMsg(channelId, channelType);
         }
     }
 
@@ -2885,6 +3312,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 continue;
             }
             boolean isNotify = false;
+            boolean isResetStatus = false;
+            boolean isResetData = false;
+            boolean isResetReaction = false;
             if (list.get(i).wkMsg.clientSeq == wkMsg.clientSeq
                     || list.get(i).wkMsg.clientMsgNO.equals(wkMsg.clientMsgNO)
                     || (!TextUtils.isEmpty(list.get(i).wkMsg.messageID) && !TextUtils.isEmpty(wkMsg.messageID) && list.get(i).wkMsg.messageID.equals(wkMsg.messageID))) {
@@ -2894,24 +3324,46 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 if (wkMsg.messageSeq > lastVisibleMsgSeq) {
                     lastVisibleMsgSeq = wkMsg.messageSeq;
                 }
-                if (list.get(i).wkMsg.remoteExtra.revoke != wkMsg.remoteExtra.revoke) {
+                // 先记录旧的readedCount（用于比较状态变化）
+                int oldReadedCount = -1;
+                long oldEditedAt = 0L;
+                int oldStatus = list.get(i).wkMsg.status;
+                int oldRevoke = 0;
+                if (list.get(i).wkMsg.remoteExtra != null) {
+                    oldReadedCount = list.get(i).wkMsg.remoteExtra.readedCount;
+                    oldEditedAt = list.get(i).wkMsg.remoteExtra.editedAt;
+                    oldRevoke = list.get(i).wkMsg.remoteExtra.revoke;
+                }
+                // 安全检查：如果旧消息的remoteExtra为null，直接用新消息的替换
+                if (list.get(i).wkMsg.remoteExtra == null && wkMsg.remoteExtra != null) {
+                    list.get(i).wkMsg.remoteExtra = wkMsg.remoteExtra;
+                }
+                if (list.get(i).wkMsg.remoteExtra != null && wkMsg.remoteExtra != null && oldRevoke != wkMsg.remoteExtra.revoke) {
                     isNotify = true;
+                    isResetStatus = true;
+                    isResetData = true;
+                    list.get(i).isUpdateStatus = true;
                 }
                 // 消息撤回
-                list.get(i).wkMsg.remoteExtra.revoke = wkMsg.remoteExtra.revoke;
-                list.get(i).wkMsg.remoteExtra.revoker = wkMsg.remoteExtra.revoker;
+                if (list.get(i).wkMsg.remoteExtra != null && wkMsg.remoteExtra != null) {
+                    list.get(i).wkMsg.remoteExtra.revoke = wkMsg.remoteExtra.revoke;
+                    list.get(i).wkMsg.remoteExtra.revoker = wkMsg.remoteExtra.revoker;
+                }
                 if (list.get(i).wkMsg.status != WKSendMsgResult.send_success && wkMsg.status == WKSendMsgResult.send_success) {
                     WKPlaySound.getInstance().playOutMsg(R.raw.sound_out);
                 }
-                boolean isResetStatus = false;
-                boolean isResetData = false;
-                boolean isResetReaction = false;
-                if (list.get(i).wkMsg.status != wkMsg.status
-                        || list.get(i).wkMsg.remoteExtra.readedCount != wkMsg.remoteExtra.readedCount
-                        || list.get(i).wkMsg.remoteExtra.editedAt != wkMsg.remoteExtra.editedAt
+                // 用旧值比较，避免remoteExtra是同一个对象引用导致比较永远相等的bug
+                if (oldStatus != wkMsg.status
+                        || oldReadedCount != wkMsg.remoteExtra.readedCount
+                        || oldEditedAt != wkMsg.remoteExtra.editedAt
                 ) {
                     list.get(i).isUpdateStatus = true;
                     isResetStatus = true;
+                    android.util.Log.d("WKReceiptDebug",
+                        "refreshMsg status changed: msgID=" + wkMsg.messageID
+                            + ", oldReadedCount=" + oldReadedCount
+                            + ", newReadedCount=" + wkMsg.remoteExtra.readedCount
+                            + ", isResetStatus=true");
                 }
                 if (list.get(i).wkMsg.remoteExtra.isPinned != wkMsg.remoteExtra.isPinned) {
                     isResetStatus = true;
@@ -2965,9 +3417,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 if (isNotify) {
                     EndpointManager.getInstance().invoke("stop_reaction_animation", null);
                     chatAdapter.notifyItemChanged(i);
+                    android.util.Log.d("WKReceiptDebug", "refreshMsg full notify: msgID=" + wkMsg.messageID + ", position=" + i);
                 } else {
                     if (isResetStatus) {
                         chatAdapter.notifyStatus(i);
+                        android.util.Log.d("WKReceiptDebug", "refreshMsg notifyStatus: msgID=" + wkMsg.messageID + ", position=" + i);
                     }
                     if (isResetData) {
                         chatAdapter.notifyData(i);
@@ -2979,16 +3433,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     }
                 }
 
-                if (list.get(i).wkMsg.remoteExtra.revoke == 1) {
+                if (list.get(i).wkMsg.remoteExtra != null && list.get(i).wkMsg.remoteExtra.revoke == 1) {
                     int finalI = i;
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         int curSize = list.size();
                         int previousIndex = finalI - 1;
                         int nextIndex = finalI + 1;
-                        if (previousIndex >= 0 && previousIndex < curSize && list.get(previousIndex).wkMsg.remoteExtra.revoke == 0) {
+                        if (previousIndex >= 0 && previousIndex < curSize && list.get(previousIndex).wkMsg.remoteExtra != null && list.get(previousIndex).wkMsg.remoteExtra.revoke == 0) {
                             chatAdapter.notifyItemChanged(previousIndex);
                         }
-                        if (nextIndex < curSize && list.get(nextIndex).wkMsg.remoteExtra.revoke == 0) {
+                        if (nextIndex < curSize && list.get(nextIndex).wkMsg.remoteExtra != null && list.get(nextIndex).wkMsg.remoteExtra.revoke == 0) {
                             chatAdapter.notifyItemChanged(nextIndex);
                         }
                     }, 200);

@@ -93,6 +93,7 @@
 
                     <!-- 接收新消息通知 -->
                     <LinearLayout
+                        android:id="@+id/newMsgNoticeLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
@@ -100,7 +101,8 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="14dp"
-                        android:paddingBottom="14dp">
+                        android:paddingBottom="14dp"
+                        android:background="?android:attr/selectableItemBackground">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -139,6 +141,7 @@
 
                     <!-- 通知显示消息详情 -->
                     <LinearLayout
+                        android:id="@+id/newMsgNoticeDetailLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
@@ -146,7 +149,8 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="14dp"
-                        android:paddingBottom="14dp">
+                        android:paddingBottom="14dp"
+                        android:background="?android:attr/selectableItemBackground">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -185,6 +189,7 @@
 
                     <!-- 声音 -->
                     <LinearLayout
+                        android:id="@+id/voiceLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
@@ -192,7 +197,8 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="14dp"
-                        android:paddingBottom="14dp">
+                        android:paddingBottom="14dp"
+                        android:background="?android:attr/selectableItemBackground">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -231,6 +237,7 @@
 
                     <!-- 震动 -->
                     <LinearLayout
+                        android:id="@+id/shockLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
@@ -238,7 +245,8 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="14dp"
-                        android:paddingBottom="14dp">
+                        android:paddingBottom="14dp"
+                        android:background="?android:attr/selectableItemBackground">
 
                         <LinearLayout
                             android:layout_width="0dp"

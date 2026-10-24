@@ -131,7 +131,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         String fromName = "";
         if (msg != null && (WKContentType.isSystemMsg(msg.type)
                 || msg.type == WKContentType.revoke
-                || msg.remoteExtra.revoke == 1 || msg.type == WKContentType.screenshot)) {
+                || (msg.remoteExtra != null && msg.remoteExtra.revoke == 1) || msg.type == WKContentType.screenshot)) {
             return fromName;
         }
         if (channelType == WKChannelType.PERSONAL || channelType == WKChannelType.CUSTOMER_SERVICE || msg == null || TextUtils.isEmpty(msg.fromUID) || msg.fromUID.equals(WKConfig.getInstance().getUid())) {
@@ -175,7 +175,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             content = msg.remoteExtra.contentEditMsgModel.getDisplayContent();
         }
         //判断是否被撤回
-        if (msg.remoteExtra.revoke == 1)
+        if (msg.remoteExtra != null && msg.remoteExtra.revoke == 1)
             content = WKRevokeProvider.Companion.showRevokeMsg(msg);
         else if (msg.type == WKContentType.WK_CONTENT_FORMAT_ERROR) {
             content = getContext().getString(R.string.str_content_format_err);

@@ -13,10 +13,12 @@ import java.util.Locale;
 import android.util.Log;
 
 import com.chat.base.WKBaseApplication;
+import com.chat.base.common.WKCommonModel;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKSharedPreferencesUtil;
 import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
+import com.chat.base.entity.AppVersion;
 import com.chat.base.msgitem.ReactionSticker;
 import com.chat.base.net.RetrofitUtils;
 import com.chat.scan.WKScanApplication;
@@ -36,6 +38,27 @@ public class TSApplication extends Application {
     private boolean isAppLocked = false;
     private long lastBackgroundTime = 0;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    // ========== 预加载版本检查 ==========
+    // 在Application早期就发起版本检查请求，等MainActivity启动时结果已经回来了
+    // 这样用户打开App能立刻看到更新弹窗，提升更新率
+    private AppVersion preloadedVersion = null;
+    private boolean versionPreloaded = false;
+
+    public static AppVersion getPreloadedVersion() {
+        return instance != null ? instance.preloadedVersion : null;
+    }
+
+    public static boolean isVersionPreloaded() {
+        return instance != null && instance.versionPreloaded;
+    }
+
+    public static void clearPreloadedVersion() {
+        if (instance != null) {
+            instance.preloadedVersion = null;
+            instance.versionPreloaded = false;
+        }
+    }
 
     @Override
     public void onCreate() {
@@ -61,6 +84,11 @@ public class TSApplication extends Application {
 
         // 初始化API地址（必须在WKUIKitApplication.init之前，确保网络请求时baseUrl已就绪）
         initApiUrl();
+
+        // 【关键优化】尽早发起版本检查，MainActivity启动时结果可能已经回来了
+        // 放在这里是因为：API地址已初始化，但重型SDK还没开始加载
+        // 即使后面初始化崩溃了，版本检查结果也已经缓存下来了
+        preloadVersionCheck();
 
         // 初始化UI Kit模块（注册loginMenus等所有端点）
         WKUIKitApplication.getInstance().init(this);
@@ -198,6 +226,29 @@ public class TSApplication extends Application {
         }
         // 初始化认证服务地址（用户搜索等功能使用）
         WKApiConfig.initAuthURL("http://43.133.39.170:8090");
+    }
+
+    /**
+     * 预加载版本检查
+     * 在Application早期就发起请求，这样MainActivity启动时就能立刻弹窗
+     * 即使后面初始化崩溃了，版本信息也已经拿到了
+     */
+    private void preloadVersionCheck() {
+        try {
+            WKCommonModel.getInstance().getAppNewVersion(false, version -> {
+                versionPreloaded = true;
+                preloadedVersion = version;
+                if (version != null && !TextUtils.isEmpty(version.download_url)) {
+                    // 有新版本，缓存结果，等MainActivity启动后展示
+                    Log.d("VersionPreload", "预加载到新版本: " + version.app_version
+                            + ", 强制更新: " + (version.is_force == 1));
+                }
+            });
+        } catch (Exception e) {
+            // 版本预检查失败不影响主流程
+            e.printStackTrace();
+            versionPreloaded = true;
+        }
     }
 
     /**

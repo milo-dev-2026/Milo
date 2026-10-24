@@ -1,5 +1,6 @@
 package com.chat.base.utils;
 
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,14 +30,17 @@ public class WKToastUtils {
 
 
     public void showToastSuccess(String msg) {
+        if (TextUtils.isEmpty(msg)) return;
         showToast(msg, 1);
     }
 
     public void showToastFail(String msg) {
+        if (TextUtils.isEmpty(msg)) return;
         showToast(msg, 2);
     }
 
     public void showToastNormal(String msg) {
+        if (TextUtils.isEmpty(msg)) return;
         showToast(msg, 3);
     }
 
@@ -47,12 +51,14 @@ public class WKToastUtils {
      * @param type 1：成功，2：失败，3：普通
      */
     private void showToast(String msg, int type) {
+        if (TextUtils.isEmpty(msg)) return;
         Toast toast = Toast.makeText(WKBaseApplication.getInstance().getContext(), msg, Toast.LENGTH_SHORT);
         toast.setGravity(Gravity.TOP, 0, 400);
         toast.show();
     }
 
     public void showToast(String msg) {
+        if (TextUtils.isEmpty(msg)) return;
         Toast toast = Toast.makeText(WKBaseApplication.getInstance().getContext(), msg, Toast.LENGTH_SHORT);
         toast.setGravity(Gravity.TOP, 0, 400);
         toast.show();

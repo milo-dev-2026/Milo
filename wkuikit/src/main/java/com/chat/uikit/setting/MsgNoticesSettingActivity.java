@@ -1,5 +1,6 @@
 package com.chat.uikit.setting;
 
+import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.text.TextUtils;
 import android.widget.TextView;
@@ -10,6 +11,7 @@ import com.chat.base.config.WKConstants;
 import com.chat.base.entity.UserInfoEntity;
 import com.chat.base.entity.UserInfoSetting;
 import com.chat.base.net.HttpResponseCode;
+import com.chat.base.utils.PermissionHelper;
 import com.chat.base.utils.systembar.WKOSUtils;
 import com.chat.uikit.R;
 import com.chat.uikit.databinding.ActMsgNoticesSetLayoutBinding;
@@ -76,6 +78,12 @@ public class MsgNoticesSettingActivity extends WKBaseActivity<ActMsgNoticesSetLa
 
     @Override
     protected void initListener() {
+        // 新消息通知 - 点击整行跳转系统设置
+        wkVBinding.newMsgNoticeLayout.setOnClickListener(v -> showGoSettingDialog(
+                "新消息通知",
+                "前往系统设置页面开启新消息通知权限，以确保您能及时收到消息提醒。",
+                () -> PermissionHelper.openNotificationSetting(this)));
+
         wkVBinding.newMsgNoticeSwitch.setOnCheckedChangeListener((compoundButton, b) -> {
             if (compoundButton.isPressed()) {
                 userInfoEntity.setting.new_msg_notice = b ? 1 : 0;
@@ -86,6 +94,30 @@ public class MsgNoticesSettingActivity extends WKBaseActivity<ActMsgNoticesSetLa
                 });
             }
         });
+
+        // 通知显示消息详情 - 点击整行跳转系统设置
+        wkVBinding.newMsgNoticeDetailLayout.setOnClickListener(v -> showGoSettingDialog(
+                "通知显示消息详情",
+                "前往系统通知渠道设置页面，可设置通知是否在锁屏时显示消息详情。",
+                () -> WKOSUtils.openChannelSetting(this, WKConstants.newMsgChannelID)));
+
+        wkVBinding.newMsgNoticeDetailSwitch.setOnCheckedChangeListener((compoundButton, b) -> {
+            if (compoundButton.isPressed()) {
+                userInfoEntity.setting.msg_show_detail = b ? 1 : 0;
+                UserModel.getInstance().updateUserSetting("msg_show_detail", userInfoEntity.setting.msg_show_detail, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        WKConfig.getInstance().saveUserInfo(userInfoEntity);
+                    } else showToast(msg);
+                });
+            }
+        });
+
+        // 声音 - 点击整行跳转系统设置
+        wkVBinding.voiceLayout.setOnClickListener(v -> showGoSettingDialog(
+                "通知声音",
+                "前往系统通知渠道设置页面，可自定义通知铃声和声音大小。",
+                () -> WKOSUtils.openChannelSetting(this, WKConstants.newMsgChannelID)));
+
         wkVBinding.voiceSwitch.setOnCheckedChangeListener((compoundButton, b) -> {
             if (compoundButton.isPressed()) {
                 userInfoEntity.setting.voice_on = b ? 1 : 0;
@@ -96,20 +128,17 @@ public class MsgNoticesSettingActivity extends WKBaseActivity<ActMsgNoticesSetLa
                 });
             }
         });
+
+        // 震动 - 点击整行跳转系统设置
+        wkVBinding.shockLayout.setOnClickListener(v -> showGoSettingDialog(
+                "通知震动",
+                "前往系统通知渠道设置页面，可开启或关闭通知震动提醒。",
+                () -> WKOSUtils.openChannelSetting(this, WKConstants.newMsgChannelID)));
+
         wkVBinding.shockSwitch.setOnCheckedChangeListener((compoundButton, b) -> {
             if (compoundButton.isPressed()) {
                 userInfoEntity.setting.shock_on = b ? 1 : 0;
                 UserModel.getInstance().updateUserSetting("shock_on", userInfoEntity.setting.shock_on, (code, msg) -> {
-                    if (code == HttpResponseCode.success) {
-                        WKConfig.getInstance().saveUserInfo(userInfoEntity);
-                    } else showToast(msg);
-                });
-            }
-        });
-        wkVBinding.newMsgNoticeDetailSwitch.setOnCheckedChangeListener((compoundButton, b) -> {
-            if (compoundButton.isPressed()) {
-                userInfoEntity.setting.msg_show_detail = b ? 1 : 0;
-                UserModel.getInstance().updateUserSetting("msg_show_detail", userInfoEntity.setting.msg_show_detail, (code, msg) -> {
                     if (code == HttpResponseCode.success) {
                         WKConfig.getInstance().saveUserInfo(userInfoEntity);
                     } else showToast(msg);
@@ -176,5 +205,25 @@ public class MsgNoticesSettingActivity extends WKBaseActivity<ActMsgNoticesSetLa
             });
         }, hour, minute, true);
         dialog.show();
+    }
+
+    /**
+     * 显示跳转系统设置确认弹窗
+     * @param title 标题
+     * @param message 提示内容
+     * @param onConfirm 确认后执行的操作
+     */
+    private void showGoSettingDialog(String title, String message, Runnable onConfirm) {
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("去设置", (dialog, which) -> {
+                    dialog.dismiss();
+                    if (onConfirm != null) {
+                        onConfirm.run();
+                    }
+                })
+                .setNegativeButton("取消", (dialog, which) -> dialog.dismiss())
+                .show();
     }
 }

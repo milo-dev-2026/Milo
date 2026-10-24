@@ -35,12 +35,14 @@ import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKConversationMsg;
 import com.xinbida.wukongim.entity.WKConversationMsgExtra;
 import com.xinbida.wukongim.entity.WKMsg;
+import com.xinbida.wukongim.entity.WKMsgExtra;
 import com.xinbida.wukongim.entity.WKReminder;
 import com.xinbida.wukongim.entity.WKSyncChannelMsg;
 import com.xinbida.wukongim.entity.WKSyncChat;
 import com.xinbida.wukongim.entity.WKSyncConvMsgExtra;
 import com.xinbida.wukongim.entity.WKSyncExtraMsg;
 import com.xinbida.wukongim.entity.WKSyncMsg;
+import com.chat.uikit.message.entity.WKSyncExtraMsgEntity;
 import com.xinbida.wukongim.interfaces.ISyncChannelMsgBack;
 import com.xinbida.wukongim.interfaces.ISyncConversationChatBack;
 import com.xinbida.wukongim.message.type.WKMsgContentType;
@@ -647,15 +649,18 @@ public class MsgModel extends WKBaseModel {
         jsonObject.put("limit", limit);
         jsonObject.put("pull_mode", pullMode);
         jsonObject.put("device_uuid", WKConstants.getDeviceUUID());
+        android.util.Log.d("ChatHistoryFix", "syncChannelMsg request: channel=" + channelID + " type=" + channelType + " startMsgSeq=" + startMessageSeq + " endMsgSeq=" + endMessageSeq + " limit=" + limit + " pullMode=" + pullMode);
         request(createService(MsgService.class).syncChannelMsg(jsonObject), new IRequestResultListener<>() {
             @Override
             public void onSuccess(WKSyncChannelMsg result) {
+                android.util.Log.d("ChatHistoryFix", "syncChannelMsg response: channel=" + channelID + " type=" + channelType + " resultNull=" + (result == null));
                 iSyncChannelMsgBack.onBack(result);
                 ackDeviceUUID();
             }
 
             @Override
             public void onFail(int code, String msg) {
+                android.util.Log.e("ChatHistoryFix", "syncChannelMsg fail: channel=" + channelID + " code=" + code + " msg=" + msg);
                 iSyncChannelMsgBack.onBack(null);
             }
         });
@@ -750,38 +755,246 @@ public class MsgModel extends WKBaseModel {
     }
 
     public void syncExtraMsg(String channelID, byte channelType, Runnable onComplete) {
+        syncExtraMsg(channelID, channelType, null, onComplete);
+    }
+
+    public interface SyncExtraCallback {
+        void onSyncResult(List<WKSyncExtraMsgEntity> allExtraList);
+    }
+
+    public void syncExtraMsg(String channelID, byte channelType, SyncExtraCallback callback, Runnable onComplete) {
+        // 单聊时，服务端要求传对方uid（服务端内部会拼成双向查询）
+        // 如果channelID是uid@uid格式，需要提取对方uid再传
+        String syncChannelId = channelID;
+        if (channelType == WKChannelType.PERSONAL && channelID != null && channelID.contains("@")) {
+            String myUid = WKConfig.getInstance().getUid();
+            String[] parts = channelID.split("@", 2);
+            if (parts.length == 2) {
+                if (parts[0].equals(myUid)) {
+                    syncChannelId = parts[1]; // 自己在前，对方在后
+                } else {
+                    syncChannelId = parts[0]; // 对方在前，自己在后
+                }
+                android.util.Log.d("WKReceiptDebug", "syncExtraMsg: convert channel_id from '" + channelID.substring(0, Math.min(20, channelID.length())) + "...' to '" + syncChannelId.substring(0, Math.min(20, syncChannelId.length())) + "...' (myUid=" + (myUid != null ? myUid.substring(0, Math.min(10, myUid.length())) : "null") + "...)");
+            }
+        }
+        // 循环同步：服务端按version升序+LIMIT 100，需要循环拉取直到拿完所有数据
+        List<WKSyncExtraMsgEntity> allData = new ArrayList<>();
+        syncExtraMsgLoop(syncChannelId, channelID, channelType, 0, allData, callback, onComplete);
+    }
+
+    private void syncExtraMsgLoop(String syncChannelId, String originalChannelId, byte channelType, long startVersion,
+                                   final List<WKSyncExtraMsgEntity> allData,
+                                   final SyncExtraCallback callback,
+                                   final Runnable onComplete) {
         JSONObject jsonObject = new JSONObject();
-        jsonObject.put("channel_id", channelID);
+        jsonObject.put("channel_id", syncChannelId);
         jsonObject.put("channel_type", channelType);
-        long maxExtraVersion = WKIM.getInstance().getMsgManager().getMsgExtraMaxVersionWithChannel(channelID, channelType);
-        jsonObject.put("extra_version", maxExtraVersion);
-        jsonObject.put("limit", 100);
+        jsonObject.put("version", startVersion);
+        jsonObject.put("limit", 200);
         String deviceUUID = WKConstants.getDeviceUUID();
         jsonObject.put("source", deviceUUID);
-        request(createService(MsgService.class).syncExtraMsg(jsonObject), new IRequestResultListener<>() {
+        final long[] maxVersion = {startVersion};
+        android.util.Log.d("WKReceiptDebug", "syncExtraMsg loop: channel_id=" + syncChannelId + ", startVersion=" + startVersion);
+        request(createService(MsgService.class).syncExtraMsg(jsonObject), new IRequestResultListener<String>() {
             @Override
-            public void onSuccess(List<WKSyncExtraMsg> result) {
-                if (WKReader.isNotEmpty(result)) {
-                    for (WKSyncExtraMsg extra : result) {
-                        android.util.Log.d("WKReceiptDebug",
-                            "syncExtraMsg: " + extra.toString());
+            public void onSuccess(String result) {
+                List<WKSyncExtraMsgEntity> list = null;
+                try {
+                    // 多层兜底解析：兼容各种返回格式
+                    // 支持：直接数组、{items:[...]}、{data:{items:[...]}}、{data:{list:[...]}} 等任意嵌套
+                    list = parseExtraMsgList(result);
+                } catch (Exception e) {
+                    android.util.Log.e("WKReceiptDebug", "syncExtraMsg parse error: " + e.getMessage());
+                }
+                int count = list != null ? list.size() : 0;
+                android.util.Log.d("WKReceiptDebug", "syncExtraMsg batch: count=" + count + ", startVersion=" + startVersion);
+                if (count > 0 && list != null) {
+                    allData.addAll(list);
+                    for (WKSyncExtraMsgEntity extra : list) {
+                        long ver = extra.version > 0 ? extra.version : extra.extra_version;
+                        if (ver > maxVersion[0]) {
+                            maxVersion[0] = ver;
+                        }
+                        // 更新到SDK内存并持久化到数据库，确保下次进入聊天页直接显示
+                        if (!TextUtils.isEmpty(extra.message_id)) {
+                            WKMsg wkMsg = WKIM.getInstance().getMsgManager().getWithMessageID(extra.message_id);
+                            if (wkMsg != null) {
+                                if (wkMsg.remoteExtra == null) {
+                                    wkMsg.remoteExtra = new WKMsgExtra();
+                                }
+                                boolean changed = false;
+                                if (wkMsg.remoteExtra.revoke != extra.revoke) {
+                                    wkMsg.remoteExtra.revoke = extra.revoke;
+                                    changed = true;
+                                }
+                                if (extra.revoker != null && !extra.revoker.equals(wkMsg.remoteExtra.revoker)) {
+                                    wkMsg.remoteExtra.revoker = extra.revoker;
+                                    changed = true;
+                                }
+                                if (wkMsg.remoteExtra.readedCount != extra.readed_count) {
+                                    wkMsg.remoteExtra.readedCount = extra.readed_count;
+                                    changed = true;
+                                }
+                                wkMsg.remoteExtra.readed = extra.readed;
+                                if (changed) {
+                                    // setRefreshMsg第二个参数为true表示持久化到数据库
+                                    WKIM.getInstance().getMsgManager().setRefreshMsg(wkMsg, true);
+                                }
+                            }
+                        }
                     }
-                    WKIM.getInstance().getMsgManager().saveRemoteExtraMsg(new WKChannel(channelID, channelType), result);
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> syncExtraMsg(channelID, channelType, onComplete), 500);
-                } else {
-                    if (onComplete != null) {
-                        new Handler(Looper.getMainLooper()).post(onComplete);
+                    // 服务端LIMIT 100，如果返回了100条，说明还有更多数据，继续同步
+                    if (count >= 100 && maxVersion[0] > startVersion) {
+                        android.util.Log.d("WKReceiptDebug", "syncExtraMsg continue from version=" + maxVersion[0]);
+                        syncExtraMsgLoop(syncChannelId, originalChannelId, channelType, maxVersion[0], allData, callback, onComplete);
+                        return;
                     }
+                }
+                // 同步完成
+                android.util.Log.d("WKReceiptDebug", "syncExtraMsg all done, total=" + allData.size() + ", maxVersion=" + maxVersion[0]);
+                // 保存到SDK数据库（下次进入聊天页直接显示）
+                if (!allData.isEmpty()) {
+                    try {
+                        List<WKSyncExtraMsg> sdkList = new ArrayList<>();
+                        for (WKSyncExtraMsgEntity entity : allData) {
+                            WKSyncExtraMsg sdkExtra = new WKSyncExtraMsg();
+                            // SDK的WKSyncExtraMsg字段可能被混淆了，用反射赋值
+                            setFieldValue(sdkExtra, "message_id", entity.message_id);
+                            setFieldValue(sdkExtra, "messageID", entity.message_id);
+                            setFieldValue(sdkExtra, "channel_id", originalChannelId);
+                            setFieldValue(sdkExtra, "channelID", originalChannelId);
+                            setFieldValue(sdkExtra, "channel_type", (int) channelType);
+                            setFieldValue(sdkExtra, "channelType", (int) channelType);
+                            setFieldValue(sdkExtra, "revoke", entity.revoke);
+                            setFieldValue(sdkExtra, "revoker", entity.revoker);
+                            setFieldValue(sdkExtra, "readed_count", entity.readed_count);
+                            setFieldValue(sdkExtra, "readedCount", entity.readed_count);
+                            setFieldValue(sdkExtra, "readed", entity.readed);
+                            setFieldValue(sdkExtra, "extra_version", entity.extra_version);
+                            setFieldValue(sdkExtra, "extraVersion", entity.extra_version);
+                            sdkList.add(sdkExtra);
+                        }
+                        com.xinbida.wukongim.entity.WKChannel channel =
+                            new com.xinbida.wukongim.entity.WKChannel(originalChannelId, channelType);
+                        WKIM.getInstance().getMsgManager().saveRemoteExtraMsg(channel, sdkList);
+                        android.util.Log.d("WKReceiptDebug", "saveRemoteExtraMsg: saved " + sdkList.size() + " items to DB");
+                    } catch (Exception e) {
+                        android.util.Log.e("WKReceiptDebug", "saveRemoteExtraMsg error: " + e.getMessage());
+                    }
+                }
+                if (callback != null) {
+                    callback.onSyncResult(allData);
+                }
+                if (onComplete != null) {
+                    new Handler(Looper.getMainLooper()).post(onComplete);
                 }
             }
 
             @Override
             public void onFail(int code, String msg) {
+                android.util.Log.d("WKReceiptDebug", "syncExtraMsg onFail: code=" + code + ", msg=" + msg);
+                if (callback != null) {
+                    callback.onSyncResult(allData);
+                }
                 if (onComplete != null) {
                     new Handler(Looper.getMainLooper()).post(onComplete);
                 }
             }
         });
+    }
+
+    // 反射设置字段值（兼容驼峰/蛇形命名）
+    private void setFieldValue(Object obj, String fieldName, Object value) {
+        try {
+            java.lang.reflect.Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(obj, value);
+        } catch (Exception e) {
+            // 字段不存在则忽略
+        }
+    }
+
+    /**
+     * 多层兜底解析消息扩展数组
+     * 支持任意嵌套格式：
+     *   1. 直接数组: [...]
+     *   2. 对象包数组: {"items":[...]} / {"list":[...]} / {"data":[...]}
+     *   3. 多层嵌套: {"data":{"items":[...]}} / {"result":{"list":[...]}}
+     *   4. 含版本号字段: {"last_max_seq":128,"items":[...]}
+     * 只要能找到数组就解析成功，确保服务端改格式不会导致撤回/已读失效
+     */
+    private List<WKSyncExtraMsgEntity> parseExtraMsgList(String json) {
+        if (json == null || json.isEmpty()) return new ArrayList<>();
+        json = json.trim();
+
+        // 情况1：直接是数组
+        if (json.startsWith("[")) {
+            List<WKSyncExtraMsgEntity> list = JSON.parseArray(json, WKSyncExtraMsgEntity.class);
+            return list != null ? list : new ArrayList<>();
+        }
+
+        // 情况2：是对象，递归找数组
+        try {
+            JSONObject root = JSON.parseObject(json);
+            if (root != null) {
+                List<WKSyncExtraMsgEntity> result = findArrayInObject(root, 0);
+                return result != null ? result : new ArrayList<>();
+            }
+        } catch (Exception e) {
+            android.util.Log.e("WKReceiptDebug", "parseExtraMsgList error: " + e.getMessage());
+        }
+
+        return new ArrayList<>();
+    }
+
+    /**
+     * 递归在JSONObject中查找数组
+     * 优先匹配常见数组字段名：items / list / data / records
+     * 找不到就遍历所有字段继续找
+     */
+    private List<WKSyncExtraMsgEntity> findArrayInObject(JSONObject obj, int depth) {
+        if (obj == null || depth > 5) return null; // 最多递归5层，防止死循环
+
+        // 优先尝试常见数组字段名
+        String[] commonArrayKeys = {"items", "list", "data", "records", "rows", "result"};
+        for (String key : commonArrayKeys) {
+            if (obj.containsKey(key)) {
+                Object val = obj.get(key);
+                if (val instanceof com.alibaba.fastjson.JSONArray) {
+                    return JSON.parseArray(val.toString(), WKSyncExtraMsgEntity.class);
+                } else if (val instanceof JSONObject) {
+                    // 值是对象，继续递归找
+                    List<WKSyncExtraMsgEntity> result = findArrayInObject((JSONObject) val, depth + 1);
+                    if (result != null) return result;
+                }
+            }
+        }
+
+        // 常见字段没找到，遍历所有字段找数组
+        for (String key : obj.keySet()) {
+            Object val = obj.get(key);
+            if (val instanceof com.alibaba.fastjson.JSONArray) {
+                // 找到数组了，检查第一个元素是否有消息扩展特征字段
+                com.alibaba.fastjson.JSONArray arr = (com.alibaba.fastjson.JSONArray) val;
+                if (arr.size() > 0) {
+                    Object first = arr.get(0);
+                    if (first instanceof JSONObject) {
+                        JSONObject firstObj = (JSONObject) first;
+                        // 消息扩展至少有 message_id / readed / revoke 其中一个字段
+                        if (firstObj.containsKey("message_id") || firstObj.containsKey("readed")
+                                || firstObj.containsKey("revoke") || firstObj.containsKey("extra_version")) {
+                            return JSON.parseArray(arr.toString(), WKSyncExtraMsgEntity.class);
+                        }
+                    }
+                }
+            } else if (val instanceof JSONObject) {
+                List<WKSyncExtraMsgEntity> result = findArrayInObject((JSONObject) val, depth + 1);
+                if (result != null) return result;
+            }
+        }
+
+        return null;
     }
 
 

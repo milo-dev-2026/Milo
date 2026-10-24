@@ -50,6 +50,7 @@ import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKReminder;
 import com.xinbida.wukongim.entity.WKUIConversationMsg;
+import com.xinbida.wukongim.entity.WKMsg;
 import com.xinbida.wukongim.message.type.WKConnectReason;
 import com.xinbida.wukongim.message.type.WKConnectStatus;
 
@@ -401,23 +402,30 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             if (msg == null) return;
             for (int i = 0, size = chatConversationAdapter.getData().size(); i < size; i++) {
                 if (chatConversationAdapter.getData().get(i).uiConversationMsg.channelID.equals(msg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelType == msg.channelType && chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg() != null && (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().clientSeq == msg.clientSeq || chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().clientMsgNO.equals(msg.clientMsgNO))) {
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().status != msg.status || chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.readedCount != msg.remoteExtra.readedCount) {
-                        chatConversationAdapter.getData().get(i).isRefreshStatus = true;
+                    WKMsg oldMsg = chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg();
+                    // 安全检查：如果旧消息的remoteExtra为null，用新消息的替换
+                    if (oldMsg.remoteExtra == null && msg.remoteExtra != null) {
+                        oldMsg.remoteExtra = msg.remoteExtra;
                     }
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.revoke != msg.remoteExtra.revoke) {
-                        chatConversationAdapter.getData().get(i).isResetContent = true;
+                    if (oldMsg.remoteExtra != null && msg.remoteExtra != null) {
+                        if (oldMsg.status != msg.status || oldMsg.remoteExtra.readedCount != msg.remoteExtra.readedCount) {
+                            chatConversationAdapter.getData().get(i).isRefreshStatus = true;
+                        }
+                        if (oldMsg.remoteExtra.revoke != msg.remoteExtra.revoke) {
+                            chatConversationAdapter.getData().get(i).isResetContent = true;
+                        }
+                        if (oldMsg.remoteExtra.editedAt != msg.remoteExtra.editedAt) {
+                            oldMsg.remoteExtra.editedAt = msg.remoteExtra.editedAt;
+                            oldMsg.remoteExtra.contentEdit = msg.remoteExtra.contentEdit;
+                            WKIMUtils.getInstance().resetMsgProhibitWord(oldMsg);
+                        }
+                        oldMsg.remoteExtra.revoker = msg.remoteExtra.revoker;
+                        oldMsg.remoteExtra.revoke = msg.remoteExtra.revoke;
+                        oldMsg.remoteExtra.unreadCount = msg.remoteExtra.unreadCount;
+                        oldMsg.remoteExtra.readedCount = msg.remoteExtra.readedCount;
                     }
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().status = msg.status;
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.editedAt != msg.remoteExtra.editedAt) {
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.editedAt = msg.remoteExtra.editedAt;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.contentEdit = msg.remoteExtra.contentEdit;
-                        WKIMUtils.getInstance().resetMsgProhibitWord(chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg());
-                    }
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.revoker = msg.remoteExtra.revoker;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.revoke = msg.remoteExtra.revoke;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.unreadCount = msg.remoteExtra.unreadCount;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().remoteExtra.readedCount = msg.remoteExtra.readedCount;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().messageID = msg.messageID;
+                    oldMsg.status = msg.status;
+                    oldMsg.messageID = msg.messageID;
                     refreshIds.add(i);
                     break;
                 }

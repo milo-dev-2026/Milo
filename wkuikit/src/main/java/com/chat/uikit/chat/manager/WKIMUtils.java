@@ -55,6 +55,7 @@ import com.xinbida.wukongim.entity.WKChannelMember;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKConversationMsg;
 import com.xinbida.wukongim.entity.WKMsg;
+import com.xinbida.wukongim.entity.WKMsgExtra;
 import com.xinbida.wukongim.entity.WKUIConversationMsg;
 import com.xinbida.wukongim.message.type.WKSendMsgResult;
 import com.xinbida.wukongim.message.type.WKConnectStatus;
@@ -222,7 +223,7 @@ public class WKIMUtils {
         WKIM.getInstance().getMsgManager().addOnSyncChannelMsgListener((channelID, channelType, startMessageSeq, endMessageSeq, limit, pullMode, iSyncChannelMsgBack) -> {
             // 增大同步消息数量限制，确保能拉取完整历史记录
             int syncLimit = Math.max(limit, 200);
-            android.util.Log.d("ChatHistoryFix", "syncChannelMsg: channel=" + channelID + " original limit=" + limit + ", adjusted to=" + syncLimit + " pullMode=" + pullMode);
+            android.util.Log.d("ChatHistoryFix", "syncChannelMsg: channel=" + channelID + " type=" + channelType + " startMessageSeq=" + startMessageSeq + " endMessageSeq=" + endMessageSeq + " limit=" + limit + " adjusted=" + syncLimit + " pullMode=" + pullMode);
             MsgModel.getInstance().syncChannelMsg(channelID, channelType, startMessageSeq, endMessageSeq, syncLimit, pullMode, iSyncChannelMsgBack);
         });
         //新消息监听
@@ -435,7 +436,10 @@ public class WKIMUtils {
     }
 
     public WKUIChatMsgItemEntity msg2UiMsg(IConversationContext context, WKMsg msg, int memberCount, boolean showNickName, boolean isChoose) {
-        if (msg.remoteExtra.readedCount == 0) {
+        if (msg.remoteExtra != null && msg.remoteExtra.readedCount == 0) {
+            msg.remoteExtra.unreadCount = memberCount - 1;
+        } else if (msg.remoteExtra == null) {
+            msg.remoteExtra = new WKMsgExtra();
             msg.remoteExtra.unreadCount = memberCount - 1;
         }
         if (msg.type == WKContentType.WK_TEXT) {
