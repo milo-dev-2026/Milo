@@ -232,6 +232,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private final Handler extraSyncHandler = new Handler(Looper.getMainLooper());
     private boolean isExtraDataChanged = false;
     private int hiddenPageRetryCount = 0;
+    // 原始消息（含被隐藏的系统通知）中最早的一条 orderSeq，用于判断是否已同步到顶
+    private long rawEarliestOrderSeq = 0;
     private final Runnable extraSyncRunnable = new Runnable() {
         @Override
         public void run() {
@@ -1440,6 +1442,19 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 return Long.compare(a.orderSeq, b.orderSeq);
             });
         }
+        // 记录原始最早 orderSeq（含被隐藏的系统通知），自动同步据此判断是否到顶
+        if (WKReader.isNotEmpty(msgList)) {
+            for (WKMsg msg : msgList) {
+                if (msg != null && msg.orderSeq > 0
+                        && msg.type != WKContentType.emptyView
+                        && msg.type != WKContentType.spanEmptyView
+                        && msg.type != WKContentType.msgPromptTime) {
+                    if (rawEarliestOrderSeq == 0 || msg.orderSeq < rawEarliestOrderSeq) {
+                        rawEarliestOrderSeq = msg.orderSeq;
+                    }
+                }
+            }
+        }
         // 指定群不展示系统通知、撤回提示、截图提示
         if (HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) && channelType == WKChannelType.GROUP && WKReader.isNotEmpty(msgList)) {
             List<WKMsg> visibleList = new ArrayList<>(msgList.size());
@@ -1982,10 +1997,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: realFirstOrderSeq=" + realFirstOrderSeq + " total synced=" + autoSyncedMsgCount + " retry=" + autoSyncRetryCount);
 
-        if (realFirstOrderSeq <= 1000) {
+        boolean reachedEarliest = realFirstOrderSeq <= 1000
+                || (rawEarliestOrderSeq > 0 && rawEarliestOrderSeq <= 1000);
+        if (reachedEarliest) {
             isAutoSyncingHistory = false;
+            isRefreshLoading = false;
             markSyncCompleted();
-            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + realFirstOrderSeq + "), completed! total=" + autoSyncedMsgCount);
+            android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + realFirstOrderSeq + ", raw=" + rawEarliestOrderSeq + "), completed! total=" + autoSyncedMsgCount);
             return;
         }
 
@@ -2075,12 +2093,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      * 处理自动同步返回空的情况（可能是到顶了，也可能是失败）
      */
     private void handleAutoSyncEmpty(long currentFirstOrderSeq) {
-        if (currentFirstOrderSeq > 1000 && autoSyncRetryCount < MAX_AUTO_SYNC_RETRY) {
+        if (currentFirstOrderSeq > 1000 && autoSyncRetryCount < 1) {
             autoSyncRetryCount++;
             android.util.Log.d("ChatHistoryFix", "autoSyncHistory: empty result, retry " + autoSyncRetryCount + "/" + MAX_AUTO_SYNC_RETRY);
             new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 500);
         } else {
             isAutoSyncingHistory = false;
+            isRefreshLoading = false;
             isCanRefresh = false;
             if (autoSyncRetryCount >= MAX_AUTO_SYNC_RETRY) {
                 android.util.Log.d("ChatHistoryFix", "autoSyncHistory: max retries reached, stopped! total=" + autoSyncedMsgCount);
@@ -3217,7 +3236,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                                 chatAdapter.notifyBackground(previousMsgIndex);
                             }
                         }
-                        if (isShowHistory || redDot > 0) {
+                        if (isShowHistory || redDot > 0 || wkVBinding.recyclerView.canScrollVertically(1)) {
                             redDot += 1;
                             showUnReadCountView();
                             wkVBinding.chatUnreadLayout.newMsgLayout.post(() -> CommonAnim.getInstance().showOrHide(wkVBinding.chatUnreadLayout.newMsgLayout, redDot > 0, true, false));
