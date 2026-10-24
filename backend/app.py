@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import time
 import random
@@ -4811,6 +4811,157 @@ def message_readed():
     except Exception as e:
         logger.error(f"message/readed 转发异常: {e}")
         return make_error(f"已读上报失败: {str(e)}", 500)
+def _get_message_tables(cursor):
+    """获取数据库中所有消息分表名"""
+    cursor.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema=%s AND (table_name='message' OR table_name REGEXP '^message[0-9]+$') "
+        "ORDER BY table_name",
+        (Config.MYSQL_DATABASE,)
+    )
+    tables = [row['table_name'] for row in cursor.fetchall()]
+    if not tables:
+        tables = ['message']
+    return tables
+
+
+@app.route('/v1/message/channel/sync', methods=['POST'])
+def message_channel_sync():
+    """消息频道同步接口 - 修复分表查询问题"""
+    uid = get_current_uid()
+    if not uid:
+        return make_error("登录已过期，请重新登录", 401)
+
+    try:
+        data = request.get_json(silent=True) or {}
+        channel_id = data.get('channel_id', '')
+        channel_type = int(data.get('channel_type', 2))
+        start_message_seq = int(data.get('start_message_seq', 0))
+        end_message_seq = int(data.get('end_message_seq', 0))
+        limit = int(data.get('limit', 100))
+        pull_mode = int(data.get('pull_mode', 0))
+
+        logger.info(f"message/channel/sync: channel={channel_id} type={channel_type} start={start_message_seq} end={end_message_seq} limit={limit} pull_mode={pull_mode}")
+
+        if not channel_id:
+            return make_error("channel_id不能为空", 400)
+
+        limit = min(limit, 500)
+
+        import pymysql
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE, charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                tables = _get_message_tables(cursor)
+                logger.info(f"message/channel/sync: found tables={tables}")
+
+                union_parts = []
+                for table in tables:
+                    union_parts.append(
+                        f"SELECT message_id, message_seq, client_msg_no, from_uid, channel_id, channel_type, "
+                        f"`timestamp`, payload, is_deleted, revoke, revoker, voice_status, `setting`, `signal`, "
+                        f"expire, extra_version, unread_count, readed_count, readed, receipt "
+                        f"FROM `{table}` WHERE channel_id=%s AND channel_type=%s"
+                    )
+
+                union_sql = " UNION ALL ".join(union_parts)
+                params = []
+                for _ in tables:
+                    params.extend([channel_id, channel_type])
+
+                if pull_mode == 0:
+                    if start_message_seq > 0:
+                        union_sql += " AND message_seq <= %s"
+                        params.append(start_message_seq)
+                    union_sql += " ORDER BY message_seq DESC LIMIT %s"
+                    params.append(limit + 1)
+                else:
+                    union_sql += " AND message_seq >= %s"
+                    params.append(start_message_seq)
+                    if end_message_seq > 0:
+                        union_sql += " AND message_seq <= %s"
+                        params.append(end_message_seq)
+                    union_sql += " ORDER BY message_seq ASC LIMIT %s"
+                    params.append(limit + 1)
+
+                full_sql = f"SELECT * FROM ({union_sql}) AS combined"
+                if pull_mode == 0:
+                    full_sql += " ORDER BY message_seq DESC LIMIT %s"
+                else:
+                    full_sql += " ORDER BY message_seq ASC LIMIT %s"
+                params.append(limit + 1)
+
+                logger.info(f"message/channel/sync SQL: {full_sql}")
+                cursor.execute(full_sql, params)
+                rows = cursor.fetchall()
+
+                has_more = len(rows) > limit
+                if has_more:
+                    rows = rows[:limit]
+
+                if pull_mode == 0:
+                    rows.reverse()
+
+                messages = []
+                min_seq = 0
+                max_seq = 0
+                for row in rows:
+                    msg_seq = row.get('message_seq', 0)
+                    if min_seq == 0 or msg_seq < min_seq:
+                        min_seq = msg_seq
+                    if msg_seq > max_seq:
+                        max_seq = msg_seq
+
+                    import json as _json
+                    payload = {}
+                    try:
+                        payload = _json.loads(row['payload']) if row['payload'] else {}
+                    except Exception:
+                        pass
+
+                    messages.append({
+                        "message_id": str(row.get('message_id', '')),
+                        "message_seq": msg_seq,
+                        "client_msg_no": str(row.get('client_msg_no', '') or ''),
+                        "from_uid": str(row.get('from_uid', '') or ''),
+                        "channel_id": str(row.get('channel_id', '')),
+                        "channel_type": row.get('channel_type', 2),
+                        "timestamp": int(row.get('timestamp', 0) or 0),
+                        "payload": payload,
+                        "is_deleted": row.get('is_deleted', 0),
+                        "revoke": row.get('revoke', 0),
+                        "revoker": str(row.get('revoker', '') or ''),
+                        "voice_status": row.get('voice_status', 0),
+                        "setting": row.get('setting', 0),
+                        "signal": row.get('signal', 0),
+                        "expire": row.get('expire', 0),
+                        "extra_version": row.get('extra_version', 0),
+                        "unread_count": row.get('unread_count', 0),
+                        "readed_count": row.get('readed_count', 0),
+                        "readed": row.get('readed', 0),
+                        "receipt": row.get('receipt', 0),
+                    })
+
+                result = {
+                    "messages": messages,
+                    "more": 1 if has_more else 0,
+                    "min_message_seq": min_seq,
+                    "max_message_seq": max_seq,
+                }
+                logger.info(f"message/channel/sync result: count={len(messages)} more={has_more} seq_range=[{min_seq},{max_seq}]")
+                return jsonify(result)
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.error(f"message/channel/sync 异常: {e}", exc_info=True)
+        return make_error(f"同步失败: {str(e)}", 500)
 
 
 # ==================== 消息搜索 ====================
