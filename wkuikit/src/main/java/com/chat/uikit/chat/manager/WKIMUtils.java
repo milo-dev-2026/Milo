@@ -221,8 +221,8 @@ public class WKIMUtils {
         });
         //监听同步频道会话 - 增大单频道消息同步数量，支持全量拉取历史消息
         WKIM.getInstance().getMsgManager().addOnSyncChannelMsgListener((channelID, channelType, startMessageSeq, endMessageSeq, limit, pullMode, iSyncChannelMsgBack) -> {
-            // 增大同步消息数量限制，确保能拉取完整历史记录
-            int syncLimit = Math.max(limit, 200);
+            // 按实际分页大小同步，避免每页多拉一倍消息导致翻页卡顿
+            int syncLimit = Math.max(limit, 100);
             android.util.Log.d("ChatHistoryFix", "syncChannelMsg: channel=" + channelID + " type=" + channelType + " startMessageSeq=" + startMessageSeq + " endMessageSeq=" + endMessageSeq + " limit=" + limit + " adjusted=" + syncLimit + " pullMode=" + pullMode);
             MsgModel.getInstance().syncChannelMsg(channelID, channelType, startMessageSeq, endMessageSeq, syncLimit, pullMode, iSyncChannelMsgBack);
         });

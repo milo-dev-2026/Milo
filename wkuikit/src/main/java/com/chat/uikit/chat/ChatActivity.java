@@ -1485,6 +1485,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         List<WKUIChatMsgItemEntity> list = new ArrayList<>();
         if (WKReader.isNotEmpty(msgList)) {
             long pre_msg_time = chatAdapter.getLastTimeMsg();
+            // 置顶消息只读一次，避免每条消息都读 SharedPreferences
+            String pinnedMsgKey = String.format("pinned_msg_%s_%s", channelId, channelType);
+            String pinnedClientMsgNO = WKSharedPreferencesUtil.getInstance().getSPWithUID(pinnedMsgKey);
             for (int i = 0, size = msgList.size(); i < size; i++) {
 
                 if (WKTimeUtils.getInstance().isNeedShowTimeDivider(msgList.get(i).timestamp, pre_msg_time) && msgList.get(i).type != WKContentType.emptyView && msgList.get(i).type != WKContentType.spanEmptyView) {
@@ -1504,8 +1507,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         uiMsg.isPinned = msgList.get(i).remoteExtra.isPinned;
                     }
                 }
-                String pinKey = String.format("pinned_msg_%s_%s", channelId, channelType);
-                String pinnedClientMsgNO = WKSharedPreferencesUtil.getInstance().getSPWithUID(pinKey);
                 if (!TextUtils.isEmpty(pinnedClientMsgNO)
                         && msgList.get(i).clientMsgNO != null
                         && msgList.get(i).clientMsgNO.equals(pinnedClientMsgNO)) {
@@ -1543,6 +1544,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             restorePinnedBanner();
         } else {
             chatAdapter.resetData(list);
+            // 预建已存在消息集合，避免逐条 O(n) 扫描导致 O(n^2)
+            java.util.Set<String> existMsgNoSet = new java.util.HashSet<>();
+            for (int i = 0, size = chatAdapter.getData().size(); i < size; i++) {
+                WKMsg existMsg = chatAdapter.getData().get(i).wkMsg;
+                if (existMsg != null && !TextUtils.isEmpty(existMsg.clientMsgNO)) {
+                    existMsgNoSet.add(existMsg.clientMsgNO);
+                }
+            }
             if (pullMode == 1) {
                 // 去除与已有数据重复的消息（时间戳跟随消息：消息被去重则时间戳也去掉）
                 List<WKUIChatMsgItemEntity> filteredList = new ArrayList<>();
@@ -1554,7 +1563,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         pendingTimeItem = list.get(i);
                         continue;
                     }
-                    if (wk != null && !chatAdapter.isExist(wk.clientMsgNO)) {
+                    if (wk != null && !existMsgNoSet.contains(wk.clientMsgNO)) {
                         // 消息需要保留，先加入前面的时间戳
                         if (pendingTimeItem != null) {
                             filteredList.add(pendingTimeItem);
@@ -1581,7 +1590,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         pendingTimeItem = list.get(i);
                         continue;
                     }
-                    if (wk != null && !chatAdapter.isExist(wk.clientMsgNO)) {
+                    if (wk != null && !existMsgNoSet.contains(wk.clientMsgNO)) {
                         // 消息需要保留，先加入前面的时间戳
                         if (pendingTimeItem != null) {
                             filteredList.add(pendingTimeItem);

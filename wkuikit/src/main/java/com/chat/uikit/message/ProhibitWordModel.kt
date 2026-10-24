@@ -19,9 +19,12 @@ class ProhibitWordModel private constructor() : WKBaseModel() {
     }
 
     private var words: ArrayList<ProhibitWord> = ArrayList()
+    private var wordsLoaded = false
+
     fun getAll(): List<ProhibitWord> {
-        if (words.isEmpty()) {
+        if (!wordsLoaded) {
             words = ProhibitWordDB.instance.getAll()
+            wordsLoaded = true
         }
         return words
     }
@@ -34,7 +37,7 @@ class ProhibitWordModel private constructor() : WKBaseModel() {
                 override fun onSuccess(result: List<ProhibitWord>) {
                     if (WKReader.isNotEmpty(result)) {
                         ProhibitWordDB.instance.save(result)
-                        words.clear()
+                        wordsLoaded = false
                         getAll()
                         val list: List<Any>? = EndpointManager.getInstance()
                             .invokes(EndpointCategory.refreshProhibitWord, 1)
