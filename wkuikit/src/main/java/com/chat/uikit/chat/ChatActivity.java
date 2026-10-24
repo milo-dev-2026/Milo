@@ -1431,11 +1431,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 return Long.compare(a.orderSeq, b.orderSeq);
             });
         }
-        // 指定群不展示系统通知消息
+        // 指定群不展示系统通知、撤回提示、截图提示
         if (HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId) && channelType == WKChannelType.GROUP && WKReader.isNotEmpty(msgList)) {
             List<WKMsg> visibleList = new ArrayList<>(msgList.size());
             for (WKMsg msg : msgList) {
-                if (!WKContentType.isSystemMsg(msg.type)) {
+                if (!isHideSystemNotifyMsg(msg)) {
                     visibleList.add(msg);
                 }
             }
@@ -3321,10 +3321,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      * 是否为需要隐藏的系统通知消息（仅针对指定群）
      */
     private boolean isHideSystemNotifyMsg(WKMsg msg) {
-        return msg != null
-                && HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId)
-                && channelType == WKChannelType.GROUP
-                && WKContentType.isSystemMsg(msg.type);
+        if (msg == null
+                || !HIDE_SYSTEM_NOTIFY_CHANNEL_ID.equals(channelId)
+                || channelType != WKChannelType.GROUP) {
+            return false;
+        }
+        // 系统通知类（入群/退群/管理员变更/群信息变更等）、撤回提示、截图提示
+        return WKContentType.isSystemMsg(msg.type)
+                || msg.type == WKContentType.revoke
+                || msg.type == WKContentType.screenshot;
     }
 
     private synchronized void refreshMsg(WKMsg wkMsg) {
