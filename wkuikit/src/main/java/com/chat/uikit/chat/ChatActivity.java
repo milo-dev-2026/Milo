@@ -1370,8 +1370,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                             }
                         }
                     }
-                    // 如果还有更早的消息，启动同步
-                    if (realFirstOrderSeq > 1) {
+                    // 如果还有更早的消息，启动同步（orderSeq = messageSeq * 1000，到顶时最小为1000）
+                    if (realFirstOrderSeq > 1000) {
                         isAutoSyncingHistory = true;
                         autoSyncedMsgCount = 0;
                         autoSyncRetryCount = 0;
@@ -1912,7 +1912,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         android.util.Log.d("ChatHistoryFix", "autoSyncMoreHistory: realFirstOrderSeq=" + realFirstOrderSeq + " total synced=" + autoSyncedMsgCount + " retry=" + autoSyncRetryCount);
 
-        if (realFirstOrderSeq <= 1) {
+        if (realFirstOrderSeq <= 1000) {
             isAutoSyncingHistory = false;
             markSyncCompleted();
             android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached earliest message (orderSeq=" + realFirstOrderSeq + "), completed! total=" + autoSyncedMsgCount);
@@ -1986,7 +1986,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     isAutoSyncingHistory = false;
                     markSyncCompleted();
                     android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached max limit! total=" + autoSyncedMsgCount);
-                } else if (newFirstOrderSeq <= 1) {
+                } else if (newFirstOrderSeq <= 1000) {
                     isAutoSyncingHistory = false;
                     markSyncCompleted();
                     android.util.Log.d("ChatHistoryFix", "autoSyncHistory: reached top! total=" + autoSyncedMsgCount);
@@ -2005,7 +2005,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
      * 处理自动同步返回空的情况（可能是到顶了，也可能是失败）
      */
     private void handleAutoSyncEmpty(long currentFirstOrderSeq) {
-        if (currentFirstOrderSeq > 100 && autoSyncRetryCount < MAX_AUTO_SYNC_RETRY) {
+        if (currentFirstOrderSeq > 1000 && autoSyncRetryCount < MAX_AUTO_SYNC_RETRY) {
             autoSyncRetryCount++;
             android.util.Log.d("ChatHistoryFix", "autoSyncHistory: empty result, retry " + autoSyncRetryCount + "/" + MAX_AUTO_SYNC_RETRY);
             new Handler(Looper.getMainLooper()).postDelayed(() -> autoSyncMoreHistory(), 500);
