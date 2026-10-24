@@ -2119,6 +2119,40 @@ def search_user():
         return make_error("搜索失败，请稍后重试")
 
 
+@app.route('/v1/groups/<group_no>/qrcode', methods=['GET'])
+def group_qrcode(group_no):
+    """群二维码：使用固定编码生成永久有效的群二维码（不依赖临时邀请码）"""
+    uid = get_current_uid()
+    if not uid:
+        return make_error("登录已过期，请重新登录", 401)
+    group_no = (group_no or '').strip()
+    if not group_no:
+        return make_error("群不存在")
+    try:
+        conn = pymysql.connect(
+            host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DATABASE, charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT group_no FROM `group` WHERE group_no=%s LIMIT 1", (group_no,))
+                if not cursor.fetchone():
+                    return make_error("群不存在")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"获取群二维码失败: {e}", exc_info=True)
+        return make_error("获取群二维码失败")
+    host = request.headers.get('X-Forwarded-Host') or request.headers.get('Host') or '43.133.39.170:8090'
+    return make_success({
+        'day': 0,
+        'expire': '永久有效',
+        'qrcode': f"http://{host}/v1/qrcode/g{group_no}",
+    })
+
+
 @app.route('/v1/user/qrcode', methods=['GET'])
 def user_qrcode():
     """获取用户二维码数据"""
@@ -2166,6 +2200,32 @@ def user_qrcode():
 @app.route('/v1/qrcode/<path:short_no>', methods=['GET'])
 def scan_qrcode(short_no):
     """扫描二维码：先解析个人二维码，若不存在则转发到8091处理群二维码。"""
+    # 永久群二维码：编码为 g + group_no，无过期时间
+    if len(short_no) == 33 and short_no[:1] == 'g' and all(c in '0123456789abcdefABCDEF' for c in short_no[1:]):
+        gid = short_no[1:]
+        try:
+            conn = pymysql.connect(
+                host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DATABASE, charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT group_no FROM `group` WHERE group_no=%s LIMIT 1", (gid,))
+                    if not cursor.fetchone():
+                        return make_error('群不存在')
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f'群二维码解析失败: {e}', exc_info=True)
+            return make_error('二维码无效或已过期')
+        return make_success({
+            'forward': 'native',
+            'type': 'group',
+            'data': {'group_no': gid},
+        })
+
     short_no = (short_no or '').strip('/')
     if not short_no:
         return make_error('二维码无效')
