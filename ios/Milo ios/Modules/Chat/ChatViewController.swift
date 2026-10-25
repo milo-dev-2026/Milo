@@ -1701,7 +1701,7 @@ final class PendingMediaMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
     private let thumbnailView = UIImageView()
-    private let maskView = UIView()
+    private let dimOverlay = UIView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
     private let playIcon = UIImageView()
@@ -1732,8 +1732,8 @@ final class PendingMediaMessageCell: UITableViewCell {
         thumbnailView.clipsToBounds = true
         thumbnailView.isUserInteractionEnabled = false
 
-        maskView.backgroundColor = UIColor.black.withAlphaComponent(0.35)
-        maskView.isHidden = true
+        dimOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        dimOverlay.isHidden = true
 
         spinner.color = .white
         spinner.hidesWhenStopped = true
@@ -1762,13 +1762,13 @@ final class PendingMediaMessageCell: UITableViewCell {
         senderNameLabel.textColor = .secondaryLabel
         senderNameLabel.isHidden = true
 
-        bubbleView.addSubviews(thumbnailView, maskView, playIcon, spinner, statusLabel)
+        bubbleView.addSubviews(thumbnailView, dimOverlay, playIcon, spinner, statusLabel)
         contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
 
         thumbnailView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-        maskView.snp.makeConstraints { make in
+        dimOverlay.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
         playIcon.snp.makeConstraints { make in
@@ -1817,7 +1817,7 @@ final class PendingMediaMessageCell: UITableViewCell {
         }
 
         let failed = message.status == -1
-        maskView.isHidden = !failed
+        dimOverlay.isHidden = !failed
         statusLabel.isHidden = !failed
         playIcon.isHidden = failed || message.type != .video
         if failed {
