@@ -477,6 +477,13 @@ extension IMManager: WKChatManagerDelegate {
     func onRecvMessages(_ message: WKMessage!, left: Int) {
         guard let wkMsg = message else { return }
 
+        // 入群申请系统消息（type=1009，对齐 Android WKContentType.approveGroupMember）
+        if Int(wkMsg.content.realContentType) == 1009 {
+            if let dict = wkMsg.content.contentDict as? [String: Any] {
+                FriendApplyStore.shared.saveGroupApply(dict)
+            }
+        }
+
         let msg = convertWKMessageToMessage(wkMsg)
 
         DispatchQueue.main.async {

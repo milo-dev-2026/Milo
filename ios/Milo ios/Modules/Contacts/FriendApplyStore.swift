@@ -38,6 +38,9 @@ final class FriendApplyStore {
             updated.avatar = apply.avatar ?? item.avatar
             updated.token = apply.token
             updated.remark = apply.remark
+            updated.type = apply.type
+            updated.groupNo = apply.groupNo
+            updated.groupName = apply.groupName
             updated.status = 0
             list.insert(updated, at: 0)
         } else {
@@ -61,22 +64,32 @@ final class FriendApplyStore {
     }
 
     // MARK: 解析 CMD 参数
-    /// Android NewFriendEntity: apply_uid / apply_name / token / remark / type
+    /// Android NewFriendEntity: apply_uid / apply_name / token / remark / type / group_no / group_name
     func saveFromCMD(_ param: [String: Any]) {
         let uid = (param["apply_uid"] as? String) ?? ""
         guard !uid.isEmpty else { return }
-        // type: 0 好友申请 1 入群申请；iOS 暂不支持入群申请审批，这里只处理好友申请
+        // type: 0 好友申请 1 入群申请（与 Android 一致，入群申请也入库展示）
         let type = (param["type"] as? NSNumber)?.intValue ?? (param["type"] as? Int) ?? 0
-        guard type == 0 else { return }
         let apply = FriendApply(
             uid: uid,
             name: (param["apply_name"] as? String) ?? "",
             avatar: param["apply_avatar"] as? String,
             remark: (param["remark"] as? String) ?? "",
             status: 0,
-            token: (param["token"] as? String) ?? ""
+            token: (param["token"] as? String) ?? "",
+            type: type,
+            groupNo: (param["group_no"] as? String) ?? "",
+            groupName: (param["group_name"] as? String) ?? ""
         )
         upsert(apply)
+    }
+
+    // MARK: 入群申请（contentType=1009 的消息，对齐 Android approveGroupMember）
+    /// Android GroupModel.saveGroupApplyMsg：解析后强制 type=1 入库
+    func saveGroupApply(_ param: [String: Any]) {
+        var p = param
+        p["type"] = 1
+        saveFromCMD(p)
     }
 
     private func save(_ list: [FriendApply]) {

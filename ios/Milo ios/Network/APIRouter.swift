@@ -109,6 +109,9 @@ enum APIRouter: URLRequestConvertible {
     case removeBlackList(uid: String)
     case complaint(uid: String, reason: String)
     case rejectFriendApply(uid: String)
+    // 入群申请审批（对齐 Android GroupModel.approveGroupApply / rejectGroupApply）
+    case approveGroupApply(groupId: String, uid: String, token: String)
+    case rejectGroupApply(groupId: String, uid: String, token: String, remark: String)
     case getGroupQrCode(groupId: String)
     case updateGroupSetting(groupId: String, key: String, value: Int)
     case updateGroupSettingString(groupId: String, key: String, value: String)
@@ -369,6 +372,10 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "reason": reason])
         case let .rejectFriendApply(uid):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
+        case let .approveGroupApply(groupId, uid, token):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_no": groupId, "uid": uid, "token": token])
+        case let .rejectGroupApply(groupId, uid, token, remark):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_no": groupId, "uid": uid, "token": token, "remark": remark])
         case .updateGroupSetting(let groupId, let key, let value):
             request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
         case .updateGroupSettingString(let groupId, let key, let value):
@@ -478,6 +485,8 @@ enum APIRouter: URLRequestConvertible {
         case .removeBlackList(let uid): return "/v1/user/blacklist/\(uid)"
         case .complaint: return "/v1/complaint"
         case .rejectFriendApply: return "/v1/friends/reject"
+        case .approveGroupApply: return "/v1/group/apply/approve"
+        case .rejectGroupApply: return "/v1/group/apply/reject"
         case .getGroupQrCode(let groupId): return "/v1/groups/\(groupId)/qrcode"
         case .updateGroupSetting(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         case .updateGroupSettingString(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"

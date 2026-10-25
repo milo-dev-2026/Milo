@@ -84,7 +84,15 @@ class NewFriendsViewController: UIViewController {
     private func acceptApply(_ apply: FriendApply) {
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.acceptFriendApply(token: apply.token ?? ""))
+                let isGroupApply = (apply.type ?? 0) == 1
+                let response: [String: Any]
+                if isGroupApply {
+                    // 入群申请 - 通过（对齐 Android approveGroupApply）
+                    response = try await APIClient.shared.requestRaw(.approveGroupApply(groupId: apply.groupNo ?? "", uid: apply.uid, token: apply.token ?? ""))
+                } else {
+                    // 好友申请 - 通过（对齐 Android agreeFriendApply）
+                    response = try await APIClient.shared.requestRaw(.acceptFriendApply(token: apply.token ?? ""))
+                }
                 let status = response["status"] as? Int
                 if status == nil || status == 200 {
                     AppUtility.showToast("已同意")
@@ -101,20 +109,33 @@ class NewFriendsViewController: UIViewController {
     }
 
     private func rejectApply(_ apply: FriendApply) {
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.rejectFriendApply(uid: apply.uid))
-                let status = response["status"] as? Int
-                if status == nil || status == 200 {
-                    AppUtility.showToast("已拒绝")
-                    loadData()
-                } else {
-                    AppUtility.showToast(response["msg"] as? String ?? "操作失败")
-                }
-            } catch {
-                AppUtility.showToast("操作失败")
-            }
+        // 拒绝仅用于入群申请（Android 好友申请不显示拒绝按钮），且需要输入拒绝备注
+        guard (apply.type ?? 0) == 1 else { return }
+        let alert = UIAlertController(title: "拒绝", message: nil, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "请输入拒绝备注"
         }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            let remark = alert.textFields?.first?.text ?? ""
+            Task {
+                do {
+                    let response = try await APIClient.shared.requestRaw(.rejectGroupApply(groupId: apply.groupNo ?? "", uid: apply.uid, token: apply.token ?? "", remark: remark))
+                    let status = response["status"] as? Int
+                    if status == nil || status == 200 {
+                        AppUtility.showToast("已拒绝")
+                        FriendApplyStore.shared.markStatus(uid: apply.uid, status: 2)
+                        self.loadData()
+                    } else {
+                        AppUtility.showToast(response["msg"] as? String ?? "操作失败")
+                    }
+                } catch {
+                    AppUtility.showToast("操作失败")
+                }
+            }
+        })
+        present(alert, animated: true)
     }
 }
 
@@ -269,17 +290,25 @@ class FriendApplyCell: UITableViewCell {
     func configure(with apply: FriendApply) {
         nameLabel.text = apply.name
 
+        // 与 Android 一致：remark 为空时显示默认文案；入群申请补充群名
         let remark = apply.remark ?? ""
-        remarkLabel.text = remark
-        remarkLabel.isHidden = remark.isEmpty
+        if !remark.isEmpty {
+            remarkLabel.text = remark
+        } else if (apply.type ?? 0) == 1 {
+            let groupName = apply.groupName ?? ""
+            remarkLabel.text = groupName.isEmpty ? "申请加入群聊" : "申请加入群聊「\(groupName)」"
+        } else {
+            remarkLabel.text = "请求加好友"
+        }
+        remarkLabel.isHidden = false
 
         AppUtility.loadChannelAvatar(channelId: apply.uid, channelType: 1, name: apply.name, into: avatarView)
 
         if apply.status == 0 {
-            // 等待验证：显示同意/拒绝按钮（Android 好友申请只显示"同意"）
+            // 等待验证：好友申请只显示"同意"，入群申请显示"拒绝/同意"（对齐 Android）
             statusLabel.isHidden = true
             buttonStack.isHidden = false
-            rejectButton.isHidden = true
+            rejectButton.isHidden = (apply.type ?? 0) != 1
         } else {
             // 已同意/已拒绝：显示状态文字
             statusLabel.isHidden = false

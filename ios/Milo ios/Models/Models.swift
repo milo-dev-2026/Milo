@@ -710,6 +710,11 @@ struct FriendApply: Codable {
     var remark: String?
     var status: Int
     var token: String?
+    /// 0 好友申请 1 入群申请（对齐 Android NewFriendEntity.type）
+    var type: Int?
+    /// 入群申请时的群号/群名称
+    var groupNo: String?
+    var groupName: String?
 }
 
 // MARK: - API响应包装
