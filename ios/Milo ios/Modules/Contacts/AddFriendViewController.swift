@@ -21,7 +21,7 @@ class AddFriendViewController: UIViewController {
         searchField.placeholder = "输入用户ID/昵称/账号"
         searchField.borderStyle = .roundedRect
         searchField.font = ScreenAdapter.font(16)
-        searchField.keyboardType = .asciiCapable
+        searchField.keyboardType = .default
 
         searchButton.setTitle("搜索", for: .normal)
         searchButton.backgroundColor = .themePrimary

@@ -26,10 +26,13 @@ class ChatInputBar: UIView {
     private let moreButton = UIButton(type: .system)
     private let emojiButton = UIButton(type: .system)
     private var textViewHeight: Constraint!
+    /// 面板容器常驻（高度 0↔N），保证 inputBar 高度约束链完整
+    private let panelContainer = UIView()
+    private var panelContainerHeight: Constraint!
     private var morePanel: UIView?
-    private var morePanelHeight: Constraint?
     private var emojiPanel: EmojiPanelView?
-    private var emojiPanelHeight: Constraint?
+    private var isMoreVisible = false
+    private var isEmojiVisible = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -123,6 +126,16 @@ class ChatInputBar: UIView {
             self.textViewHeight = make.height.equalTo(minH).constraint
             make.trailing.equalTo(sendButton.snp.leading).offset(-hPad)
         }
+
+        // 面板容器：固定在输入行下方、inputBar 内部，高度 0↔N 动画
+        panelContainer.clipsToBounds = true
+        addSubview(panelContainer)
+        panelContainer.snp.makeConstraints { make in
+            make.top.equalTo(inputRow.snp.bottom)
+            make.leading.trailing.equalToSuperview()
+            make.bottom.equalToSuperview()
+            self.panelContainerHeight = make.height.equalTo(0).constraint
+        }
     }
 
     @objc private func send() {
@@ -134,9 +147,9 @@ class ChatInputBar: UIView {
     }
 
     @objc private func toggleMorePanel() {
-        hideEmojiPanel()
-        if morePanel != nil {
-            hideMorePanel()
+        textView.resignFirstResponder()
+        if isMoreVisible {
+            collapsePanel()
         } else {
             showMorePanel()
         }
@@ -145,118 +158,109 @@ class ChatInputBar: UIView {
 
     @objc private func toggleEmojiPanel() {
         textView.resignFirstResponder()
-        if morePanel != nil { hideMorePanel() }
-        if emojiPanel != nil {
-            hideEmojiPanel()
+        if isEmojiVisible {
+            collapsePanel()
         } else {
             showEmojiPanel()
         }
     }
 
-    private func showEmojiPanel() {
-        let panel = EmojiPanelView()
-        panel.delegate = self
-        addSubview(panel)
-
-        // 表情面板固定在输入行下方、inputBar 内部展开，保证可点击
-        panel.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview()
-            make.top.equalTo(inputRow.snp.bottom)
-            make.bottom.equalToSuperview()
-            self.emojiPanelHeight = make.height.equalTo(0).constraint
-        }
-
-        emojiPanel = panel
-        superview?.layoutIfNeeded()
-
-        let panelHeight = ScreenAdapter.scaleH(220)
+    /// 收起面板（容器高度归 0，输入栏恢复单行）
+    private func collapsePanel() {
+        isMoreVisible = false
+        isEmojiVisible = false
         UIView.animate(withDuration: 0.25) {
-            self.emojiPanelHeight?.update(offset: panelHeight)
+            self.panelContainerHeight?.update(offset: 0)
+            self.superview?.layoutIfNeeded()
+        }
+    }
+
+    private func showEmojiPanel() {
+        if emojiPanel == nil {
+            let panel = EmojiPanelView()
+            panel.delegate = self
+            panelContainer.addSubview(panel)
+            panel.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+            emojiPanel = panel
+        }
+        morePanel?.isHidden = true
+        emojiPanel?.isHidden = false
+        isMoreVisible = false
+        isEmojiVisible = true
+        superview?.layoutIfNeeded()
+        UIView.animate(withDuration: 0.25) {
+            self.panelContainerHeight?.update(offset: ScreenAdapter.scaleH(220))
             self.superview?.layoutIfNeeded()
         }
     }
 
     func hideEmojiPanel() {
-        guard let panel = emojiPanel else { return }
-        UIView.animate(withDuration: 0.25, animations: {
-            self.emojiPanelHeight?.update(offset: 0)
-            self.superview?.layoutIfNeeded()
-        }) { _ in
-            panel.removeFromSuperview()
-            self.emojiPanel = nil
-            self.emojiPanelHeight = nil
-        }
+        guard isEmojiVisible else { return }
+        collapsePanel()
     }
 
     private func showMorePanel() {
-        let panel = UIView()
-        panel.backgroundColor = .clear
-        addSubview(panel)
+        if morePanel == nil {
+            let panel = UIView()
+            panel.backgroundColor = .clear
+            panelContainer.addSubview(panel)
 
-        let panelHeight = ScreenAdapter.scaleH(180)
-        let columns: [(icon: String, title: String, action: Selector)] = [
-            ("photo.on.rectangle", "相册", #selector(didTapPhoto)),
-            ("camera", "拍摄", #selector(didTapCamera)),
-            ("location", "位置", #selector(didTapLocation)),
-            ("folder", "文件", #selector(didTapFile)),
-            ("note.text", "笔记", #selector(didTapNote)),
-            ("person.text.rectangle", "名片", #selector(didTapCard))
-        ]
+            let columns: [(icon: String, title: String, action: Selector)] = [
+                ("photo.on.rectangle", "相册", #selector(didTapPhoto)),
+                ("camera", "拍摄", #selector(didTapCamera)),
+                ("location", "位置", #selector(didTapLocation)),
+                ("folder", "文件", #selector(didTapFile)),
+                ("note.text", "笔记", #selector(didTapNote)),
+                ("person.text.rectangle", "名片", #selector(didTapCard))
+            ]
 
-        var prevButton: UIButton?
-        for item in columns {
-            let btn = UIButton(type: .system)
-            let iconSize = ScreenAdapter.scaleW(32)
-            btn.setImage(UIImage(systemName: item.icon), for: .normal)
-            btn.tintColor = .themePrimary
-            btn.setTitle(item.title, for: .normal)
-            btn.setTitleColor(.label, for: .normal)
-            btn.titleLabel?.font = ScreenAdapter.font(11)
-            btn.titleEdgeInsets = UIEdgeInsets(top: iconSize + 4, left: 0, bottom: 0, right: 0)
-            btn.imageEdgeInsets = UIEdgeInsets(top: -14, left: 0, bottom: 0, right: 0)
-            btn.addTarget(self, action: item.action, for: .touchUpInside)
-            panel.addSubview(btn)
+            var prevButton: UIButton?
+            for item in columns {
+                let btn = UIButton(type: .system)
+                let iconSize = ScreenAdapter.scaleW(32)
+                btn.setImage(UIImage(systemName: item.icon), for: .normal)
+                btn.tintColor = .themePrimary
+                btn.setTitle(item.title, for: .normal)
+                btn.setTitleColor(.label, for: .normal)
+                btn.titleLabel?.font = ScreenAdapter.font(11)
+                btn.titleEdgeInsets = UIEdgeInsets(top: iconSize + 4, left: 0, bottom: 0, right: 0)
+                btn.imageEdgeInsets = UIEdgeInsets(top: -14, left: 0, bottom: 0, right: 0)
+                btn.addTarget(self, action: item.action, for: .touchUpInside)
+                panel.addSubview(btn)
 
-            btn.snp.makeConstraints { make in
-                make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
-                if let prev = prevButton {
-                    make.leading.equalTo(prev.snp.trailing).offset(ScreenAdapter.scaleW(16))
-                } else {
-                    make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+                btn.snp.makeConstraints { make in
+                    make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+                    if let prev = prevButton {
+                        make.leading.equalTo(prev.snp.trailing).offset(ScreenAdapter.scaleW(16))
+                    } else {
+                        make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+                    }
+                    make.width.equalTo(ScreenAdapter.scaleW(64))
+                    make.height.equalTo(ScreenAdapter.scaleH(64))
                 }
-                make.width.equalTo(ScreenAdapter.scaleW(64))
-                make.height.equalTo(ScreenAdapter.scaleH(64))
+                prevButton = btn
             }
-            prevButton = btn
+            panel.snp.makeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+            morePanel = panel
         }
-
-        // 功能面板固定在输入行下方、inputBar 内部展开，保证按钮在 bounds 内可点击
-        panel.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview()
-            make.top.equalTo(inputRow.snp.bottom)
-            make.bottom.equalToSuperview()
-            self.morePanelHeight = make.height.equalTo(0).constraint
-        }
-
-        morePanel = panel
+        emojiPanel?.isHidden = true
+        morePanel?.isHidden = false
+        isEmojiVisible = false
+        isMoreVisible = true
         superview?.layoutIfNeeded()
-
         UIView.animate(withDuration: 0.25) {
-            self.morePanelHeight?.update(offset: panelHeight)
+            self.panelContainerHeight?.update(offset: ScreenAdapter.scaleH(180))
             self.superview?.layoutIfNeeded()
         }
     }
 
     func hideMorePanel() {
-        guard let panel = morePanel else { return }
-        UIView.animate(withDuration: 0.25, animations: {
-            self.morePanelHeight?.update(offset: 0)
-            self.superview?.layoutIfNeeded()
-        }) { _ in
-            panel.removeFromSuperview()
-            self.morePanel = nil
-            self.morePanelHeight = nil
-        }
+        guard isMoreVisible else { return }
+        collapsePanel()
     }
 
     @objc private func didTapPhoto() {
@@ -291,6 +295,13 @@ class ChatInputBar: UIView {
 }
 
 extension ChatInputBar: UITextViewDelegate {
+
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        // 键盘弹出时收起面板（键盘替代面板位置）
+        if isMoreVisible || isEmojiVisible {
+            collapsePanel()
+        }
+    }
 
     func textViewDidChange(_ textView: UITextView) {
         let minH = ScreenAdapter.scaleH(36)
