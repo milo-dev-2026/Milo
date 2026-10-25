@@ -16,6 +16,7 @@ enum APIRouter: URLRequestConvertible {
     case sendLoginAuthCode(uid: String)
     case checkLoginAuth(uid: String, code: String)
     case searchGroupMembers(keyword: String, groupId: String)
+    case searchUser(keyword: String, page: Int, pageSize: Int)
     case syncConversations
     case syncChannelMessages(channelId: String, channelType: Int, startMessageSeq: Int, limit: Int)
     case sendTextMessage(channelId: String, content: String, channelType: Int)
@@ -199,6 +200,8 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "code": code])
         case let .searchGroupMembers(keyword, groupId):
             request = try URLEncoding.default.encode(request, with: ["keyword": keyword, "group_id": groupId])
+        case let .searchUser(keyword, page, pageSize):
+            request = try URLEncoding.default.encode(request, with: ["keyword": keyword, "page": page, "page_size": pageSize])
         case .syncFriends:
             request = try URLEncoding.default.encode(request, with: [
                 "version": 0,
@@ -391,6 +394,7 @@ enum APIRouter: URLRequestConvertible {
         case .sendLoginAuthCode: return "/v1/user/login_auth/sendcode"
         case .checkLoginAuth: return "/v1/user/login_auth/check"
         case .searchGroupMembers: return "/v1/groups/members/search"
+        case .searchUser: return "/v1/user/search"
         case .syncConversations: return "/v1/conversation/sync"
         case .syncChannelMessages: return "/v1/message/channel/sync"
         case .sendTextMessage: return "/v1/message/send"
@@ -487,7 +491,7 @@ enum APIRouter: URLRequestConvertible {
              .getFavorites, .getGroupAnnouncement, .getDeviceList,
              .getGroupMembers, .getGroupAdmins, .getMutedMembers,
              .getGroupBlackList, .getLeftGroupMembers,
-             .getIMServer, .syncNotes, .syncTags:
+             .getIMServer, .syncNotes, .syncTags, .searchUser:
             return .get
         case .updateGroupAnnouncement, .updateLockAfterMinute,
              .updateGroupInfo, .setJoinApproval, .setGroupMuteAll,
@@ -662,6 +666,35 @@ class APIClient {
         body.append(data)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         return body
+    }
+
+    /// 对齐 Android：服务端中转上传聊天文件
+    /// POST /v1/file/upload?type=chat&path=/{channelType}/{channelId}/{millis}_{rand8}.{ext}
+    /// 返回服务端存储相对路径（如 file/preview/chat/...），消息中直接携带该路径
+    func uploadChatFile(data: Data, fileName: String, channelId: String, channelType: Int) async throws -> String {
+        let ext = (fileName as NSString).pathExtension
+        let suffix = ext.isEmpty ? "bin" : ext
+        let rand = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8))
+        let millis = Int64(Date().timeIntervalSince1970 * 1000)
+        let filePath = "/\(channelType)/\(channelId)/\(millis)_\(rand).\(suffix)"
+        let urlString = APIConfig.apiBaseURL + "/v1/file/upload?type=chat&path=" + filePath
+        let url = try urlString.asURL()
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let token = UserDefaults.standard.string(forKey: "token") ?? ""
+        if !token.isEmpty {
+            request.setValue(token, forHTTPHeaderField: "token")
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = createMultipartBody(data: data, fileName: fileName, boundary: boundary)
+        let responseData = try await session.request(request).serializingData().value
+        let result = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        if let path = result?["path"] as? String, !path.isEmpty {
+            return path
+        }
+        print("[API] 聊天文件上传失败. Raw: \(String(data: responseData, encoding: .utf8)?.prefix(300) ?? "")")
+        throw APIError.noData
     }
 }
 

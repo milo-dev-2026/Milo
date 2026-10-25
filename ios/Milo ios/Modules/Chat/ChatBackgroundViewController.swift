@@ -6,16 +6,9 @@ class ChatBackgroundViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var backgrounds: [(name: String, color: UIColor)] = []
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupUI()
-    }
-
-    private func setupUI() {
-        title = "聊天背景"
-        view.backgroundColor = .themeBackground
-
-        backgrounds = [
+    /// 可选聊天背景列表（与设置页展示一致）
+    static var backgroundList: [(name: String, color: UIColor)] {
+        return [
             ("默认", .themeChatBackground),
             ("浅灰", UIColor(white: 0.95, alpha: 1)),
             ("白色", .white),
@@ -25,6 +18,26 @@ class ChatBackgroundViewController: UIViewController {
             ("米色", UIColor(red: 0.98, green: 0.96, blue: 0.9, alpha: 1)),
             ("深灰", UIColor(white: 0.3, alpha: 1))
         ]
+    }
+
+    /// 当前用户选择的聊天背景色
+    static var currentColor: UIColor {
+        let list = backgroundList
+        let index = UserDefaults.standard.integer(forKey: "chat_bg_index")
+        guard list.indices.contains(index) else { return .themeChatBackground }
+        return list[index].color
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+    }
+
+    private func setupUI() {
+        title = "聊天背景"
+        view.backgroundColor = .themeBackground
+
+        backgrounds = ChatBackgroundViewController.backgroundList
 
         tableView.dataSource = self
         tableView.delegate = self

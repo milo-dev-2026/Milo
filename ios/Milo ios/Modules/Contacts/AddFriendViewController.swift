@@ -7,7 +7,7 @@ class AddFriendViewController: UIViewController {
     private let searchField = UITextField()
     private let searchButton = UIButton(type: .system)
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var searchResult: User?
+    private var searchResults: [User] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -18,7 +18,7 @@ class AddFriendViewController: UIViewController {
         title = "添加好友"
         view.backgroundColor = .themeBackground
 
-        searchField.placeholder = "输入用户ID"
+        searchField.placeholder = "输入用户ID/昵称/账号"
         searchField.borderStyle = .roundedRect
         searchField.font = ScreenAdapter.font(16)
         searchField.keyboardType = .asciiCapable
@@ -50,24 +50,40 @@ class AddFriendViewController: UIViewController {
     }
 
     @objc private func searchUser() {
-        let uid = searchField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !uid.isEmpty else {
-            AppUtility.showToast("请输入用户ID")
+        let keyword = searchField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !keyword.isEmpty else {
+            AppUtility.showToast("请输入搜索关键词")
             return
         }
         view.endEditing(true)
         Task {
             do {
-                let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
-                    .getChannelInfo(channelId: uid, channelType: 1)
-                )
-                let user = channelInfo.toUser()
-                searchResult = user
+                // 对齐 Android：使用 /v1/user/search 模糊搜索接口
+                let resp = try await APIClient.shared.requestRaw(.searchUser(keyword: keyword, page: 1, pageSize: 20))
+                var users: [User] = []
+                let data = resp["data"] as? [String: Any] ?? resp
+                if let list = data["list"] as? [[String: Any]] {
+                    for item in list {
+                        let uid = item["uid"] as? String ?? ""
+                        guard !uid.isEmpty else { continue }
+                        let nickname = item["nickname"] as? String ?? ""
+                        let username = item["username"] as? String ?? ""
+                        let name = !nickname.isEmpty ? nickname : (!username.isEmpty ? username : uid)
+                        let avatar = item["avatar"] as? String ?? ""
+                        users.append(User(uid: uid, name: name, avatar: avatar))
+                    }
+                }
+                searchResults = users
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
+                    if users.isEmpty {
+                        AppUtility.showToast("未找到相关用户")
+                    }
                 }
             } catch {
-                AppUtility.showToast("搜索失败")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("搜索失败")
+                }
             }
         }
     }
@@ -76,22 +92,20 @@ class AddFriendViewController: UIViewController {
 extension AddFriendViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return searchResult != nil ? 1 : 0
+        return searchResults.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ResultCell", for: indexPath)
-        if let user = searchResult {
-            cell.textLabel?.text = user.name
-            cell.detailTextLabel?.text = "ID: \(user.uid)"
-            cell.accessoryType = .disclosureIndicator
-        }
+        let user = searchResults[indexPath.row]
+        cell.textLabel?.text = "\(user.name)（ID: \(user.uid)）"
+        cell.accessoryType = .disclosureIndicator
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard let user = searchResult else { return }
+        let user = searchResults[indexPath.row]
         let detailVC = ContactDetailViewController(uid: user.uid)
         navigationController?.pushViewController(detailVC, animated: true)
     }

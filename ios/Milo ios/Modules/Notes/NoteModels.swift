@@ -54,16 +54,16 @@ struct NoteBlock: Codable {
     }
 
     static func fromDict(_ dict: [String: Any]) -> NoteBlock? {
-        guard let id = dict["id"] as? String,
-              let typeStr = dict["type"] as? String,
-              let type = NoteBlockType(rawValue: typeStr) else { return nil }
+        let id = dict["id"] as? String ?? UUID().uuidString
+        let typeStr = dict["type"] as? String ?? "text"
+        let type = NoteBlockType(rawValue: typeStr) ?? .text
         let content = dict["content"] as? String ?? ""
-        let imageURL = dict["imageURL"] as? String
-        let videoURL = dict["videoURL"] as? String
+        let imageURL = dict["imageURL"] as? String ?? dict["image_url"] as? String ?? dict["url"] as? String
+        let videoURL = dict["videoURL"] as? String ?? dict["video_url"] as? String
         var location: NoteLocation?
         if let locDict = dict["location"] as? [String: Any],
-           let lat = locDict["latitude"] as? Double,
-           let lng = locDict["longitude"] as? Double {
+           let lat = (locDict["latitude"] as? NSNumber)?.doubleValue ?? locDict["latitude"] as? Double,
+           let lng = (locDict["longitude"] as? NSNumber)?.doubleValue ?? locDict["longitude"] as? Double {
             location = NoteLocation(latitude: lat, longitude: lng, address: locDict["address"] as? String ?? "")
         }
         return NoteBlock(id: id, type: type, content: content, imageURL: imageURL, videoURL: videoURL, location: location)
@@ -91,6 +91,57 @@ struct NoteEntity: Codable {
         self.isSticky = isSticky
         self.remark = remark
         self.group = group
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, blocks, createTime, updateTime, isSticky, remark, group
+        case content // Android 扁平正文字段
+        case create_time, update_time // 兼容 snake_case
+    }
+
+    /// 容错解码：兼容 Android 笔记结构（扁平 content / 缺字段 / 时间戳为字符串或秒级）
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+        blocks = (try? c.decodeIfPresent([NoteBlock].self, forKey: .blocks)) ?? []
+        // 兼容 Android 扁平 content 字段：无 blocks 时包装为单个文本块
+        if blocks.isEmpty,
+           let text = try? c.decodeIfPresent(String.self, forKey: .content),
+           !text.isEmpty {
+            blocks = [NoteBlock(type: .text, content: text)]
+        }
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        createTime = NoteEntity.decodeTime(from: c, keys: [.createTime, .create_time]) ?? now
+        updateTime = NoteEntity.decodeTime(from: c, keys: [.updateTime, .update_time]) ?? createTime
+        // 秒级时间戳（10位）转毫秒
+        if createTime > 0 && createTime < 10_000_000_000 { createTime *= 1000 }
+        if updateTime > 0 && updateTime < 10_000_000_000 { updateTime *= 1000 }
+        isSticky = (try? c.decodeIfPresent(Bool.self, forKey: .isSticky)) ?? false
+        remark = (try? c.decodeIfPresent(String.self, forKey: .remark)) ?? ""
+        group = (try? c.decodeIfPresent(String.self, forKey: .group)) ?? "普通笔记"
+    }
+
+    private static func decodeTime(from container: KeyedDecodingContainer<CodingKeys>, keys: [CodingKeys]) -> Int64? {
+        for key in keys {
+            if let v = try? container.decodeIfPresent(Int64.self, forKey: key) { return v }
+            if let s = try? container.decodeIfPresent(String.self, forKey: key), let v = Int64(s) { return v }
+            if let d = try? container.decodeIfPresent(Double.self, forKey: key) { return Int64(d) }
+        }
+        return nil
+    }
+
+    /// 自定义编码：仅编码存储属性（CodingKeys 含兼容解码用的额外 case）
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(blocks, forKey: .blocks)
+        try c.encode(createTime, forKey: .createTime)
+        try c.encode(updateTime, forKey: .updateTime)
+        try c.encode(isSticky, forKey: .isSticky)
+        try c.encode(remark, forKey: .remark)
+        try c.encode(group, forKey: .group)
     }
     
     /// 从内容块提取预览文本
@@ -140,15 +191,29 @@ struct NoteEntity: Codable {
     }
 
     static func fromDict(_ dict: [String: Any]) -> NoteEntity? {
-        guard let id = dict["id"] as? String else { return nil }
+        var idValue = dict["id"] as? String
+        if idValue == nil, let num = dict["id"] as? NSNumber { idValue = num.stringValue }
+        guard let id = idValue else { return nil }
         let title = dict["title"] as? String ?? ""
         var blocks: [NoteBlock] = []
         if let blocksArray = dict["blocks"] as? [[String: Any]] {
             blocks = blocksArray.compactMap { NoteBlock.fromDict($0) }
         }
-        let createTime = Int64(dict["createTime"] as? Int ?? 0)
-        let updateTime = Int64(dict["updateTime"] as? Int ?? 0)
-        let isSticky = dict["isSticky"] as? Bool ?? false
+        // 兼容 Android 扁平 content 字段
+        if blocks.isEmpty, let content = dict["content"] as? String, !content.isEmpty {
+            blocks = [NoteBlock(type: .text, content: content)]
+        }
+        func toInt64(_ v: Any?) -> Int64 {
+            if let n = v as? NSNumber { return n.int64Value }
+            if let s = v as? String { return Int64(s) ?? 0 }
+            return 0
+        }
+        var createTime = toInt64(dict["createTime"] ?? dict["create_time"])
+        var updateTime = toInt64(dict["updateTime"] ?? dict["update_time"])
+        // 秒级时间戳（10位）转毫秒
+        if createTime > 0 && createTime < 10_000_000_000 { createTime *= 1000 }
+        if updateTime > 0 && updateTime < 10_000_000_000 { updateTime *= 1000 }
+        let isSticky = (dict["isSticky"] as? Bool) ?? (dict["is_sticky"] as? Bool) ?? false
         let remark = dict["remark"] as? String ?? ""
         let group = dict["group"] as? String ?? "普通笔记"
         return NoteEntity(id: id, title: title, blocks: blocks,

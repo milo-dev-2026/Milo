@@ -11,7 +11,6 @@ class ConversationListViewController: UIViewController {
     // MARK: - 顶部标题栏
     private let titleBarView = UIView()
     private let titleLabel = UILabel()
-    private let deviceButton = UIButton(type: .custom)
     private let searchButton = UIButton(type: .custom)
     private let addButton = UIButton(type: .custom)
 
@@ -36,6 +35,10 @@ class ConversationListViewController: UIViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleNewMessage(_:)),
             name: IMManager.messageReceivedNotification, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleConnectionStatusChanged(_:)),
+            name: IMManager.connectionStatusChangedNotification, object: nil
         )
     }
 
@@ -73,26 +76,14 @@ class ConversationListViewController: UIViewController {
             make.height.equalTo(48)
         }
 
-        // 左侧设备按钮
-        let deviceConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        deviceButton.setImage(UIImage(systemName: "desktopcomputer", withConfiguration: deviceConfig), for: .normal)
-        deviceButton.tintColor = .label
-        deviceButton.addTarget(self, action: #selector(deviceButtonTapped), for: .touchUpInside)
-        titleBarView.addSubview(deviceButton)
-        deviceButton.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(12)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
-        }
-
-        // 中间标题 "Milo"
-        titleLabel.text = "Milo"
+        // 中间标题 "Milo"（含连接状态）
         titleLabel.font = ScreenAdapter.boldFont(20)
         titleLabel.textColor = .label
         titleBarView.addSubview(titleLabel)
         titleLabel.snp.makeConstraints { make in
             make.center.equalToSuperview()
         }
+        updateTitleStatus()
 
         // 右侧加号按钮
         let addConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
@@ -178,13 +169,21 @@ class ConversationListViewController: UIViewController {
     }
 
     // MARK: - 按钮点击
-    @objc private func deviceButtonTapped() {
-        AppUtility.showToast("PC端登录")
-    }
-
     @objc private func searchButtonTapped() {
         let searchVC = SearchAllViewController()
         navigationController?.pushViewController(searchVC, animated: true)
+    }
+
+    // MARK: - 连接状态标题
+    @objc private func handleConnectionStatusChanged(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.updateTitleStatus()
+        }
+    }
+
+    private func updateTitleStatus() {
+        let statusText = IMManager.shared.connectStatusText
+        titleLabel.text = statusText.isEmpty ? "Milo" : "Milo(\(statusText))"
     }
 
     // MARK: - 加号弹窗菜单

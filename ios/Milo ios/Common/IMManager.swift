@@ -22,6 +22,17 @@ class IMManager: NSObject {
     private var isSetup = false
     /// 当前 IM 连接状态（由 onConnectStatus 回调维护）
     private(set) var isConnected = false
+    /// 当前连接状态原始值（WKConnectStatus.rawValue：0未连接 1连接中 2收取中 3已连接 4断开）
+    private(set) var connectStatusRaw: Int = 0
+    /// 当前连接状态文案（"" 表示已连接，无需展示）
+    var connectStatusText: String {
+        switch connectStatusRaw {
+        case 1: return "连接中..."
+        case 2: return "收取中..."
+        case 3: return ""
+        default: return "未连接"
+        }
+    }
 
     static let messageReceivedNotification = NSNotification.Name("IMMessageReceived")
     static let messageStatusUpdateNotification = NSNotification.Name("IMMessageStatusUpdate")
@@ -630,8 +641,13 @@ extension IMManager: WKConnectionManagerDelegate {
                 break
             }
             self.isConnected = isConnected
+            self.connectStatusRaw = Int(status.rawValue)
             self.onConnectionChanged?(isConnected)
-            NotificationCenter.default.post(name: IMManager.connectionStatusChangedNotification, object: NSNumber(value: isConnected))
+            NotificationCenter.default.post(
+                name: IMManager.connectionStatusChangedNotification,
+                object: NSNumber(value: isConnected),
+                userInfo: ["status": Int(status.rawValue)]
+            )
         }
     }
 
@@ -639,8 +655,13 @@ extension IMManager: WKConnectionManagerDelegate {
         DispatchQueue.main.async {
             print("[IM] 被踢下线, reason: \(reasonCode.rawValue)")
             self.isConnected = false
+            self.connectStatusRaw = 4
             self.onConnectionChanged?(false)
-            NotificationCenter.default.post(name: IMManager.connectionStatusChangedNotification, object: NSNumber(value: false))
+            NotificationCenter.default.post(
+                name: IMManager.connectionStatusChangedNotification,
+                object: NSNumber(value: false),
+                userInfo: ["status": 4]
+            )
         }
     }
 }

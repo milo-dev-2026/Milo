@@ -27,6 +27,8 @@ class ChatViewController: UIViewController {
         self.titleText = title
         self.channelType = channelType
         super.init(nibName: nil, bundle: nil)
+        // 打开聊天窗口时隐藏底部 Tab 栏
+        hidesBottomBarWhenPushed = true
     }
 
     required init?(coder: NSCoder) {
@@ -96,7 +98,7 @@ class ChatViewController: UIViewController {
 
     private func setupUI() {
         title = titleText
-        view.backgroundColor = .themeChatBackground
+        applyChatBackground()
 
         tableView.dataSource = self
         tableView.delegate = self
@@ -110,6 +112,9 @@ class ChatViewController: UIViewController {
         tableView.register(NoteMessageCell.self, forCellReuseIdentifier: "NoteMessageCell")
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
+        // 自适应行高：气泡高度随内容撑开
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = ScreenAdapter.scaleH(64)
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         tableView.addGestureRecognizer(longPress)
@@ -130,6 +135,18 @@ class ChatViewController: UIViewController {
             make.leading.trailing.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom)
         }
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 从聊天背景设置页返回时刷新背景
+        applyChatBackground()
+    }
+
+    /// 应用聊天背景设置（与聊天背景设置页 chat_bg_index 联动）
+    private func applyChatBackground() {
+        view.backgroundColor = ChatBackgroundViewController.currentColor
+        tableView.backgroundColor = .clear
     }
 
     private func setupNavBar() {
@@ -796,154 +813,148 @@ extension ChatViewController: ChatInputBarDelegate {
             AppUtility.showToast("图片数据无效")
             return
         }
-        COSUploadManager.shared.uploadImage(image,
-            progress: { progressValue in
-                print("图片上传进度: \(String(format: "%.1f%%", progressValue * 100))")
-            },
-            completion: { [weak self] result in
-                guard let self = self else { return }
-                switch result {
-                case .success(let cdnURL):
-                    // 先走SDK发送
-                    IMManager.shared.sendImageMessage(
-                        channelId: self.channelId,
-                        imageURL: cdnURL,
-                        width: image.size.width,
-                        height: image.size.height,
-                        channelType: self.channelType
-                    )
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: self.channelId,
-                        channelType: self.channelType,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: cdnURL,
-                        type: .image,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 0 // 发送中
-                    )
-                    self.messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                case .failure(let error):
-                    print("图片上传失败: \(error.localizedDescription)")
+        Task {
+            do {
+                // 对齐 Android：走服务器中转上传通道，消息携带服务端相对路径
+                let path = try await APIClient.shared.uploadChatFile(
+                    data: data, fileName: "image.jpg",
+                    channelId: channelId, channelType: channelType
+                )
+                IMManager.shared.sendImageMessage(
+                    channelId: self.channelId,
+                    imageURL: path,
+                    width: image.size.width,
+                    height: image.size.height,
+                    channelType: self.channelType
+                )
+                let msg = Message(
+                    messageID: UUID().uuidString,
+                    channelID: self.channelId,
+                    channelType: self.channelType,
+                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                    content: path,
+                    type: .image,
+                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                    status: 0 // 发送中
+                )
+                self.messages.append(msg)
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.scrollToBottom()
+                }
+            } catch {
+                print("图片上传失败: \(error.localizedDescription)")
+                DispatchQueue.main.async {
                     AppUtility.showToast("图片上传失败")
                 }
             }
-        )
+        }
     }
 
     private func sendVideoMessage(url: URL) {
-        // 先上传视频
-        COSUploadManager.shared.uploadVideo(url,
-            progress: { progressValue in
-                print("视频上传进度: \(String(format: "%.1f%%", progressValue * 100))")
-            },
-            completion: { [weak self] videoResult in
-                guard let self = self else { return }
-                switch videoResult {
-                case .success(let videoCDNURL):
-                    // 再上传缩略图（使用系统图标作为占位）
-                    let thumbImage = UIImage(systemName: "video")!
-                    COSUploadManager.shared.uploadImage(thumbImage,
-                        progress: { progressValue in
-                            print("视频缩略图上传进度: \(String(format: "%.1f%%", progressValue * 100))")
-                        },
-                        completion: { [weak self] thumbResult in
-                            guard let self = self else { return }
-                            switch thumbResult {
-                            case .success(let thumbCDNURL):
-                                // 通过SDK发送视频消息
-                                IMManager.shared.sendVideoMessage(
-                                    channelId: self.channelId,
-                                    thumbURL: thumbCDNURL,
-                                    videoURL: videoCDNURL,
-                                    duration: 0,
-                                    channelType: self.channelType
-                                )
-                                let content = "\(thumbCDNURL)|\(videoCDNURL)"
-                                let msg = Message(
-                                    messageID: UUID().uuidString,
-                                    channelID: self.channelId,
-                                    channelType: self.channelType,
-                                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                                    content: content,
-                                    type: .video,
-                                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                                    status: 0 // 发送中
-                                )
-                                self.messages.append(msg)
-                                DispatchQueue.main.async {
-                                    self.tableView.reloadData()
-                                    self.scrollToBottom()
-                                }
-                            case .failure(let error):
-                                print("缩略图上传失败: \(error.localizedDescription)")
-                                AppUtility.showToast("缩略图上传失败")
-                            }
-                        }
-                    )
-                case .failure(let error):
-                    print("视频上传失败: \(error.localizedDescription)")
+        Task {
+            do {
+                // 读取视频数据与时长，生成真实缩略图
+                let videoData = try Data(contentsOf: url)
+                let asset = AVAsset(url: url)
+                let durationSeconds = Int(CMTimeGetSeconds(asset.duration).rounded())
+                var thumbData: Data?
+                let generator = AVAssetImageGenerator(asset: asset)
+                generator.appliesPreferredTrackTransform = true
+                if let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) {
+                    thumbData = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.6)
+                }
+
+                // 对齐 Android：走服务器中转上传通道
+                let videoPath = try await APIClient.shared.uploadChatFile(
+                    data: videoData, fileName: "video.mp4",
+                    channelId: channelId, channelType: channelType
+                )
+                var thumbPath = ""
+                if let thumbData = thumbData {
+                    thumbPath = (try? await APIClient.shared.uploadChatFile(
+                        data: thumbData, fileName: "thumb.jpg",
+                        channelId: channelId, channelType: channelType
+                    )) ?? ""
+                }
+
+                IMManager.shared.sendVideoMessage(
+                    channelId: self.channelId,
+                    thumbURL: thumbPath,
+                    videoURL: videoPath,
+                    duration: durationSeconds,
+                    channelType: self.channelType
+                )
+                let content = "\(thumbPath)|\(videoPath)"
+                let msg = Message(
+                    messageID: UUID().uuidString,
+                    channelID: self.channelId,
+                    channelType: self.channelType,
+                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                    content: content,
+                    type: .video,
+                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                    status: 0 // 发送中
+                )
+                self.messages.append(msg)
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.scrollToBottom()
+                }
+            } catch {
+                print("视频上传失败: \(error.localizedDescription)")
+                DispatchQueue.main.async {
                     AppUtility.showToast("视频上传失败")
                 }
             }
-        )
+        }
     }
 
     private func sendFileMessage(url: URL) {
         let fileName = url.lastPathComponent
+        Task {
+            do {
+                // 读取文件数据与大小
+                let accessing = url.startAccessingSecurityScopedResource()
+                let fileData = try Data(contentsOf: url)
+                if accessing { url.stopAccessingSecurityScopedResource() }
+                let fileSize = Int64(fileData.count)
 
-        COSUploadManager.shared.uploadFile(fileURL: url,
-            fileName: fileName,
-            contentType: "application/octet-stream",
-            progress: { progressValue in
-                print("文件上传进度: \(String(format: "%.1f%%", progressValue * 100))")
-            },
-            completion: { [weak self] result in
-                guard let self = self else { return }
-                switch result {
-                case .success(let cdnURL):
-                    // 读取文件大小
-                    let fileSize: Int64
-                    do {
-                        let resources = try url.resourceValues(forKeys: [.fileSizeKey])
-                        fileSize = Int64(resources.fileSize ?? 0)
-                    } catch {
-                        fileSize = 0
-                    }
-                    // 通过SDK发送文件消息
-                    IMManager.shared.sendFileMessage(
-                        channelId: self.channelId,
-                        fileName: fileName,
-                        fileSize: fileSize,
-                        fileURL: cdnURL,
-                        channelType: self.channelType
-                    )
-                    let content = "\(fileName)|\(fileSize)|\(cdnURL)"
-                    let msg = Message(
-                        messageID: UUID().uuidString,
-                        channelID: self.channelId,
-                        channelType: self.channelType,
-                        fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                        content: content,
-                        type: .file,
-                        timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                        status: 0 // 发送中
-                    )
-                    messages.append(msg)
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                case .failure(let error):
-                    print("文件上传失败: \(error.localizedDescription)")
+                // 对齐 Android：走服务器中转上传通道
+                let path = try await APIClient.shared.uploadChatFile(
+                    data: fileData, fileName: fileName,
+                    channelId: channelId, channelType: channelType
+                )
+                IMManager.shared.sendFileMessage(
+                    channelId: self.channelId,
+                    fileName: fileName,
+                    fileSize: fileSize,
+                    fileURL: path,
+                    channelType: self.channelType
+                )
+                let content = "\(fileName)|\(fileSize)|\(path)"
+                let msg = Message(
+                    messageID: UUID().uuidString,
+                    channelID: self.channelId,
+                    channelType: self.channelType,
+                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                    content: content,
+                    type: .file,
+                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                    status: 0 // 发送中
+                )
+                self.messages.append(msg)
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.scrollToBottom()
+                }
+            } catch {
+                print("文件上传失败: \(error.localizedDescription)")
+                DispatchQueue.main.async {
                     AppUtility.showToast("文件上传失败")
                 }
             }
-        )
+        }
     }
 
     private func sendLocationMessage(_ location: PickedLocation) {
@@ -1169,8 +1180,17 @@ class TextMessageCell: UITableViewCell {
         let nameGap = ScreenAdapter.scaleH(2)
         let maxWidth = ScreenAdapter.screenWidth * 0.6
         let font = ScreenAdapter.font(15)
-        let size = message.content.size(withAttributes: [.font: font])
-        let bubbleWidth = min(size.width + ScreenAdapter.scaleW(24), maxWidth)
+        let innerPad = ScreenAdapter.scaleW(24)
+        // 多行测量：按最大文本宽度换行计算实际所需宽度，避免单行测量导致气泡过宽或过窄
+        let maxTextWidth = maxWidth - innerPad
+        let content = message.content.isEmpty ? " " : message.content
+        let textRect = (content as NSString).boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        )
+        let bubbleWidth = max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40))
 
         if isFromMe {
             avatarView.snp.remakeConstraints { make in

@@ -272,12 +272,27 @@ struct WKMessageData: Codable {
 
     /// 解析payload为 (type, content)，content格式与各消息Cell约定一致
     var decodedPayload: (type: Int, content: String) {
-        guard let dict = payloadJSONDict else { return (1, "") }
+        guard let dict = payloadJSONDict else {
+            // 回退：payload 不是 JSON 字典时，按纯文本处理，避免消息内容丢失显示为小点
+            if let payload = payload, !payload.isEmpty {
+                if let data = Data(base64Encoded: payload),
+                   let text = String(data: data, encoding: .utf8), !text.isEmpty {
+                    // base64 解码后若是 JSON 字符串字面量（带引号），去掉首尾引号
+                    if text.count > 1, text.hasPrefix("\""), text.hasSuffix("\"") {
+                        return (1, String(text.dropFirst().dropLast()))
+                    }
+                    return (1, text)
+                }
+                return (1, payload)
+            }
+            return (1, "")
+        }
         let type = WKMessageData.anyToInt(dict["type"])
         let str = { (key: String) -> String in dict[key] as? String ?? "" }
         switch type {
         case 1: // 文本
-            return (type, str("content"))
+            let c = str("content")
+            return (type, c.isEmpty ? str("text") : c)
         case 2: // 图片: content = url
             return (type, str("url"))
         case 3: // 语音: "duration|url"

@@ -20,6 +20,7 @@ class ChatInputBar: UIView {
 
     weak var delegate: ChatInputBarDelegate?
 
+    private let inputRow = UIView()
     private let textView = UITextView()
     private let sendButton = UIButton(type: .system)
     private let moreButton = UIButton(type: .system)
@@ -67,6 +68,12 @@ class ChatInputBar: UIView {
             make.height.equalTo(0.5)
         }
 
+        // 输入行容器：面板展开时位于其下方，保证面板在 inputBar bounds 内可点击
+        addSubview(inputRow)
+        inputRow.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+        }
+
         textView.font = ScreenAdapter.font(15)
         textView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         textView.layer.borderWidth = 0.5
@@ -88,7 +95,7 @@ class ChatInputBar: UIView {
         emojiButton.tintColor = .themePrimary
         emojiButton.addTarget(self, action: #selector(toggleEmojiPanel), for: .touchUpInside)
 
-        addSubviews(emojiButton, textView, sendButton, moreButton)
+        inputRow.addSubviews(emojiButton, textView, sendButton, moreButton)
 
         moreButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-hPad)
@@ -151,9 +158,11 @@ class ChatInputBar: UIView {
         panel.delegate = self
         addSubview(panel)
 
-        // 表情面板从底部向上展开：只约束底部和高度
+        // 表情面板固定在输入行下方、inputBar 内部展开，保证可点击
         panel.snp.makeConstraints { make in
-            make.leading.trailing.bottom.equalToSuperview()
+            make.leading.trailing.equalToSuperview()
+            make.top.equalTo(inputRow.snp.bottom)
+            make.bottom.equalToSuperview()
             self.emojiPanelHeight = make.height.equalTo(0).constraint
         }
 
@@ -221,9 +230,11 @@ class ChatInputBar: UIView {
             prevButton = btn
         }
 
-        // 面板从底部向上展开：只约束底部和高度，不约束顶部
+        // 功能面板固定在输入行下方、inputBar 内部展开，保证按钮在 bounds 内可点击
         panel.snp.makeConstraints { make in
-            make.leading.trailing.bottom.equalToSuperview()
+            make.leading.trailing.equalToSuperview()
+            make.top.equalTo(inputRow.snp.bottom)
+            make.bottom.equalToSuperview()
             self.morePanelHeight = make.height.equalTo(0).constraint
         }
 
@@ -276,10 +287,6 @@ class ChatInputBar: UIView {
     @objc private func didTapCard() {
         hideMorePanel()
         delegate?.didTapCardButton()
-    }
-
-    private var vPad: CGFloat {
-        return ScreenAdapter.scaleH(6)
     }
 }
 
