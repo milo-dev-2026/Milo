@@ -28,6 +28,16 @@ public class PermissionHelper {
      * 确保通知渠道存在（跳转设置页前调用，确保用户进去能看到）
      */
     public static void ensureNotificationChannel(Context context, String channelId, String channelName, int importance) {
+        android.net.Uri sound = null;
+        if (WKConstants.newMsgChannelID.equals(channelId)) {
+            sound = android.net.Uri.parse("android.resource://" + context.getPackageName() + "/" + com.chat.base.R.raw.msg_notify);
+        } else if (WKConstants.newRTCChannelID.equals(channelId)) {
+            sound = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+        }
+        ensureNotificationChannel(context, channelId, channelName, importance, sound);
+    }
+
+    public static void ensureNotificationChannel(Context context, String channelId, String channelName, int importance, android.net.Uri sound) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
@@ -37,6 +47,13 @@ public class PermissionHelper {
                     channel.enableVibration(true);
                     channel.enableLights(true);
                     channel.setShowBadge(true);
+                    channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                    if (sound != null) {
+                        channel.setSound(sound, new android.media.AudioAttributes.Builder()
+                                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build());
+                    }
                     manager.createNotificationChannel(channel);
                 }
             }
@@ -114,6 +131,15 @@ public class PermissionHelper {
         } else {
             return checkAppOpsMode(context, 10001);
         }
+    }
+
+    /**
+     * 自启动状态是否无法真实检测。
+     * vivo/OPPO 的 AppOps 没有对应自启动的 op，checkAppOpsMode(10001) 恒返回 false，
+     * 即使系统设置里已开启，检测结果也永远是未开启。
+     */
+    public static boolean isAutoStartUndetectable(Context context) {
+        return WKOSUtils.isVivo() || WKOSUtils.isOppo();
     }
 
     public static void openAutoStartSetting(Context context) {
@@ -255,7 +281,12 @@ public class PermissionHelper {
         }
 
         // fallback：跳转通知渠道设置页
-        ensureNotificationChannel(context, channelId, "新消息通知", NotificationManager.IMPORTANCE_HIGH);
+        // 新消息渠道若尚未创建，创建时就要带上提示音，否则渠道先生成默认音后无法再改
+        android.net.Uri newMsgSound = null;
+        if (WKConstants.newMsgChannelID.equals(channelId)) {
+            newMsgSound = android.net.Uri.parse("android.resource://" + context.getPackageName() + "/" + com.chat.base.R.raw.msg_notify);
+        }
+        ensureNotificationChannel(context, channelId, "新消息通知", NotificationManager.IMPORTANCE_HIGH, newMsgSound);
         try {
             Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());

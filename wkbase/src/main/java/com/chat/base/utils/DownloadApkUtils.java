@@ -12,6 +12,8 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.widget.Toast;
@@ -22,6 +24,10 @@ import com.chat.base.WKBaseApplication;
 import com.chat.base.R;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 
 /**
@@ -37,6 +43,7 @@ public class DownloadApkUtils {
     private String downloadUrl;
     private File localFiles;
     private boolean isdownload = false;
+    private String lastVersionName = "";
     // 下载状态监听
     private DownloadListener downloadListener;
     // 广播接收器是否已注册
@@ -84,6 +91,7 @@ public class DownloadApkUtils {
             }
 
             downloadUrl = url;
+            lastVersionName = versionName;
             Context appContext = getAppContext(context);
 
             File downloadPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -155,9 +163,10 @@ public class DownloadApkUtils {
                         localFiles = privatePath;
                         request.setDestinationUri(Uri.fromFile(privatePath));
                     } catch (Exception e2) {
-                        WKToastUtils.getInstance().showToastNormal("下载失败，请使用浏览器下载");
                         isdownload = false;
-                        safeOpenBrowser(appContext);
+                        WKLogUtils.e("系统下载器不可用", "改用直连下载: " + e2.getMessage());
+                        WKToastUtils.getInstance().showToastNormal("正在切换直连下载...");
+                        startDirectDownload(appContext);
                         return;
                     }
                 }
@@ -180,24 +189,96 @@ public class DownloadApkUtils {
                 } catch (Exception e) {
                     e.printStackTrace();
                     isdownload = false;
-                    WKToastUtils.getInstance().showToastNormal("下载失败，请重试或使用浏览器下载");
-                    safeOpenBrowser(appContext);
+                    WKLogUtils.e("系统下载器不可用", "改用直连下载: " + e.getMessage());
+                    WKToastUtils.getInstance().showToastNormal("正在切换直连下载...");
+                    startDirectDownload(appContext);
                     if (downloadListener != null) {
                         downloadListener.onFailed("下载失败: " + e.getMessage());
                     }
                 }
             }
         } catch (Throwable t) {
-            // 终极兜底：任何异常都不闪退，跳浏览器
+            // 终极兜底：任何异常都不闪退，先尝试直连下载
             t.printStackTrace();
             isdownload = false;
             try {
-                WKToastUtils.getInstance().showToastNormal("下载启动失败，请用浏览器下载");
-                safeOpenBrowser(context);
+                WKToastUtils.getInstance().showToastNormal("正在切换直连下载...");
+                startDirectDownload(context);
             } catch (Exception e2) {
-                // 连Toast都失败了，就什么都不做了
+                // 连启动直连下载都失败了，就静默处理
             }
         }
+    }
+
+    /**
+     * 直连下载：不依赖系统 DownloadManager，
+     * 规避部分 ROM（MIUI/HyperOS 等）上 enqueue 被拦截或下载任务直接失败的问题。
+     */
+    private void startDirectDownload(Context context) {
+        if (isdownload) {
+            return;
+        }
+        final Context appContext = getAppContext(context);
+        final String url = downloadUrl;
+        final String versionName = lastVersionName;
+        if (TextUtils.isEmpty(url) || TextUtils.isEmpty(versionName)) {
+            safeOpenBrowser(appContext);
+            return;
+        }
+        isdownload = true;
+        WKToastUtils.getInstance().showToastNormal("正在直连下载安装包，请稍候...");
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            File dir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (dir == null) {
+                dir = appContext.getFilesDir();
+            }
+            File target = new File(dir, appContext.getPackageName() + versionName + ".apk");
+            File tmp = new File(target.getAbsolutePath() + ".part");
+            try {
+                WKFileUtils.delFileOrFolder(tmp);
+                conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(20000);
+                conn.setReadTimeout(60000);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Milo");
+                int code = conn.getResponseCode();
+                if (code != HttpURLConnection.HTTP_OK && code != 206) {
+                    throw new Exception("HTTP " + code);
+                }
+                try (InputStream in = conn.getInputStream();
+                     FileOutputStream out = new FileOutputStream(tmp)) {
+                    byte[] buffer = new byte[64 * 1024];
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, len);
+                    }
+                    out.flush();
+                }
+                if (!tmp.renameTo(target)) {
+                    throw new Exception("保存安装包失败");
+                }
+                localFiles = target;
+                isdownload = false;
+                if (!getAPKInfo(appContext, versionName, target)) {
+                    throw new Exception("安装包校验失败");
+                }
+                new Handler(Looper.getMainLooper()).post(() -> installAPK(target));
+            } catch (Throwable t) {
+                isdownload = false;
+                WKFileUtils.delFileOrFolder(tmp);
+                final String err = t.getMessage();
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    WKLogUtils.e("直连下载失败", "url=" + url + " err=" + err);
+                    WKToastUtils.getInstance().showToastNormal("直连下载失败，正在跳转浏览器下载...");
+                    safeOpenBrowser(appContext);
+                });
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+        }).start();
     }
 
     /**
@@ -281,10 +362,21 @@ public class DownloadApkUtils {
             if (c.moveToFirst()) {
                 @SuppressLint("Range") int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
                 switch (status) {
-                    //下载暂停
+                    //下载暂停（常见于系统下载器等待 WiFi / 排队）
                     case DownloadManager.STATUS_PAUSED:
-                        WKLogUtils.e("新版本下载状态", "下载暂停");
+                        int reason = -1;
+                        try {
+                            reason = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_REASON));
+                        } catch (Exception ignored) {
+                        }
+                        WKLogUtils.e("新版本下载状态", "下载暂停 reason=" + reason + "，改用直连下载");
                         isdownload = false;
+                        unregisterReceiverSafely();
+                        try {
+                            if (downloadManager != null) downloadManager.remove(downloadId);
+                        } catch (Exception ignored) {
+                        }
+                        startDirectDownload(mContext);
                         break;
                     //下载延迟
                     case DownloadManager.STATUS_PENDING:
@@ -310,10 +402,9 @@ public class DownloadApkUtils {
                     case DownloadManager.STATUS_FAILED:
                         isdownload = false;
                         unregisterReceiverSafely();
-                        WKLogUtils.e("新版本下载状态", "下载失败");
-                        WKToastUtils.getInstance().showToastNormal("下载失败，正在跳转浏览器下载...");
-                        // 下载失败时，自动跳转到浏览器下载
-                        safeOpenBrowser(mContext);
+                        WKLogUtils.e("新版本下载状态", "系统下载器失败，改用直连下载");
+                        WKToastUtils.getInstance().showToastNormal("正在切换直连下载...");
+                        startDirectDownload(mContext);
                         if (downloadListener != null) {
                             downloadListener.onFailed("下载失败");
                         }

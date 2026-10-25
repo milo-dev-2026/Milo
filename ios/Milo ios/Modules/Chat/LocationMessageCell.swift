@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import MAMapKit
 import AMapSearchKit
+import CoreLocation
 
 class LocationMessageCell: UITableViewCell {
 

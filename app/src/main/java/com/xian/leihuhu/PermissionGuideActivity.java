@@ -34,6 +34,7 @@ public class PermissionGuideActivity extends Activity {
     private TextView tvSelectAllHint;
 
     private boolean isAutoStartEnabled = false;
+    private boolean isAutoStartUndetectable = false;
     private boolean isBatteryEnabled = false;
     private boolean isNotificationEnabled = false;
     private boolean isVoiceEnabled = false;
@@ -53,6 +54,7 @@ public class PermissionGuideActivity extends Activity {
         rootView = LayoutInflater.from(this).inflate(R.layout.dialog_permission_guide, null);
         setContentView(rootView);
         initViews();
+        isAutoStartUndetectable = PermissionHelper.isAutoStartUndetectable(this);
         checkAllPermissions();
     }
 
@@ -88,7 +90,7 @@ public class PermissionGuideActivity extends Activity {
         }
 
         rootView.findViewById(R.id.item_auto_start).setOnClickListener(v -> {
-            if (!isAutoStartEnabled) {
+            if (!isAutoStartEnabled || isAutoStartUndetectable) {
                 justOpenedAutoStartSetting = true;
                 PermissionHelper.openAutoStartSetting(PermissionGuideActivity.this);
             }
@@ -119,7 +121,7 @@ public class PermissionGuideActivity extends Activity {
         });
 
         btnEnter.setOnClickListener(v -> {
-            if (isAutoStartEnabled && isBatteryEnabled && isNotificationEnabled && isVoiceEnabled && isLockScreenEnabled) {
+            if ((isAutoStartEnabled || isAutoStartUndetectable) && isBatteryEnabled && isNotificationEnabled && isVoiceEnabled && isLockScreenEnabled) {
                 markGuideShown(this);
                 finish();
             } else {
@@ -165,13 +167,22 @@ public class PermissionGuideActivity extends Activity {
                 + " voice=" + isVoiceEnabled
                 + " lockScreen=" + isLockScreenEnabled);
 
-        updateItemState(iconAutoStart, btnAutoStart, isAutoStartEnabled);
+        if (isAutoStartUndetectable) {
+            // vivo/OPPO 检测不到自启动真实状态，显示中性提示，不误导为“未开启”，也不阻断进入
+            iconAutoStart.setImageResource(R.drawable.ic_permission_unchecked);
+            btnAutoStart.setText("请确认已开启");
+            btnAutoStart.setTextColor(0xFF999999);
+            btnAutoStart.setBackgroundResource(R.drawable.bg_permission_btn_gray);
+            btnAutoStart.setEnabled(true);
+        } else {
+            updateItemState(iconAutoStart, btnAutoStart, isAutoStartEnabled);
+        }
         updateItemState(iconBattery, btnBattery, isBatteryEnabled);
         updateItemState(iconNotification, btnNotification, isNotificationEnabled);
         updateItemState(iconVoice, btnVoice, isVoiceEnabled);
         updateItemState(iconLockScreen, btnLockScreen, isLockScreenEnabled);
 
-        boolean allEnabled = isAutoStartEnabled && isBatteryEnabled && isNotificationEnabled && isVoiceEnabled && isLockScreenEnabled;
+        boolean allEnabled = (isAutoStartEnabled || isAutoStartUndetectable) && isBatteryEnabled && isNotificationEnabled && isVoiceEnabled && isLockScreenEnabled;
         if (allEnabled) {
             btnEnter.setBackgroundResource(R.drawable.bg_permission_btn_blue);
             btnEnter.setTextColor(0xFFFFFFFF);
@@ -219,10 +230,10 @@ public class PermissionGuideActivity extends Activity {
                         && PermissionHelper.isVoiceNotificationEnabled(context, WKConstants.newRTCChannelID)
                         && PermissionHelper.isLockScreenNotificationEnabled(context, WKConstants.newMsgChannelID);
             } else {
-                // 其他品牌：只检测3项核心权限
+                // 其他品牌：只检测3项核心权限（vivo/OPPO 自启动无法检测，不参与判断）
                 allEnabled = PermissionHelper.isNotificationEnabled(context)
                         && PermissionHelper.isBatteryOptimizationIgnored(context)
-                        && PermissionHelper.isAutoStartEnabled(context);
+                        && (PermissionHelper.isAutoStartUndetectable(context) || PermissionHelper.isAutoStartEnabled(context));
             }
             return !allEnabled;
         }

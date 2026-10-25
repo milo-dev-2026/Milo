@@ -3,6 +3,7 @@ import SnapKit
 import MAMapKit
 import AMapLocationKit
 import AMapSearchKit
+import CoreLocation
 
 // MARK: - 地图选点页
 struct PickedLocation {

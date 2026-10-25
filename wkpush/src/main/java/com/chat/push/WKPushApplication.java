@@ -5,6 +5,8 @@ import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
@@ -190,24 +192,56 @@ public class WKPushApplication {
             NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
 
             String channelId = WKConstants.newMsgChannelID;
-            String channelName = "Default_Channel";
+            String channelName = "新消息通知";
             String channelDescription = "this is default channel!";
             NotificationChannel mNotificationChannel = new NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_HIGH);
             mNotificationChannel.setDescription(channelDescription);
             mNotificationChannel.enableVibration(true);
             mNotificationChannel.enableLights(true);
             mNotificationChannel.setShowBadge(true);
+            // 来消息提示音：使用 utalk 的 msg_notify 音频（渠道创建后声音不可改，故配合渠道 ID 升级生效）
+            try {
+                Uri newMsgSound = Uri.parse("android.resource://" + context.getPackageName() + "/" + com.chat.base.R.raw.msg_notify);
+                mNotificationChannel.setSound(newMsgSound, new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+            } catch (Exception e) {
+                Log.e(TAG, "设置来消息提示音失败: " + e.getMessage());
+            }
+            mNotificationChannel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
             nm.createNotificationChannel(mNotificationChannel);
 
             String rtcChannelId = WKConstants.newRTCChannelID;
-            String rtcChannelName = "VoiceCall_Channel";
+            String rtcChannelName = "语音通话提醒";
             String rtcChannelDescription = "voice and video call notification channel";
             NotificationChannel rtcChannel = new NotificationChannel(rtcChannelId, rtcChannelName, NotificationManager.IMPORTANCE_HIGH);
             rtcChannel.setDescription(rtcChannelDescription);
             rtcChannel.enableVibration(true);
+            rtcChannel.setVibrationPattern(new long[]{0, 4000, 2000, 4000});
             rtcChannel.enableLights(true);
             rtcChannel.setShowBadge(true);
+            // 语音通话使用系统默认来电铃声
+            try {
+                Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                rtcChannel.setSound(ringtone, new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+            } catch (Exception e) {
+                Log.e(TAG, "设置来电铃声失败: " + e.getMessage());
+            }
+            rtcChannel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
             nm.createNotificationChannel(rtcChannel);
+
+            // 清理历史版本的旧渠道，避免系统设置里出现多个重复的“新消息通知/语音通话提醒”
+            try {
+                nm.deleteNotificationChannel("wk_new_msg_notification_v2");
+                nm.deleteNotificationChannel("wk_new_msg_notification_v3");
+                nm.deleteNotificationChannel("wk_new_rtc_notification_v2");
+            } catch (Exception e) {
+                Log.e(TAG, "清理旧通知渠道失败: " + e.getMessage());
+            }
         }
     }
 

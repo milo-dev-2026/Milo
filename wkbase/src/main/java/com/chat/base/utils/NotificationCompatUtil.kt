@@ -107,6 +107,10 @@ class NotificationCompatUtil {
                 NotificationChannel(channel.channelId, channel.name, channel.importance)
             notificationChannel.description = channel.description   // 描述
             notificationChannel.vibrationPattern = channel.vibrate  // 震动模式
+            notificationChannel.enableVibration(channel.vibrate != null)
+            notificationChannel.enableLights(true)
+            notificationChannel.setShowBadge(true)
+            notificationChannel.lockscreenVisibility = channel.lockScreenVisibility  // 锁屏可见性
             notificationChannel.setSound(channel.sound ?: Settings.System.DEFAULT_NOTIFICATION_URI, notificationChannel.audioAttributes)    // 声音
             val notificationManager =
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

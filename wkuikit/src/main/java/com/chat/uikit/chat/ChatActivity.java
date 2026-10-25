@@ -263,41 +263,42 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (extraList == null || extraList.isEmpty() || chatAdapter == null) return false;
         List<com.chat.base.msgitem.WKUIChatMsgItemEntity> data = chatAdapter.getData();
         if (data == null || data.isEmpty()) return false;
+        // 【性能修复】原来对每条消息遍历整份 extraList（O(消息数 * extra数)），
+        // 消息多时会在主线程卡住数秒；改为先建索引再单次遍历。
+        java.util.HashMap<String, com.chat.uikit.message.entity.WKSyncExtraMsgEntity> extraMap =
+                new java.util.HashMap<>(extraList.size() * 2);
+        for (com.chat.uikit.message.entity.WKSyncExtraMsgEntity extra : extraList) {
+            if (extra != null && !TextUtils.isEmpty(extra.message_id)) {
+                extraMap.put(extra.message_id, extra);
+            }
+        }
+        if (extraMap.isEmpty()) return false;
 
         int updatedCount = 0;
-        int revokeUpdated = 0;
-        int readedUpdated = 0;
-
         for (com.chat.base.msgitem.WKUIChatMsgItemEntity item : data) {
             if (item.wkMsg == null || TextUtils.isEmpty(item.wkMsg.messageID)) continue;
-            for (com.chat.uikit.message.entity.WKSyncExtraMsgEntity extra : extraList) {
-                if (TextUtils.isEmpty(extra.message_id)) continue;
-                if (item.wkMsg.messageID.equals(extra.message_id)) {
-                    if (item.wkMsg.remoteExtra == null) {
-                        item.wkMsg.remoteExtra = new com.xinbida.wukongim.entity.WKMsgExtra();
-                    }
-                    boolean changed = false;
-                    if (item.wkMsg.remoteExtra.revoke != extra.revoke) {
-                        item.wkMsg.remoteExtra.revoke = extra.revoke;
-                        if (extra.revoke == 1) revokeUpdated++;
-                        changed = true;
-                    }
-                    if (extra.revoker != null && !extra.revoker.equals(item.wkMsg.remoteExtra.revoker)) {
-                        item.wkMsg.remoteExtra.revoker = extra.revoker;
-                        changed = true;
-                    }
-                    if (item.wkMsg.remoteExtra.readedCount != extra.readed_count) {
-                        item.wkMsg.remoteExtra.readedCount = extra.readed_count;
-                        if (extra.readed_count > 0) readedUpdated++;
-                        changed = true;
-                    }
-                    item.wkMsg.remoteExtra.readed = extra.readed;
-                    if (changed) {
-                        item.isUpdateStatus = true;
-                        updatedCount++;
-                    }
-                    break;
-                }
+            com.chat.uikit.message.entity.WKSyncExtraMsgEntity extra = extraMap.get(item.wkMsg.messageID);
+            if (extra == null) continue;
+            if (item.wkMsg.remoteExtra == null) {
+                item.wkMsg.remoteExtra = new com.xinbida.wukongim.entity.WKMsgExtra();
+            }
+            boolean changed = false;
+            if (item.wkMsg.remoteExtra.revoke != extra.revoke) {
+                item.wkMsg.remoteExtra.revoke = extra.revoke;
+                changed = true;
+            }
+            if (extra.revoker != null && !extra.revoker.equals(item.wkMsg.remoteExtra.revoker)) {
+                item.wkMsg.remoteExtra.revoker = extra.revoker;
+                changed = true;
+            }
+            if (item.wkMsg.remoteExtra.readedCount != extra.readed_count) {
+                item.wkMsg.remoteExtra.readedCount = extra.readed_count;
+                changed = true;
+            }
+            item.wkMsg.remoteExtra.readed = extra.readed;
+            if (changed) {
+                item.isUpdateStatus = true;
+                updatedCount++;
             }
         }
 
@@ -460,11 +461,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         chatPanelManager.initRefreshListener();
         EndpointManager.getInstance().invoke("start_screen_shot", this);
         MsgModel.getInstance().syncExtraMsg(channelId, channelType,
-            allExtraList -> applyExtraToAdapter(allExtraList),
+            allExtraList -> isExtraDataChanged = applyExtraToAdapter(allExtraList),
             () -> {
                 restorePinnedBanner();
-                if (chatAdapter != null) {
+                // 【性能修复】只有状态真正变化时才全量刷新，避免每次进页面都重绑整份列表
+                if (chatAdapter != null && isExtraDataChanged) {
                     chatAdapter.notifyDataSetChanged();
+                    isExtraDataChanged = false;
                 }
             });
         // 启动定时同步消息扩展（撤回/已读状态）
@@ -581,7 +584,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     }
                     return null;
                 });
-                initData();
+                // onCreate 中已调用过 initData()，这里重复调用会导致两次网络同步和两个定时器
             } catch (Throwable e) {
                 Log.e("ChatActivity", "ChatPanelManager init failed: " + e.getMessage(), e);
             }
@@ -3264,6 +3267,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         WKIMUtils.getInstance().resetMsgProhibitWord(wkMsg);
         List<WKUIChatMsgItemEntity> list = chatAdapter.getData();
         chatAdapter.refreshReplyMsg(wkMsg);
+        // 置顶消息只读一次，避免循环内反复 String.format + 读 SP
+        String localPinnedClientMsgNO = WKSharedPreferencesUtil.getInstance()
+                .getSPWithUID(String.format("pinned_msg_%s_%s", channelId, channelType));
         for (int i = 0, size = list.size(); i < size; i++) {
             if (list.get(i).wkMsg == null) {
                 continue;
@@ -3316,11 +3322,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 ) {
                     list.get(i).isUpdateStatus = true;
                     isResetStatus = true;
-                    android.util.Log.d("WKReceiptDebug",
-                        "refreshMsg status changed: msgID=" + wkMsg.messageID
-                            + ", oldReadedCount=" + oldReadedCount
-                            + ", newReadedCount=" + wkMsg.remoteExtra.readedCount
-                            + ", isResetStatus=true");
                 }
                 if (list.get(i).wkMsg.remoteExtra.isPinned != wkMsg.remoteExtra.isPinned) {
                     isResetStatus = true;
@@ -3332,8 +3333,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     list.get(i).isPinned = 0;
                 }
                 list.get(i).wkMsg.remoteExtra.isPinned = wkMsg.remoteExtra.isPinned;
-                String localPinKey = String.format("pinned_msg_%s_%s", channelId, channelType);
-                String localPinnedMsgNO = WKSharedPreferencesUtil.getInstance().getSPWithUID(localPinKey);
+                String localPinnedMsgNO = localPinnedClientMsgNO;
                 if (!TextUtils.isEmpty(localPinnedMsgNO)
                         && list.get(i).wkMsg.clientMsgNO != null
                         && list.get(i).wkMsg.clientMsgNO.equals(localPinnedMsgNO)) {
@@ -3374,11 +3374,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 if (isNotify) {
                     EndpointManager.getInstance().invoke("stop_reaction_animation", null);
                     chatAdapter.notifyItemChanged(i);
-                    android.util.Log.d("WKReceiptDebug", "refreshMsg full notify: msgID=" + wkMsg.messageID + ", position=" + i);
                 } else {
                     if (isResetStatus) {
                         chatAdapter.notifyStatus(i);
-                        android.util.Log.d("WKReceiptDebug", "refreshMsg notifyStatus: msgID=" + wkMsg.messageID + ", position=" + i);
                     }
                     if (isResetData) {
                         chatAdapter.notifyData(i);

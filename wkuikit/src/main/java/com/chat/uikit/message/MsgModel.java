@@ -818,85 +818,99 @@ public class MsgModel extends WKBaseModel {
 
                 if (count > 0 && list != null) {
                     allData.addAll(list);
-                    for (WKSyncExtraMsgEntity extra : list) {
-                        long ver = extra.version > 0 ? extra.version : extra.extra_version;
-                        if (ver > maxVersion[0]) {
-                            maxVersion[0] = ver;
-                        }
-                        // 更新到SDK内存并持久化到数据库，确保下次进入聊天页直接显示
-                        if (!TextUtils.isEmpty(extra.message_id)) {
-                            WKMsg wkMsg = WKIM.getInstance().getMsgManager().getWithMessageID(extra.message_id);
-                            if (wkMsg != null) {
-                                if (wkMsg.remoteExtra == null) {
-                                    wkMsg.remoteExtra = new WKMsgExtra();
+                    // 【性能修复】逐条查库/写库 + 批量 saveRemoteExtraMsg 都是 SQLCipher 重活，
+                    // 以前在 RxJava 的 main 线程回调里执行，会让主线程卡住数秒甚至一分钟（ANR/黑屏）。
+                    // 现在全部放到后台线程，处理完再回主线程回调。
+                    final int finalCount = count;
+                    final List<WKSyncExtraMsgEntity> finalList = list;
+                    Thread worker = new Thread(() -> {
+                        for (WKSyncExtraMsgEntity extra : finalList) {
+                            long ver = extra.version > 0 ? extra.version : extra.extra_version;
+                            if (ver > maxVersion[0]) {
+                                maxVersion[0] = ver;
+                            }
+                            try {
+                                if (!TextUtils.isEmpty(extra.message_id)) {
+                                    WKMsg wkMsg = WKIM.getInstance().getMsgManager().getWithMessageID(extra.message_id);
+                                    if (wkMsg != null) {
+                                        if (wkMsg.remoteExtra == null) {
+                                            wkMsg.remoteExtra = new WKMsgExtra();
+                                        }
+                                        boolean changed = false;
+                                        if (wkMsg.remoteExtra.revoke != extra.revoke) {
+                                            wkMsg.remoteExtra.revoke = extra.revoke;
+                                            changed = true;
+                                        }
+                                        if (extra.revoker != null && !extra.revoker.equals(wkMsg.remoteExtra.revoker)) {
+                                            wkMsg.remoteExtra.revoker = extra.revoker;
+                                            changed = true;
+                                        }
+                                        if (wkMsg.remoteExtra.readedCount != extra.readed_count) {
+                                            wkMsg.remoteExtra.readedCount = extra.readed_count;
+                                            changed = true;
+                                        }
+                                        wkMsg.remoteExtra.readed = extra.readed;
+                                        if (changed) {
+                                            // 保持原有持久化行为（现在已不在主线程执行，不会再卡界面）
+                                            WKIM.getInstance().getMsgManager().setRefreshMsg(wkMsg, true);
+                                        }
+                                    }
                                 }
-                                boolean changed = false;
-                                if (wkMsg.remoteExtra.revoke != extra.revoke) {
-                                    wkMsg.remoteExtra.revoke = extra.revoke;
-                                    changed = true;
-                                }
-                                if (extra.revoker != null && !extra.revoker.equals(wkMsg.remoteExtra.revoker)) {
-                                    wkMsg.remoteExtra.revoker = extra.revoker;
-                                    changed = true;
-                                }
-                                if (wkMsg.remoteExtra.readedCount != extra.readed_count) {
-                                    wkMsg.remoteExtra.readedCount = extra.readed_count;
-                                    changed = true;
-                                }
-                                wkMsg.remoteExtra.readed = extra.readed;
-                                if (changed) {
-                                    // setRefreshMsg第二个参数为true表示持久化到数据库
-                                    WKIM.getInstance().getMsgManager().setRefreshMsg(wkMsg, true);
-                                }
+                            } catch (Exception ignore) {
+                                // 单条失败不影响其它消息
                             }
                         }
-                    }
-                    // 服务端LIMIT 100，如果返回了100条，说明还有更多数据，继续同步
-                    if (count >= 100 && maxVersion[0] > startVersion) {
-
-                        syncExtraMsgLoop(syncChannelId, originalChannelId, channelType, maxVersion[0], allData, callback, onComplete);
-                        return;
-                    }
-                }
-                // 同步完成
-                // 记录已同步到的版本，下次只做增量拉取
-                WKSharedPreferencesUtil.getInstance().putSPWithUID("sync_extra_version_" + originalChannelId + "_" + channelType, String.valueOf(maxVersion[0]));
-                // 保存到SDK数据库（下次进入聊天页直接显示）
-                if (!allData.isEmpty()) {
-                    try {
-                        List<WKSyncExtraMsg> sdkList = new ArrayList<>();
-                        for (WKSyncExtraMsgEntity entity : allData) {
-                            WKSyncExtraMsg sdkExtra = new WKSyncExtraMsg();
-                            // SDK的WKSyncExtraMsg字段可能被混淆了，用反射赋值
-                            setFieldValue(sdkExtra, "message_id", entity.message_id);
-                            setFieldValue(sdkExtra, "messageID", entity.message_id);
-                            setFieldValue(sdkExtra, "channel_id", originalChannelId);
-                            setFieldValue(sdkExtra, "channelID", originalChannelId);
-                            setFieldValue(sdkExtra, "channel_type", (int) channelType);
-                            setFieldValue(sdkExtra, "channelType", (int) channelType);
-                            setFieldValue(sdkExtra, "revoke", entity.revoke);
-                            setFieldValue(sdkExtra, "revoker", entity.revoker);
-                            setFieldValue(sdkExtra, "readed_count", entity.readed_count);
-                            setFieldValue(sdkExtra, "readedCount", entity.readed_count);
-                            setFieldValue(sdkExtra, "readed", entity.readed);
-                            setFieldValue(sdkExtra, "extra_version", entity.extra_version);
-                            setFieldValue(sdkExtra, "extraVersion", entity.extra_version);
-                            sdkList.add(sdkExtra);
+                        // 【性能修复】每页处理完立即记录版本，避免同步被中断后下次从头全量重拉
+                        WKSharedPreferencesUtil.getInstance().putSPWithUID("sync_extra_version_" + originalChannelId + "_" + channelType, String.valueOf(maxVersion[0]));
+                        // 服务端LIMIT 200，返回条数达到批量上限说明还有更多数据，继续同步
+                        if (finalCount >= 100 && maxVersion[0] > startVersion) {
+                            new Handler(Looper.getMainLooper()).post(() ->
+                                    syncExtraMsgLoop(syncChannelId, originalChannelId, channelType, maxVersion[0], allData, callback, onComplete));
+                            return;
                         }
-                        com.xinbida.wukongim.entity.WKChannel channel =
-                            new com.xinbida.wukongim.entity.WKChannel(originalChannelId, channelType);
-                        WKIM.getInstance().getMsgManager().saveRemoteExtraMsg(channel, sdkList);
-                        android.util.Log.d("WKReceiptDebug", "saveRemoteExtraMsg: saved " + sdkList.size() + " items to DB");
-                    } catch (Exception e) {
-                        android.util.Log.e("WKReceiptDebug", "saveRemoteExtraMsg error: " + e.getMessage());
-                    }
+                        // 保存到SDK数据库（下次进入聊天页直接显示）
+                        if (!allData.isEmpty()) {
+                            try {
+                                List<WKSyncExtraMsg> sdkList = new ArrayList<>();
+                                for (WKSyncExtraMsgEntity entity : allData) {
+                                    WKSyncExtraMsg sdkExtra = new WKSyncExtraMsg();
+                                    // SDK的WKSyncExtraMsg字段可能被混淆了，用反射赋值
+                                    setFieldValue(sdkExtra, "message_id", entity.message_id);
+                                    setFieldValue(sdkExtra, "messageID", entity.message_id);
+                                    setFieldValue(sdkExtra, "channel_id", originalChannelId);
+                                    setFieldValue(sdkExtra, "channelID", originalChannelId);
+                                    setFieldValue(sdkExtra, "channel_type", (int) channelType);
+                                    setFieldValue(sdkExtra, "channelType", (int) channelType);
+                                    setFieldValue(sdkExtra, "revoke", entity.revoke);
+                                    setFieldValue(sdkExtra, "revoker", entity.revoker);
+                                    setFieldValue(sdkExtra, "readed_count", entity.readed_count);
+                                    setFieldValue(sdkExtra, "readedCount", entity.readed_count);
+                                    setFieldValue(sdkExtra, "readed", entity.readed);
+                                    setFieldValue(sdkExtra, "extra_version", entity.extra_version);
+                                    setFieldValue(sdkExtra, "extraVersion", entity.extra_version);
+                                    sdkList.add(sdkExtra);
+                                }
+                                com.xinbida.wukongim.entity.WKChannel channel =
+                                        new com.xinbida.wukongim.entity.WKChannel(originalChannelId, channelType);
+                                WKIM.getInstance().getMsgManager().saveRemoteExtraMsg(channel, sdkList);
+                            } catch (Exception e) {
+                                android.util.Log.e("WKReceiptDebug", "saveRemoteExtraMsg error: " + e.getMessage());
+                            }
+                        }
+                        new Handler(Looper.getMainLooper()).post(() -> {
+                            if (callback != null) {
+                                callback.onSyncResult(allData);
+                            }
+                            if (onComplete != null) {
+                                onComplete.run();
+                            }
+                        });
+                    }, "sync-extra-worker");
+                    worker.start();
+                    return;
                 }
-                if (callback != null) {
-                    callback.onSyncResult(allData);
-                }
-                if (onComplete != null) {
-                    new Handler(Looper.getMainLooper()).post(onComplete);
-                }
+                // 本轮没有新增数据，直接收尾
+
             }
 
             @Override

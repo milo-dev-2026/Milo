@@ -21,7 +21,7 @@ object PushNotificationHelper {
         importance = NotificationManager.IMPORTANCE_HIGH,
         lockScreenVisibility = NotificationCompat.VISIBILITY_PUBLIC,
         vibrate = longArrayOf(0, 200),
-        sound = Uri.parse("android.resource://" + WKBaseApplication.getInstance().context.packageName + "/" + R.raw.newmsg)
+        sound = Uri.parse("android.resource://" + WKBaseApplication.getInstance().context.packageName + "/" + com.chat.base.R.raw.msg_notify)
     )
 
     /** 通知渠道-@提醒消息(重要性级别-紧急：发出提示音，并以浮动通知的形式显示 & 锁屏显示 & 振动0.25s )*/
@@ -31,7 +31,7 @@ object PushNotificationHelper {
         importance = NotificationManager.IMPORTANCE_HIGH,
         lockScreenVisibility = NotificationCompat.VISIBILITY_PUBLIC,
         vibrate = longArrayOf(0, 250),
-        sound = Uri.parse("android.resource://" + WKBaseApplication.getInstance().context.packageName + "/" + R.raw.newmsg)
+        sound = Uri.parse("android.resource://" + WKBaseApplication.getInstance().context.packageName + "/" + com.chat.base.R.raw.msg_notify)
     )
 
     /** 通知渠道-系统通知(重要性级别-中：无提示音) */
@@ -48,7 +48,7 @@ object PushNotificationHelper {
         importance = NotificationManager.IMPORTANCE_HIGH,
         lockScreenVisibility = NotificationCompat.VISIBILITY_PUBLIC,
         vibrate = longArrayOf(0, 4000, 2000, 4000),
-        sound = Uri.parse("android.resource://" + WKBaseApplication.getInstance().context.packageName + "/" + R.raw.newrtc)
+        sound = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
     )
 
     /**

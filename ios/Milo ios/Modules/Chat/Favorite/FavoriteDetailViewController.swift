@@ -4,6 +4,7 @@ import Kingfisher
 import AVFoundation
 import AVKit
 import MapKit
+import CoreLocation
 
 // MARK: - 收藏详情页
 class FavoriteDetailViewController: UIViewController {

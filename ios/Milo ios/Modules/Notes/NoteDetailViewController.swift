@@ -3,6 +3,7 @@ import SnapKit
 import Kingfisher
 import AVKit
 import MapKit
+import CoreLocation
 
 // MARK: - 笔记详情页
 class NoteDetailViewController: UIViewController {
