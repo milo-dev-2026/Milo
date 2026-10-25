@@ -221,15 +221,19 @@ class ChatFileViewController: UIViewController, UITableViewDataSource, UITableVi
         // 从 IM SDK 获取频道历史消息，筛选文件类型
         Task {
             do {
-                let messages = try await IMManager.shared.syncChannelMessages(channelId: channelId, channelType: channelType, limit: 200)
+                let messages = try await withCheckedThrowingContinuation { continuation in
+                    IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 200) { msgs, error in
+                        if let error = error { continuation.resume(throwing: error) }
+                        else { continuation.resume(returning: msgs ?? []) }
+                    }
+                }
                 var list: [(name: String, size: String, type: String, date: String, url: String)] = []
                 for msg in messages {
-                    if msg.contentType == .file {
-                        let content = msg.content ?? ""
-                        let parts = content.components(separatedBy: "|")
-                        let fileName = parts.count > 0 ? parts[0] : "未知文件"
-                        let fileSize = parts.count > 1 ? parts[1] : ""
-                        let fileUrl = parts.count > 2 ? parts[2] : ""
+                    if msg.content is WKFileMessageContent {
+                        let content = (msg.content as? WKFileMessageContent)?.fileName ?? ""
+                        let fileName = content.isEmpty ? "未知文件" : content
+                        let fileSize = "\((msg.content as? WKFileMessageContent)?.fileSize ?? 0)"
+                        let fileUrl = (msg.content as? WKFileMessageContent)?.url ?? ""
                         let date = AppUtility.formatTimestamp(msg.timestamp)
                         let ext = (fileName as NSString).pathExtension.lowercased()
                         list.append((name: fileName, size: fileSize, type: ext, date: date, url: fileUrl))
