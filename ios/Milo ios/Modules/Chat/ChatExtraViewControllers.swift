@@ -1,6 +1,7 @@
 import UIKit
 import SnapKit
 import AVFoundation
+import WuKongIMSDK
 
 class RecordingViewController: UIViewController {
 

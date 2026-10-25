@@ -119,12 +119,11 @@ class CacheManagerViewController: UIViewController, UITableViewDataSource, UITab
     // MARK: - 缓存大小计算
 
     private func loadCacheSizes() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
+        Task {
             var sizes: [CacheCategory: UInt64] = [:]
 
             // 图片缓存 = Kingfisher 磁盘缓存 + Caches/image
-            let kfSize = UInt64(ImageCache.default.diskStorageSize)
+            let kfSize = UInt64((try? await ImageCache.default.diskStorageSize) ?? 0)
             sizes[.image] = kfSize + self.folderSize(self.cachesURL.appendingPathComponent("image", isDirectory: true))
 
             for category in [CacheCategory.video, .voice, .file] {
