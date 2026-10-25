@@ -344,20 +344,5 @@ class RecordSearchViewController: UIViewController, UITableViewDataSource, UITab
 }
 
 // MARK: - 消息列表
-class MailListViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private var messages: [(messageId: String, content: String, sender: String, time: String)] = []
-
-    override func viewDidLoad() {
-        super.viewDidLoad(); title = "消息列表"; view.backgroundColor = .themeBackground
-        tableView.dataSource = self; tableView.delegate = self; tableView.register(UITableViewCell.self, forCellReuseIdentifier: "MLCell")
-        view.addSubview(tableView); tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
-    }
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(messages.count, 1) }
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "MLCell", for: indexPath)
-        if messages.isEmpty { cell.textLabel?.text = "暂无消息"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
-        else { let m = messages[indexPath.row]; cell.textLabel?.text = m.content; cell.detailTextLabel?.text = "\(m.sender)  \(m.time)" }
-        return cell
-    }
-}
+// 注意：MailListViewController 已移至 Modules/Contacts/MailListViewController.swift（手机通讯录导入）
+// 此处原消息列表功能已由 ChatSearchViewController 覆盖，删除避免重复定义
