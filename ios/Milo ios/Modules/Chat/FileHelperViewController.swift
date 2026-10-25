@@ -39,11 +39,24 @@ struct FileTransferRecord: Codable {
 // MARK: - 文件传输助手控制器
 class FileHelperViewController: UIViewController {
 
+    /// 页面模式：文件传输助手 / 系统通知（复用同一页面）
+    enum Mode {
+        case fileHelper
+        case systemNotice
+    }
+
     // MARK: - 常量
-    /// 文件传输助手频道
-    private let fileHelperChannelId = "file_helper"
-    private let fileHelperChannelType = 1
+    /// 文件传输助手频道（固定 channelId，对齐后端/Android 虚拟账号）
+    private var channelId: String {
+        return mode == .fileHelper ? "system_file_helper" : "system_notice"
+    }
+    private let channelType = 1
     private let storageKey = "file_helper_records"
+    /// 系统通知复用系统消息本地存储（SystemTeamViewController 使用同一 Key）
+    private let noticeStorageKey = "system_team_messages"
+
+    // MARK: - 数据
+    private let mode: Mode
 
     // MARK: - UI 组件
     private let tableView = UITableView(frame: .zero, style: .plain)
@@ -51,13 +64,29 @@ class FileHelperViewController: UIViewController {
 
     // MARK: - 数据
     private var records: [FileTransferRecord] = []
+    private var notices: [SystemNotice] = []
     private var imagePicker: UIImagePickerController?
+
+    // MARK: - 初始化
+    init(mode: Mode = .fileHelper) {
+        self.mode = mode
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     // MARK: - 生命周期
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        loadRecords()
+        if mode == .fileHelper {
+            loadRecords()
+        } else {
+            loadNotices()
+        }
+        ensureLocalConversation()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -65,9 +94,16 @@ class FileHelperViewController: UIViewController {
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
+    /// 保证本地会话记录存在（会话列表由会话模块统一展示）
+    private func ensureLocalConversation() {
+        if IMManager.shared.getConversation(channelId: channelId, channelType: channelType) == nil {
+            IMManager.shared.recoveryConversation(channelId: channelId, channelType: channelType)
+        }
+    }
+
     // MARK: - UI 设置
     private func setupUI() {
-        title = "文件传输助手"
+        title = mode == .fileHelper ? "文件传输助手" : "系统通知"
         view.backgroundColor = .themeBackground
 
         // 导航栏返回按钮
@@ -80,21 +116,24 @@ class FileHelperViewController: UIViewController {
         backBtn.tintColor = .label
         navigationItem.leftBarButtonItem = backBtn
 
-        // 右上角 "+" 按钮
-        let addBtn = UIBarButtonItem(
-            image: UIImage(systemName: "plus"),
-            style: .plain,
-            target: self,
-            action: #selector(addTapped)
-        )
-        addBtn.tintColor = .label
-        navigationItem.rightBarButtonItem = addBtn
-
+        // 右上角 "+" 按钮（仅文件传输助手）
+        if mode == .fileHelper {
+            let addBtn = UIBarButtonItem(
+                image: UIImage(systemName: "plus"),
+                style: .plain,
+                target: self,
+                action: #selector(addTapped)
+            )
+            addBtn.tintColor = .label
+            navigationItem.rightBarButtonItem = addBtn
+        }
         // 列表
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(FileTransferCell.self, forCellReuseIdentifier: "FileTransferCell")
-        tableView.rowHeight = ScreenAdapter.scaleH(72)
+        tableView.register(SystemNoticeMessageCell.self, forCellReuseIdentifier: "SystemNoticeMessageCell")
+        tableView.rowHeight = mode == .fileHelper ? ScreenAdapter.scaleH(72) : UITableView.automaticDimension
+        tableView.estimatedRowHeight = ScreenAdapter.scaleH(72)
         tableView.backgroundColor = .clear
         tableView.separatorInset = UIEdgeInsets(top: 0, left: ScreenAdapter.scaleW(76), bottom: 0, right: 0)
         tableView.tableFooterView = UIView()
@@ -104,7 +143,7 @@ class FileHelperViewController: UIViewController {
         }
 
         // 空列表提示
-        emptyLabel.text = "暂无文件传输记录"
+        emptyLabel.text = mode == .fileHelper ? "暂无文件传输记录" : "暂无系统消息"
         emptyLabel.font = ScreenAdapter.font(15)
         emptyLabel.textColor = .themeTextSecondary
         emptyLabel.textAlignment = .center
@@ -129,6 +168,17 @@ class FileHelperViewController: UIViewController {
         tableView.reloadData()
     }
 
+    private func loadNotices() {
+        if let data = UserDefaults.standard.data(forKey: noticeStorageKey),
+           let list = try? JSONDecoder().decode([SystemNotice].self, from: data) {
+            notices = list.sorted { $0.timestamp > $1.timestamp }
+        } else {
+            notices = []
+        }
+        updateEmptyState()
+        tableView.reloadData()
+    }
+
     private func saveRecords() {
         if let data = try? JSONEncoder().encode(records) {
             UserDefaults.standard.set(data, forKey: storageKey)
@@ -136,7 +186,8 @@ class FileHelperViewController: UIViewController {
     }
 
     private func updateEmptyState() {
-        emptyLabel.isHidden = !records.isEmpty
+        let isEmpty = mode == .fileHelper ? records.isEmpty : notices.isEmpty
+        emptyLabel.isHidden = !isEmpty
     }
 
     // MARK: - 按钮事件
@@ -216,11 +267,11 @@ class FileHelperViewController: UIViewController {
                 switch result {
                 case .success(let cdnURL):
                     IMManager.shared.sendImageMessage(
-                        channelId: self.fileHelperChannelId,
+                        channelId: self.channelId,
                         imageURL: cdnURL,
                         width: image.size.width,
                         height: image.size.height,
-                        channelType: self.fileHelperChannelType
+                        channelType: self.channelType
                     )
                     record.status = .sent
                     record.remoteURL = cdnURL
@@ -264,11 +315,11 @@ class FileHelperViewController: UIViewController {
                 switch result {
                 case .success(let cdnURL):
                     IMManager.shared.sendFileMessage(
-                        channelId: self.fileHelperChannelId,
+                        channelId: self.channelId,
                         fileName: fileName,
                         fileSize: fileSize,
                         fileURL: cdnURL,
-                        channelType: self.fileHelperChannelType
+                        channelType: self.channelType
                     )
                     record.status = .sent
                     record.remoteURL = cdnURL
@@ -346,18 +397,34 @@ class FileHelperViewController: UIViewController {
 extension FileHelperViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return records.count
+        return mode == .fileHelper ? records.count : notices.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "FileTransferCell", for: indexPath) as! FileTransferCell
-        cell.configure(with: records[indexPath.row])
+        if mode == .fileHelper {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "FileTransferCell", for: indexPath) as! FileTransferCell
+            cell.configure(with: records[indexPath.row])
+            return cell
+        }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "SystemNoticeMessageCell", for: indexPath) as! SystemNoticeMessageCell
+        cell.configure(with: notices[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        guard mode == .fileHelper else {
+            showNoticeDetail(notices[indexPath.row])
+            return
+        }
         openOrShare(records[indexPath.row])
+    }
+
+    /// 系统通知只读展示
+    private func showNoticeDetail(_ notice: SystemNotice) {
+        let alert = UIAlertController(title: notice.title, message: notice.content, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
     }
 }
 
@@ -549,5 +616,80 @@ class FileTransferCell: UITableViewCell {
         if mb < 1024 { return String(format: "%.1f MB", mb) }
         let gb = mb / 1024.0
         return String(format: "%.2f GB", gb)
+    }
+}
+
+// MARK: - 系统通知消息 Cell（只读展示）
+class SystemNoticeMessageCell: UITableViewCell {
+
+    private let iconContainer = UIView()
+    private let iconImageView = UIImageView()
+    private let titleLabel = UILabel()
+    private let contentLabel = UILabel()
+    private let timeLabel = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = .themeBgWhite
+        contentView.backgroundColor = .themeBgWhite
+
+        iconContainer.layer.cornerRadius = 10
+        iconContainer.clipsToBounds = true
+        iconContainer.backgroundColor = .themeColorPrimaryLight
+        iconImageView.image = UIImage(systemName: "bell.badge.fill")
+        iconImageView.tintColor = .themeColorPrimary
+        iconImageView.contentMode = .scaleAspectFit
+        iconContainer.addSubview(iconImageView)
+
+        titleLabel.font = ScreenAdapter.font(16)
+        titleLabel.textColor = .label
+        titleLabel.numberOfLines = 1
+
+        contentLabel.font = ScreenAdapter.font(13)
+        contentLabel.textColor = .themeTextSecondary
+        contentLabel.numberOfLines = 2
+
+        timeLabel.font = ScreenAdapter.font(11)
+        timeLabel.textColor = .themeTextTertiary
+        timeLabel.textAlignment = .right
+
+        let textStack = UIStackView(arrangedSubviews: [titleLabel, contentLabel])
+        textStack.axis = .vertical
+        textStack.spacing = 4
+
+        contentView.addSubviews(iconContainer, textStack, timeLabel)
+        iconContainer.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(ScreenAdapter.scaleW(40))
+        }
+        iconImageView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(22)
+        }
+        textStack.snp.makeConstraints { make in
+            make.leading.equalTo(iconContainer.snp.trailing).offset(ScreenAdapter.scaleW(12))
+            make.top.equalToSuperview().offset(12)
+            make.bottom.equalToSuperview().offset(-12)
+            make.trailing.lessThanOrEqualTo(timeLabel.snp.leading).offset(-ScreenAdapter.scaleW(8))
+        }
+        timeLabel.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+            make.top.equalTo(textStack.snp.top)
+        }
+    }
+
+    func configure(with notice: SystemNotice) {
+        titleLabel.text = notice.title
+        contentLabel.text = notice.content
+        timeLabel.text = AppUtility.formatTimestamp(notice.timestamp)
     }
 }

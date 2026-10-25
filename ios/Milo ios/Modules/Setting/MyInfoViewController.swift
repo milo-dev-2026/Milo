@@ -1,4 +1,4 @@
-﻿//
+//
 //  MyInfoViewController.swift
 //  Milo
 //
@@ -17,12 +17,12 @@ import Kingfisher
 class MyInfoViewController: UIViewController {
 
     private enum InfoRow {
-        case avatar, name, shortNo, sex, sign, qrcode
+        case avatar, name, shortNo, sex, qrcode
     }
 
     private let sections: [[InfoRow]] = [
         [.avatar, .name, .shortNo],
-        [.sex, .sign],
+        [.sex],
         [.qrcode]
     ]
 
@@ -35,7 +35,6 @@ class MyInfoViewController: UIViewController {
     private let headerNameLabel = UILabel()
     private let headerIdLabel = UILabel()
     private let headerSexLabel = UILabel()
-    private let headerSignLabel = UILabel()
 
     // 列表头像行的缩略图
     private let avatarThumbView = UIImageView()
@@ -58,7 +57,6 @@ class MyInfoViewController: UIViewController {
     private var uid = ""
     private var name = ""
     private var shortNo = ""
-    private var sign = ""
     private var sex: Int?
 
     private var sexText: String {
@@ -182,15 +180,6 @@ class MyInfoViewController: UIViewController {
         headerSexLabel.snp.makeConstraints { make in
             make.leading.trailing.equalTo(headerNameLabel)
             make.top.equalTo(headerIdLabel.snp.bottom).offset(6)
-        }
-
-        headerSignLabel.font = ScreenAdapter.font(13)
-        headerSignLabel.textColor = .secondaryLabel
-        headerSignLabel.numberOfLines = 2
-        headerCard.addSubview(headerSignLabel)
-        headerSignLabel.snp.makeConstraints { make in
-            make.leading.trailing.equalTo(headerNameLabel)
-            make.top.equalTo(headerSexLabel.snp.bottom).offset(6)
             make.bottom.equalToSuperview().offset(-16)
         }
     }
@@ -201,7 +190,6 @@ class MyInfoViewController: UIViewController {
         uid = defaults.string(forKey: "uid") ?? ""
         name = defaults.string(forKey: "name") ?? ""
         shortNo = defaults.string(forKey: "short_no") ?? ""
-        sign = defaults.string(forKey: "sign") ?? ""
         if let sexValue = defaults.object(forKey: "sex") as? Int {
             sex = sexValue
         } else if let sexStr = defaults.string(forKey: "sex"), let sexValue = Int(sexStr) {
@@ -211,9 +199,9 @@ class MyInfoViewController: UIViewController {
         }
 
         headerNameLabel.text = name.isEmpty ? "Milo用户" : name
-        headerIdLabel.text = "Milo号：\(shortNo.isEmpty ? uid : shortNo)"
+        headerIdLabel.text = shortNo.isEmpty ? nil : "Milo号: \(shortNo)"
+        headerIdLabel.isHidden = shortNo.isEmpty
         headerSexLabel.text = "性别：\(sexText)"
-        headerSignLabel.text = "签名：\(sign)"
 
         AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: name, into: headerAvatarView)
         AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: name, into: avatarThumbView)
@@ -304,14 +292,10 @@ extension MyInfoViewController: UITableViewDataSource, UITableViewDelegate {
             cell.detailTextLabel?.text = name.isEmpty ? "未设置" : name
         case .shortNo:
             cell.textLabel?.text = "Milo号"
-            cell.detailTextLabel?.text = shortNo.isEmpty ? uid : shortNo
+            cell.detailTextLabel?.text = shortNo.isEmpty ? "未设置" : shortNo
         case .sex:
             cell.textLabel?.text = "性别"
             cell.detailTextLabel?.text = sexText
-        case .sign:
-            cell.textLabel?.text = "签名"
-            cell.detailTextLabel?.text = sign.isEmpty ? "未设置" : sign
-            cell.detailTextLabel?.lineBreakMode = .byTruncatingTail
         case .qrcode:
             cell.textLabel?.text = "我的二维码"
             cell.imageView?.image = UIImage(systemName: "qrcode")
@@ -333,8 +317,6 @@ extension MyInfoViewController: UITableViewDataSource, UITableViewDelegate {
             if let cell = tableView.cellForRow(at: indexPath) {
                 showSexPicker(sourceView: cell)
             }
-        case .sign:
-            navigationController?.pushViewController(SignEditViewController(), animated: true)
         case .qrcode:
             showQRCode()
         }

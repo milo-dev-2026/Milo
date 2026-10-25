@@ -84,7 +84,8 @@ class NewFriendsViewController: UIViewController {
         Task {
             do {
                 let response = try await APIClient.shared.requestRaw(.acceptFriendApply(uid: apply.uid))
-                if response["status"] as? Int == 200 {
+                let status = response["status"] as? Int
+                if status == nil || status == 200 {
                     AppUtility.showToast("已同意")
                     loadData()
                 } else {
@@ -100,7 +101,8 @@ class NewFriendsViewController: UIViewController {
         Task {
             do {
                 let response = try await APIClient.shared.requestRaw(.rejectFriendApply(uid: apply.uid))
-                if response["status"] as? Int == 200 {
+                let status = response["status"] as? Int
+                if status == nil || status == 200 {
                     AppUtility.showToast("已拒绝")
                     loadData()
                 } else {

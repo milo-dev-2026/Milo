@@ -7,6 +7,7 @@ import AMapLocationKit
 import AMapSearchKit
 import UniformTypeIdentifiers
 import AVKit
+import WuKongIMSDK
 
 // MARK: - 聊天页
 class ChatViewController: UIViewController {
@@ -21,6 +22,38 @@ class ChatViewController: UIViewController {
     private var imagePicker: UIImagePickerController?
     private var typingTimer: Timer?
     private var isTyping = false
+
+    /// 上传中的本地缩略图（messageID → 图片），用于立刻展示占位气泡
+    private var pendingMedia: [String: UIImage] = [:]
+    /// 上传任务缓存（失败后点击气泡可重发）
+    private var pendingUploads: [String: PendingUpload] = [:]
+    /// 已上传成功、等待 SDK 回显替换的本地占位消息
+    private var confirmedLocalIDs: Set<String> = []
+    /// 本地占位语音消息的时长（messageID → 秒）
+    private var pendingVoiceDurations: [String: Int] = [:]
+    private let loadingContainer = UIView()
+    private let emptyLabel = UILabel()
+    private let onlineStatusLabel = UILabel()
+    private var hasFinishedLoading = false
+
+    /// 聊天文件上传专用会话（默认 30/60 秒对原图/视频不够）
+    private let uploadSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120
+        config.timeoutIntervalForResource = 300
+        return URLSession(configuration: config)
+    }()
+
+    private struct PendingUpload {
+        let type: MessageType
+        let data: Data?
+        let sourceURL: URL?
+        let fileName: String
+        let width: CGFloat
+        let height: CGFloat
+        let duration: Int
+        let thumbnail: UIImage?
+    }
 
     init(channelId: String, title: String, channelType: Int = 1) {
         self.channelId = channelId
@@ -38,7 +71,10 @@ class ChatViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        setupLoadingView()
         setupNavBar()
+        // 先读本地已缓存消息立即渲染，再异步拉取服务端补齐
+        loadCachedMessages()
         loadMessages()
         setupKeyboardObserver()
 
@@ -89,6 +125,19 @@ class ChatViewController: UIViewController {
     private func handleIncomingMessage(_ msg: Message) {
         guard msg.channelID == channelId else { return }
         if messages.contains(where: { $0.messageID == msg.messageID }) { return }
+        // 自己发送成功的消息回显：替换本地占位气泡，避免重复
+        if msg.isFromMe,
+           let idx = messages.firstIndex(where: {
+               $0.isFromMe && self.confirmedLocalIDs.contains($0.messageID) && $0.type == msg.type && $0.content == msg.content
+           }) {
+            confirmedLocalIDs.remove(messages[idx].messageID)
+            messages[idx] = msg
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                self.scrollToBottom()
+            }
+            return
+        }
         messages.append(msg)
         DispatchQueue.main.async {
             self.tableView.reloadData()
@@ -99,6 +148,15 @@ class ChatViewController: UIViewController {
     private func setupUI() {
         title = titleText
         applyChatBackground()
+        emptyLabel.text = "暂无消息"
+        emptyLabel.font = ScreenAdapter.font(14)
+        emptyLabel.textColor = .tertiaryLabel
+        emptyLabel.textAlignment = .center
+        emptyLabel.isHidden = true
+        view.addSubview(emptyLabel)
+        emptyLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
 
         tableView.dataSource = self
         tableView.delegate = self
@@ -110,6 +168,7 @@ class ChatViewController: UIViewController {
         tableView.register(LocationMessageCell.self, forCellReuseIdentifier: "LocationMessageCell")
         tableView.register(CardMessageCell.self, forCellReuseIdentifier: "CardMessageCell")
         tableView.register(NoteMessageCell.self, forCellReuseIdentifier: "NoteMessageCell")
+        tableView.register(PendingMediaMessageCell.self, forCellReuseIdentifier: "PendingMediaMessageCell")
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
         // 自适应行高：气泡高度随内容撑开
@@ -141,18 +200,109 @@ class ChatViewController: UIViewController {
         super.viewWillAppear(animated)
         // 从聊天背景设置页返回时刷新背景
         applyChatBackground()
+        refreshCachedOnlineStatus()
     }
 
-    /// 应用聊天背景设置（与聊天背景设置页 chat_bg_index 联动）
+    // MARK: - 首屏加载骨架
+    private func setupLoadingView() {
+        loadingContainer.isUserInteractionEnabled = false
+        view.addSubview(loadingContainer)
+        loadingContainer.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(12))
+            make.leading.trailing.equalToSuperview().inset(ScreenAdapter.scaleW(16))
+            make.height.equalTo(ScreenAdapter.scaleH(300))
+        }
+
+        var offset: CGFloat = 0
+        let heights: [CGFloat] = [40, 40, 64, 40]
+        let widths: [CGFloat] = [0.58, 0.42, 0.66, 0.5]
+        for index in 0..<heights.count {
+            let bar = UIView()
+            bar.backgroundColor = UIColor.systemGray5.withAlphaComponent(0.75)
+            bar.layer.cornerRadius = ScreenAdapter.scaleW(10)
+            loadingContainer.addSubview(bar)
+            let widthRatio = widths[index]
+            let isFromMe = index % 2 == 1
+            bar.snp.makeConstraints { make in
+                make.top.equalToSuperview().offset(offset)
+                make.height.equalTo(ScreenAdapter.scaleH(heights[index]))
+                make.width.equalToSuperview().multipliedBy(widthRatio)
+                if isFromMe {
+                    make.trailing.equalToSuperview()
+                } else {
+                    make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(44))
+                }
+            }
+            offset += ScreenAdapter.scaleH(heights[index]) + ScreenAdapter.scaleH(16)
+        }
+
+        UIView.animate(withDuration: 0.9, delay: 0, options: [.repeat, .autoreverse, .allowUserInteraction]) {
+            self.loadingContainer.alpha = 0.45
+        }
+    }
+
+    private func finishLoading() {
+        hasFinishedLoading = true
+        loadingContainer.layer.removeAllAnimations()
+        loadingContainer.isHidden = true
+        emptyLabel.isHidden = !messages.isEmpty
+    }
+
+    // MARK: - 聊天背景（会话级 > 全局 > 兼容 chat_bg_index）
+    private static let androidChatBgColors: [UIColor] = [
+        0xFFFFFF, 0xF5F5F5, 0xE8F5E9, 0xE3F2FD, 0xFCE4EC, 0xFFF3E0,
+        0xF3E5F5, 0xE0F7FA, 0xEFEBE9, 0xECEFF1, 0xFFFDE7, 0xF1F8E9
+    ].map { UIColor.hex(String(format: "%06X", $0)) }
+
     private func applyChatBackground() {
-        view.backgroundColor = ChatBackgroundViewController.currentColor
+        let defaults = UserDefaults.standard
+        var color: UIColor?
+
+        // 会话级背景：chat_bg_<channelId>
+        if let value = defaults.string(forKey: "chat_bg_\(channelId)"), !value.isEmpty {
+            color = ChatViewController.color(from: value)
+        }
+        // 全局背景：chat_bg_global
+        if color == nil, let value = defaults.string(forKey: "chat_bg_global"), !value.isEmpty {
+            color = ChatViewController.color(from: value)
+        }
+        // 兼容聊天背景设置页写入的 chat_bg_index（0-7）；未设置过该键时保持默认背景
+        if color == nil, defaults.object(forKey: "chat_bg_index") != nil {
+            let index = defaults.integer(forKey: "chat_bg_index")
+            if ChatViewController.androidChatBgColors.indices.contains(index) {
+                color = ChatViewController.androidChatBgColors[index]
+            }
+        }
+        view.backgroundColor = color ?? .themeChatBackground
         tableView.backgroundColor = .clear
     }
 
+    private static func color(from storedValue: String) -> UIColor? {
+        var value = storedValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if value.hasPrefix("0X") { value = String(value.dropFirst(2)) }
+        if value.hasPrefix("#") { value = String(value.dropFirst()) }
+        // 纯索引（0-11）映射到内置 12 色
+        if let index = Int(value), androidChatBgColors.indices.contains(index) {
+            return androidChatBgColors[index]
+        }
+        if value.count == 8, let argb = UInt64(value, radix: 16) {
+            return UIColor(
+                red: CGFloat((argb >> 16) & 0xFF) / 255.0,
+                green: CGFloat((argb >> 8) & 0xFF) / 255.0,
+                blue: CGFloat(argb & 0xFF) / 255.0,
+                alpha: CGFloat((argb >> 24) & 0xFF) / 255.0
+            )
+        }
+        if value.count == 6, UInt64(value, radix: 16) != nil {
+            return UIColor.hex(value)
+        }
+        return nil
+    }
+
     private func setupNavBar() {
-        // 自定义标题视图（头像+名字）
+        // 自定义标题视图（头像 + 名字 + 在线状态）
         let titleView = UIView()
-        titleView.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
+        titleView.frame = CGRect(x: 0, y: 0, width: 210, height: 44)
 
         // 头像
         let navAvatar = UIImageView()
@@ -173,13 +323,36 @@ class ChatViewController: UIViewController {
         navTitleLabel.text = titleText
         navTitleLabel.font = ScreenAdapter.mediumFont(16)
         navTitleLabel.textColor = .label
+        navTitleLabel.lineBreakMode = .byTruncatingTail
         titleView.addSubview(navTitleLabel)
-        navTitleLabel.snp.makeConstraints { make in
-            make.leading.equalTo(navAvatar.snp.trailing).offset(8)
-            make.centerY.equalToSuperview()
+
+        // 单聊在线状态（在线 / 离线X分钟），无数据时隐藏
+        onlineStatusLabel.font = ScreenAdapter.font(11)
+        onlineStatusLabel.textColor = .secondaryLabel
+        onlineStatusLabel.isHidden = true
+        titleView.addSubview(onlineStatusLabel)
+
+        let hasStatus = channelType == 1
+        if hasStatus {
+            navTitleLabel.snp.makeConstraints { make in
+                make.leading.equalTo(navAvatar.snp.trailing).offset(8)
+                make.trailing.lessThanOrEqualToSuperview()
+                make.top.equalToSuperview().offset(ScreenAdapter.scaleH(7))
+            }
+            onlineStatusLabel.snp.makeConstraints { make in
+                make.leading.equalTo(navTitleLabel)
+                make.trailing.lessThanOrEqualToSuperview()
+                make.top.equalTo(navTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(1))
+            }
+        } else {
+            navTitleLabel.snp.makeConstraints { make in
+                make.leading.equalTo(navAvatar.snp.trailing).offset(8)
+                make.trailing.lessThanOrEqualToSuperview()
+                make.centerY.equalToSuperview()
+            }
         }
 
-        // 加载头像（与Android一致：通过频道ID构造头像URL）
+        // 加载头像与在线状态（与Android一致：通过频道ID获取频道信息）
         Task {
             do {
                 let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
@@ -194,6 +367,10 @@ class ChatViewController: UIViewController {
                         name: channelInfo.displayName,
                         into: navAvatar
                     )
+                    self.updateOnlineStatus(
+                        online: (channelInfo.online ?? 0) == 1,
+                        lastOffline: channelInfo.last_offline
+                    )
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
@@ -204,21 +381,33 @@ class ChatViewController: UIViewController {
                         name: self.titleText,
                         into: navAvatar
                     )
+                    self.refreshCachedOnlineStatus()
                 }
             }
         }
 
         navigationItem.titleView = titleView
 
-        // 右侧更多按钮
+        // 右侧：语音通话（仅单聊）+ 更多（三个横杠，进入聊天信息页）
         let moreBtn = UIBarButtonItem(
-            image: UIImage(systemName: "ellipsis.circle"),
+            image: UIImage(systemName: "line.3.horizontal"),
             style: .plain,
             target: self,
             action: #selector(showMoreOptions)
         )
         moreBtn.tintColor = .label
-        navigationItem.rightBarButtonItem = moreBtn
+        if channelType == 1 {
+            let callBtn = UIBarButtonItem(
+                image: UIImage(systemName: "phone.fill"),
+                style: .plain,
+                target: self,
+                action: #selector(startVoiceCall)
+            )
+            callBtn.tintColor = .themePrimary
+            navigationItem.rightBarButtonItems = [moreBtn, callBtn]
+        } else {
+            navigationItem.rightBarButtonItem = moreBtn
+        }
 
         // 返回按钮
         let backBtn = UIBarButtonItem(
@@ -235,48 +424,81 @@ class ChatViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
 
+    /// 右上角"三个横杠"：单聊进入聊天信息页，群聊进入群设置页
     @objc private func showMoreOptions() {
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-
         if channelType == 2 {
-            alert.addAction(UIAlertAction(title: "群聊详情", style: .default) { [weak self] _ in
-                self?.openGroupDetail()
-            })
-            alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
-                self?.startGroupVoiceCall()
-            })
-            alert.addAction(UIAlertAction(title: "查找聊天记录", style: .default) { [weak self] _ in
-                self?.searchChatHistory()
-            })
+            openGroupDetail()
         } else {
-            alert.addAction(UIAlertAction(title: "聊天信息", style: .default) { [weak self] _ in
-                self?.openChatPersonal()
-            })
-            alert.addAction(UIAlertAction(title: "语音通话", style: .default) { [weak self] _ in
-                AppUtility.showToast("语音通话")
-            })
-            alert.addAction(UIAlertAction(title: "视频通话", style: .default) { [weak self] _ in
-                AppUtility.showToast("视频通话")
-            })
-            alert.addAction(UIAlertAction(title: "查找聊天记录", style: .default) { [weak self] _ in
-                self?.searchChatHistory()
-            })
+            openChatPersonal()
         }
-
-        alert.addAction(UIAlertAction(title: "清空聊天记录", style: .destructive) { [weak self] _ in
-            self?.clearChatHistory()
-        })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-
-        if let popover = alert.popoverPresentationController {
-            popover.barButtonItem = navigationItem.rightBarButtonItem
-        }
-
-        present(alert, animated: true)
     }
 
-    private func openContactDetail() {
-        let detailVC = ContactDetailViewController(uid: channelId)
+    // MARK: - 单聊语音通话
+    @objc private func startVoiceCall() {
+        guard channelType == 1 else { return }
+        Task {
+            do {
+                let response: APIResponse<TRTCParamsResponse> = try await APIClient.shared.request(.getTRTCUserSig)
+                guard let params = response.data, params.sdkAppID > 0, !params.userSig.isEmpty else {
+                    DispatchQueue.main.async {
+                        AppUtility.showToast("TRTC未配置，请联系管理员")
+                    }
+                    return
+                }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    let callVC = TRTCCallViewController(channelId: self.channelId)
+                    callVC.modalPresentationStyle = .fullScreen
+                    self.present(callVC, animated: true)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    AppUtility.showToast("获取通话参数失败: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    // MARK: - 单聊在线状态（数据缺失时不显示，不伪造）
+    private func updateOnlineStatus(online: Bool, lastOffline: Int?) {
+        guard channelType == 1 else {
+            onlineStatusLabel.isHidden = true
+            return
+        }
+        if online {
+            onlineStatusLabel.text = "在线"
+            onlineStatusLabel.isHidden = false
+            return
+        }
+        guard let lastOffline = lastOffline, lastOffline > 0 else {
+            onlineStatusLabel.isHidden = true
+            return
+        }
+        onlineStatusLabel.text = ChatViewController.offlineText(seconds: lastOffline)
+        onlineStatusLabel.isHidden = false
+    }
+
+    /// 优先使用 IMManager 已缓存的频道信息（仅能判断在线，无 last_offline 时隐藏）
+    private func refreshCachedOnlineStatus() {
+        guard channelType == 1 else { return }
+        if let info = IMManager.shared.getChannelInfo(channelId: channelId, channelType: 1), info.online {
+            updateOnlineStatus(online: true, lastOffline: nil)
+        }
+    }
+
+    private static func offlineText(seconds: Int) -> String {
+        let now = Int(Date().timeIntervalSince1970)
+        let diff = max(now - seconds, 0)
+        if diff < 60 { return "刚刚离线" }
+        if diff < 3600 { return "离线\(diff / 60)分钟" }
+        if diff < 86400 { return "离线\(diff / 3600)小时" }
+        return "离线\(diff / 86400)天"
+    }
+
+    private func openContactDetail(uid: String) {
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        guard !uid.isEmpty, uid != myUid else { return }
+        let detailVC = ContactDetailViewController(uid: uid)
         navigationController?.pushViewController(detailVC, animated: true)
     }
 
@@ -339,33 +561,62 @@ class ChatViewController: UIViewController {
         navigationController?.pushViewController(vc, animated: true)
     }
 
+    /// 首屏先用 SDK 本地消息库渲染，避免等待网络导致白屏
+    private func loadCachedMessages() {
+        IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 30) { [weak self] wkMessages, _ in
+            guard let self = self, let wkMessages = wkMessages, !wkMessages.isEmpty else { return }
+            let cached = wkMessages.map { $0.toBusinessMessage() }
+            guard cached.contains(where: { !($0.type == .text && $0.content.isEmpty) }) else { return }
+            self.applyLoadedMessages(cached, scroll: true, finish: false)
+        }
+    }
+
+    /// 合并服务端消息与本地消息（保留发送中/失败占位），按 seq + 时间排序
+    private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool) {
+        var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
+        for local in messages where (local.status == 0 || local.status == -1) {
+            if !result.contains(where: { $0.messageID == local.messageID }) {
+                result.append(local)
+            }
+        }
+        result.sort { lhs, rhs in
+            let lSeq = lhs.messageSeq == 0 ? Int.max : lhs.messageSeq
+            let rSeq = rhs.messageSeq == 0 ? Int.max : rhs.messageSeq
+            if lSeq != rSeq { return lSeq < rSeq }
+            return lhs.timestamp < rhs.timestamp
+        }
+        messages = result
+        tableView.reloadData()
+        if finish || !messages.isEmpty {
+            finishLoading()
+        }
+        if scroll {
+            scrollToBottom()
+        }
+    }
+
     private func loadMessages() {
         Task {
             do {
                 let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
                     .syncChannelMessages(channelId: channelId, channelType: self.channelType, startMessageSeq: 0, limit: 50)
                 )
-                if let msgs = response.messages {
-                    print("[Chat] 加载到 \(msgs.count) 条消息")
-                    // 按 messageSeq 升序（服务端权威顺序），其次按时间戳，避免同秒消息乱序
-                    messages = msgs.map { Message(from: $0) }.sorted {
-                        if $0.messageSeq != $1.messageSeq { return $0.messageSeq < $1.messageSeq }
-                        return $0.timestamp < $1.timestamp
-                    }
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
-                        self.scrollToBottom()
-                    }
-                } else {
-                    print("[Chat] 消息列表为空")
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
+                DispatchQueue.main.async {
+                    if let msgs = response.messages {
+                        print("[Chat] 加载到 \(msgs.count) 条消息")
+                        self.applyLoadedMessages(msgs.map { Message(from: $0) }, scroll: true, finish: true)
+                    } else {
+                        print("[Chat] 消息列表为空")
+                        self.applyLoadedMessages([], scroll: false, finish: true)
                     }
                 }
             } catch {
                 print("[Chat] 加载消息失败: \(error)")
                 DispatchQueue.main.async {
-                    AppUtility.showToast("加载消息失败: \(error.localizedDescription)")
+                    self.finishLoading()
+                    if self.messages.isEmpty {
+                        AppUtility.showToast("加载消息失败: \(error.localizedDescription)")
+                    }
                 }
             }
         }
@@ -416,6 +667,15 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let message = messages[indexPath.row]
+        // 上传中的图片/视频：先展示本地缩略图占位气泡
+        if (message.type == .image || message.type == .video), pendingMedia[message.messageID] != nil {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "PendingMediaMessageCell", for: indexPath) as! PendingMediaMessageCell
+            let messageID = message.messageID
+            cell.configure(with: message, thumbnail: pendingMedia[messageID]) { [weak self] in
+                self?.retryUpload(messageID: messageID)
+            }
+            return cell
+        }
         switch message.type {
         case .image:
             let cell = tableView.dequeueReusableCell(withIdentifier: "ImageMessageCell", for: indexPath) as! ImageMessageCell
@@ -447,6 +707,10 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell
+            // 点击头像查看个人名片（自己不发响应）
+            cell.onAvatarTap = { [weak self] uid in
+                self?.openContactDetail(uid: uid)
+            }
             cell.configure(with: message)
             return cell
         }
@@ -455,6 +719,8 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let message = messages[indexPath.row]
+        // 上传中的占位消息不做跳转
+        if pendingMedia[message.messageID] != nil { return }
         switch message.type {
         case .image:
             let content = message.content
@@ -788,6 +1054,67 @@ extension ChatViewController: ChatInputBarDelegate {
         navigationController?.pushViewController(chooseVC, animated: true)
     }
 
+    func didTapFavorite() {
+        navigationController?.pushViewController(FavoriteViewController(), animated: true)
+    }
+
+    func didTapMentionButton() {
+        guard channelType == 2 else {
+            AppUtility.showToast("仅群聊可@成员")
+            return
+        }
+        inputBar.insertText("@")
+    }
+
+    /// 语音消息：本地占位 → 上传 → 发送
+    func didSendVoiceMessage(fileURL: URL, duration: TimeInterval) {
+        let messageID = UUID().uuidString
+        let msg = Message(
+            messageID: messageID,
+            channelID: channelId,
+            channelType: channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: "local:\(messageID)",
+            type: .voice,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0
+        )
+        messages.append(msg)
+        pendingVoiceDurations[messageID] = Int(duration)
+        tableView.reloadData()
+        scrollToBottom()
+
+        Task {
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let path = try await uploadChatFile(data: data, fileName: "voice_\(messageID).m4a")
+                DispatchQueue.main.async {
+                    if let index = self.messages.firstIndex(where: { $0.messageID == messageID }) {
+                        self.messages[index].content = path
+                        self.messages[index].status = 1
+                        self.confirmedLocalIDs.insert(messageID)
+                        self.tableView.reloadData()
+                    }
+                    IMManager.shared.sendVoiceMessage(
+                        channelId: self.channelId,
+                        voiceURL: path,
+                        duration: max(1, Int(duration)),
+                        channelType: self.channelType
+                    )
+                }
+            } catch {
+                print("语音上传失败: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    if let index = self.messages.firstIndex(where: { $0.messageID == messageID }) {
+                        self.messages[index].status = -1
+                        self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+                    }
+                    AppUtility.showToast("语音发送失败")
+                }
+            }
+        }
+    }
+
     private func presentPhotoPicker() {
         let picker = UIImagePickerController()
         picker.sourceType = .photoLibrary
@@ -808,106 +1135,215 @@ extension ChatViewController: ChatInputBarDelegate {
         present(picker, animated: true)
     }
 
+    // MARK: - 图片发送（压缩 → 本地占位 → 上传 → 发送）
     private func sendImageMessage(data: Data) {
         guard let image = UIImage(data: data) else {
             AppUtility.showToast("图片数据无效")
             return
         }
+        let compressed = compressImage(image, maxSide: 1600)
+        guard let jpegData = compressed.jpegData(compressionQuality: 0.7) else {
+            AppUtility.showToast("图片处理失败")
+            return
+        }
+
+        let messageID = UUID().uuidString
+        let msg = Message(
+            messageID: messageID,
+            channelID: channelId,
+            channelType: channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: "local:\(messageID)",
+            type: .image,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0 // 发送中
+        )
+        messages.append(msg)
+        pendingMedia[messageID] = compressed
+        pendingUploads[messageID] = PendingUpload(
+            type: .image, data: jpegData, sourceURL: nil, fileName: "image.jpg",
+            width: compressed.size.width, height: compressed.size.height,
+            duration: 0, thumbnail: compressed
+        )
+        tableView.reloadData()
+        scrollToBottom()
+        performUpload(messageID: messageID)
+    }
+
+    // MARK: - 视频发送（限制体积 → 缩略图占位 → 上传 → 发送）
+    private func sendVideoMessage(url: URL) {
+        let maxVideoSize: Int64 = 50 * 1024 * 1024
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        guard fileSize == 0 || fileSize <= maxVideoSize else {
+            AppUtility.showToast("视频超过 50MB，无法发送")
+            return
+        }
+        // 相册返回的临时文件会被系统清理，先复制到沙盒临时目录再异步上传
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chat_video_\(UUID().uuidString).mp4")
+        let sourceURL: URL
+        if (try? FileManager.default.copyItem(at: url, to: tempURL)) != nil {
+            sourceURL = tempURL
+        } else {
+            sourceURL = url
+        }
+
+        let asset = AVAsset(url: sourceURL)
+        let durationSeconds = Int(CMTimeGetSeconds(asset.duration).rounded())
+        var thumbnail: UIImage?
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        if let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) {
+            thumbnail = UIImage(cgImage: cgImage)
+        }
+
+        let messageID = UUID().uuidString
+        let msg = Message(
+            messageID: messageID,
+            channelID: channelId,
+            channelType: channelType,
+            fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+            content: "local:\(messageID)",
+            type: .video,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            status: 0 // 发送中
+        )
+        messages.append(msg)
+        pendingMedia[messageID] = thumbnail ?? UIImage(systemName: "video")
+        pendingUploads[messageID] = PendingUpload(
+            type: .video, data: nil, sourceURL: sourceURL, fileName: "video.mp4",
+            width: thumbnail?.size.width ?? 0, height: thumbnail?.size.height ?? 0,
+            duration: durationSeconds, thumbnail: thumbnail
+        )
+        tableView.reloadData()
+        scrollToBottom()
+        performUpload(messageID: messageID)
+    }
+
+    private func compressImage(_ image: UIImage, maxSide: CGFloat) -> UIImage {
+        let longestSide = max(image.size.width, image.size.height)
+        guard longestSide > maxSide else { return image }
+        let ratio = maxSide / longestSide
+        let newSize = CGSize(width: floor(image.size.width * ratio), height: floor(image.size.height * ratio))
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    // MARK: - 上传执行 / 失败重发
+    private func performUpload(messageID: String) {
+        guard let upload = pendingUploads[messageID],
+              let index = messages.firstIndex(where: { $0.messageID == messageID }) else { return }
+        messages[index].status = 0
+        tableView.reloadData()
+
         Task {
             do {
-                // 对齐 Android：走服务器中转上传通道，消息携带服务端相对路径
-                let path = try await APIClient.shared.uploadChatFile(
-                    data: data, fileName: "image.jpg",
-                    channelId: channelId, channelType: channelType
-                )
-                IMManager.shared.sendImageMessage(
-                    channelId: self.channelId,
-                    imageURL: path,
-                    width: image.size.width,
-                    height: image.size.height,
-                    channelType: self.channelType
-                )
-                let msg = Message(
-                    messageID: UUID().uuidString,
-                    channelID: self.channelId,
-                    channelType: self.channelType,
-                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                    content: path,
-                    type: .image,
-                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                    status: 0 // 发送中
-                )
-                self.messages.append(msg)
+                var path = ""
+                var thumbPath = ""
+                switch upload.type {
+                case .image:
+                    guard let data = upload.data else { throw APIError.noData }
+                    path = try await uploadChatFile(data: data, fileName: upload.fileName)
+                case .video:
+                    guard let url = upload.sourceURL else { throw APIError.noData }
+                    let videoData = try Data(contentsOf: url)
+                    path = try await uploadChatFile(data: videoData, fileName: upload.fileName)
+                    if let thumbData = upload.thumbnail?.jpegData(compressionQuality: 0.7) {
+                        thumbPath = (try? await uploadChatFile(data: thumbData, fileName: "thumb.jpg")) ?? ""
+                    }
+                default:
+                    throw APIError.noData
+                }
                 DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                    self.scrollToBottom()
+                    self.completeUpload(messageID: messageID, path: path, thumbPath: thumbPath, upload: upload)
                 }
             } catch {
-                print("图片上传失败: \(error.localizedDescription)")
+                print("媒体上传失败: \(error.localizedDescription)")
                 DispatchQueue.main.async {
-                    AppUtility.showToast("图片上传失败")
+                    if let index = self.messages.firstIndex(where: { $0.messageID == messageID }) {
+                        self.messages[index].status = -1
+                        self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+                    }
+                    AppUtility.showToast(upload.type == .video ? "视频上传失败，点击气泡重发" : "图片上传失败，点击气泡重发")
                 }
             }
         }
     }
 
-    private func sendVideoMessage(url: URL) {
-        Task {
-            do {
-                // 读取视频数据与时长，生成真实缩略图
-                let videoData = try Data(contentsOf: url)
-                let asset = AVAsset(url: url)
-                let durationSeconds = Int(CMTimeGetSeconds(asset.duration).rounded())
-                var thumbData: Data?
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                if let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) {
-                    thumbData = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.6)
-                }
+    private func retryUpload(messageID: String) {
+        guard let index = messages.firstIndex(where: { $0.messageID == messageID }),
+              messages[index].status == -1,
+              pendingUploads[messageID] != nil else { return }
+        performUpload(messageID: messageID)
+    }
 
-                // 对齐 Android：走服务器中转上传通道
-                let videoPath = try await APIClient.shared.uploadChatFile(
-                    data: videoData, fileName: "video.mp4",
-                    channelId: channelId, channelType: channelType
-                )
-                var thumbPath = ""
-                if let thumbData = thumbData {
-                    thumbPath = (try? await APIClient.shared.uploadChatFile(
-                        data: thumbData, fileName: "thumb.jpg",
-                        channelId: channelId, channelType: channelType
-                    )) ?? ""
-                }
-
-                IMManager.shared.sendVideoMessage(
-                    channelId: self.channelId,
-                    thumbURL: thumbPath,
-                    videoURL: videoPath,
-                    duration: durationSeconds,
-                    channelType: self.channelType
-                )
-                let content = "\(thumbPath)|\(videoPath)"
-                let msg = Message(
-                    messageID: UUID().uuidString,
-                    channelID: self.channelId,
-                    channelType: self.channelType,
-                    fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-                    content: content,
-                    type: .video,
-                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                    status: 0 // 发送中
-                )
-                self.messages.append(msg)
-                DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                    self.scrollToBottom()
-                }
-            } catch {
-                print("视频上传失败: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    AppUtility.showToast("视频上传失败")
-                }
-            }
+    private func completeUpload(messageID: String, path: String, thumbPath: String, upload: PendingUpload) {
+        guard let index = messages.firstIndex(where: { $0.messageID == messageID }) else { return }
+        switch upload.type {
+        case .image:
+            messages[index].content = path
+            IMManager.shared.sendImageMessage(
+                channelId: channelId, imageURL: path,
+                width: upload.width, height: upload.height, channelType: channelType
+            )
+        case .video:
+            let content = "\(thumbPath)|\(path)"
+            messages[index].content = content
+            IMManager.shared.sendVideoMessage(
+                channelId: channelId, thumbURL: thumbPath, videoURL: path,
+                duration: upload.duration, channelType: channelType
+            )
+        default:
+            return
         }
+        messages[index].status = 1
+        confirmedLocalIDs.insert(messageID)
+        pendingMedia.removeValue(forKey: messageID)
+        pendingUploads.removeValue(forKey: messageID)
+        tableView.reloadData()
+        scrollToBottom()
+    }
+
+    /// 专用长超时会话上传聊天文件（对齐后端 /v1/file/upload，返回服务端相对路径）
+    private func uploadChatFile(data: Data, fileName: String) async throws -> String {
+        let ext = (fileName as NSString).pathExtension
+        let suffix = ext.isEmpty ? "bin" : ext
+        let rand = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8))
+        let millis = Int64(Date().timeIntervalSince1970 * 1000)
+        let filePath = "/\(channelType)/\(channelId)/\(millis)_\(rand).\(suffix)"
+        let urlString = APIConfig.apiBaseURL + "/v1/file/upload?type=chat&path=" + filePath
+        guard let url = URL(string: urlString) else { throw APIError.noData }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let token = UserDefaults.standard.string(forKey: "token") ?? ""
+        if !token.isEmpty {
+            request.setValue(token, forHTTPHeaderField: "token")
+        }
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (responseData, response) = try await uploadSession.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw APIError.serverError(message: "上传失败(\(http.statusCode))", code: http.statusCode)
+        }
+        if let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+           let path = json["path"] as? String, !path.isEmpty {
+            return path
+        }
+        throw APIError.noData
     }
 
     private func sendFileMessage(url: URL) {
@@ -919,12 +1355,13 @@ extension ChatViewController: ChatInputBarDelegate {
                 let fileData = try Data(contentsOf: url)
                 if accessing { url.stopAccessingSecurityScopedResource() }
                 let fileSize = Int64(fileData.count)
+                guard fileSize <= 100 * 1024 * 1024 else {
+                    DispatchQueue.main.async { AppUtility.showToast("文件超过 100MB，无法发送") }
+                    return
+                }
 
-                // 对齐 Android：走服务器中转上传通道
-                let path = try await APIClient.shared.uploadChatFile(
-                    data: fileData, fileName: fileName,
-                    channelId: channelId, channelType: channelType
-                )
+                // 对齐 Android：走服务器中转上传通道（长超时会话）
+                let path = try await self.uploadChatFile(data: fileData, fileName: fileName)
                 IMManager.shared.sendFileMessage(
                     channelId: self.channelId,
                     fileName: fileName,
@@ -1100,14 +1537,23 @@ class TextMessageCell: UITableViewCell {
     private let senderNameLabel = UILabel()
     private var isFromMe = false
     private var currentMessageID = ""
+    private var senderUID = ""
+    /// 点击头像查看个人名片
+    var onAvatarTap: ((String) -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
+        avatarView.isUserInteractionEnabled = true
+        avatarView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(avatarTapped)))
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func avatarTapped() {
+        onAvatarTap?(senderUID)
     }
 
     private func setupUI() {
@@ -1115,8 +1561,9 @@ class TextMessageCell: UITableViewCell {
 
         let avatarSize = ScreenAdapter.scaleW(36)
         let vPad = ScreenAdapter.scaleH(12)
-        let bubblePad = ScreenAdapter.scaleW(10)
-        let bubbleInner = ScreenAdapter.scaleW(12)
+        // Android 规格：chat_bubble_padding_lr=15dp、chat_bubble_padding_tb=5dp、chat_radius=10dp
+        let bubblePadLR = ScreenAdapter.scaleW(15)
+        let bubblePadTB = ScreenAdapter.scaleH(5)
 
         messageLabel.font = ScreenAdapter.font(15)
         messageLabel.numberOfLines = 0
@@ -1128,7 +1575,7 @@ class TextMessageCell: UITableViewCell {
         senderNameLabel.font = ScreenAdapter.font(12)
         senderNameLabel.textColor = .secondaryLabel
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(10)
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
@@ -1144,16 +1591,18 @@ class TextMessageCell: UITableViewCell {
         }
 
         messageLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(bubblePad)
-            make.bottom.equalToSuperview().offset(-bubblePad)
-            make.leading.equalToSuperview().offset(bubbleInner)
-            make.trailing.equalToSuperview().offset(-bubbleInner)
+            make.centerY.equalToSuperview()
+            make.top.greaterThanOrEqualToSuperview().offset(bubblePadTB)
+            make.bottom.lessThanOrEqualToSuperview().offset(-bubblePadTB)
+            make.leading.equalToSuperview().offset(bubblePadLR)
+            make.trailing.equalToSuperview().offset(-bubblePadLR)
         }
     }
 
     func configure(with message: Message) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
+        senderUID = message.fromUID
         messageLabel.text = message.content
         timeLabel.text = message.timeString
 
@@ -1178,9 +1627,9 @@ class TextMessageCell: UITableViewCell {
         let bubbleGap = ScreenAdapter.scaleW(8)
         let timeGap = ScreenAdapter.scaleH(4)
         let nameGap = ScreenAdapter.scaleH(2)
-        let maxWidth = ScreenAdapter.screenWidth * 0.6
+        let maxWidth = ScreenAdapter.screenWidth * 0.66
         let font = ScreenAdapter.font(15)
-        let innerPad = ScreenAdapter.scaleW(24)
+        let innerPad = ScreenAdapter.scaleW(30)
         // 多行测量：按最大文本宽度换行计算实际所需宽度，避免单行测量导致气泡过宽或过窄
         let maxTextWidth = maxWidth - innerPad
         let content = message.content.isEmpty ? " " : message.content
@@ -1190,7 +1639,7 @@ class TextMessageCell: UITableViewCell {
             attributes: [.font: font],
             context: nil
         )
-        let bubbleWidth = max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40))
+        let bubbleWidth = min(max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40)), maxWidth)
 
         if isFromMe {
             avatarView.snp.remakeConstraints { make in
@@ -1198,12 +1647,13 @@ class TextMessageCell: UITableViewCell {
                 make.top.equalToSuperview().offset(vPad)
                 make.width.height.equalTo(avatarSize)
             }
-            bubbleView.backgroundColor = .themeBubbleOutgoing
-            messageLabel.textColor = .label
+            bubbleView.backgroundColor = .themePrimary
+            messageLabel.textColor = .themeBubbleSendText
             bubbleView.snp.remakeConstraints { make in
                 make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
                 make.top.equalTo(avatarView)
                 make.width.equalTo(bubbleWidth)
+                make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
             }
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
@@ -1217,7 +1667,7 @@ class TextMessageCell: UITableViewCell {
                 make.width.height.equalTo(avatarSize)
             }
             bubbleView.backgroundColor = .themeBubbleIncoming
-            messageLabel.textColor = .label
+            messageLabel.textColor = .themeBubbleReceiveText
             if showName {
                 senderNameLabel.snp.remakeConstraints { make in
                     make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
@@ -1227,12 +1677,200 @@ class TextMessageCell: UITableViewCell {
                     make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
                     make.top.equalTo(senderNameLabel.snp.bottom).offset(nameGap)
                     make.width.equalTo(bubbleWidth)
+                    make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
                 }
             } else {
                 bubbleView.snp.remakeConstraints { make in
                     make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
                     make.top.equalTo(avatarView)
                     make.width.equalTo(bubbleWidth)
+                    make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
+                }
+            }
+            timeLabel.snp.remakeConstraints { make in
+                make.leading.equalTo(bubbleView.snp.leading)
+                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
+                make.bottom.equalToSuperview().offset(-vPad)
+            }
+        }
+    }
+}
+
+// MARK: - 上传中占位气泡（本地缩略图 + 发送中/失败重发）
+final class PendingMediaMessageCell: UITableViewCell {
+
+    private let bubbleView = UIView()
+    private let thumbnailView = UIImageView()
+    private let maskView = UIView()
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let statusLabel = UILabel()
+    private let playIcon = UIImageView()
+    private let timeLabel = UILabel()
+    private let avatarView = UIImageView()
+    private let senderNameLabel = UILabel()
+    private var isFromMe = false
+    private var currentMessageID = ""
+    private var onRetry: (() -> Void)?
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        selectionStyle = .none
+
+        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        bubbleView.clipsToBounds = true
+        bubbleView.backgroundColor = .systemGray6
+
+        thumbnailView.contentMode = .scaleAspectFill
+        thumbnailView.clipsToBounds = true
+        thumbnailView.isUserInteractionEnabled = false
+
+        maskView.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        maskView.isHidden = true
+
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+
+        statusLabel.text = "发送失败\n点击重发"
+        statusLabel.textColor = .white
+        statusLabel.font = ScreenAdapter.font(11)
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 2
+        statusLabel.isHidden = true
+
+        playIcon.image = UIImage(systemName: "play.circle.fill")
+        playIcon.tintColor = .white.withAlphaComponent(0.9)
+        playIcon.contentMode = .center
+        playIcon.isHidden = true
+
+        timeLabel.font = ScreenAdapter.font(11)
+        timeLabel.textColor = .tertiaryLabel
+        timeLabel.textAlignment = .center
+
+        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
+        avatarView.clipsToBounds = true
+        avatarView.contentMode = .scaleAspectFill
+
+        senderNameLabel.font = ScreenAdapter.font(12)
+        senderNameLabel.textColor = .secondaryLabel
+        senderNameLabel.isHidden = true
+
+        bubbleView.addSubviews(thumbnailView, maskView, playIcon, spinner, statusLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+
+        thumbnailView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        maskView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        playIcon.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(ScreenAdapter.scaleW(44))
+        }
+        spinner.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+        statusLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.trailing.equalToSuperview().inset(ScreenAdapter.scaleW(8))
+        }
+        avatarView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(12))
+            make.width.height.equalTo(ScreenAdapter.scaleW(36))
+        }
+
+        // 失败时点击气泡重试
+        bubbleView.isUserInteractionEnabled = true
+        bubbleView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(bubbleTapped)))
+    }
+
+    @objc private func bubbleTapped() {
+        onRetry?()
+    }
+
+    func configure(with message: Message, thumbnail: UIImage?, onRetry: (() -> Void)?) {
+        isFromMe = message.isFromMe
+        currentMessageID = message.messageID
+        self.onRetry = onRetry
+        timeLabel.text = message.timeString
+        thumbnailView.image = thumbnail ?? UIImage(systemName: message.type == .video ? "video" : "photo")
+
+        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
+
+        let showName = message.channelType == 2 && !isFromMe
+        senderNameLabel.isHidden = !showName
+        if showName {
+            let mid = message.messageID
+            senderNameLabel.text = nil
+            AppUtility.displayName(for: message.fromUID) { [weak self] name in
+                guard let self = self, self.currentMessageID == mid else { return }
+                self.senderNameLabel.text = name
+            }
+        }
+
+        let failed = message.status == -1
+        maskView.isHidden = !failed
+        statusLabel.isHidden = !failed
+        playIcon.isHidden = failed || message.type != .video
+        if failed {
+            spinner.stopAnimating()
+        } else {
+            spinner.startAnimating()
+        }
+
+        let avatarSize = ScreenAdapter.scaleW(36)
+        let hPad = ScreenAdapter.scaleW(12)
+        let vPad = ScreenAdapter.scaleH(12)
+        let bubbleGap = ScreenAdapter.scaleW(8)
+        let timeGap = ScreenAdapter.scaleH(4)
+        let nameGap = ScreenAdapter.scaleH(2)
+        let imgSize = ScreenAdapter.scaleW(160)
+
+        if isFromMe {
+            avatarView.snp.remakeConstraints { make in
+                make.trailing.equalToSuperview().offset(-hPad)
+                make.top.equalToSuperview().offset(vPad)
+                make.width.height.equalTo(avatarSize)
+            }
+            bubbleView.snp.remakeConstraints { make in
+                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
+                make.top.equalTo(avatarView)
+                make.width.height.equalTo(imgSize)
+            }
+            timeLabel.snp.remakeConstraints { make in
+                make.trailing.equalTo(bubbleView.snp.trailing)
+                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
+                make.bottom.equalToSuperview().offset(-vPad)
+            }
+        } else {
+            avatarView.snp.remakeConstraints { make in
+                make.leading.equalToSuperview().offset(hPad)
+                make.top.equalToSuperview().offset(vPad)
+                make.width.height.equalTo(avatarSize)
+            }
+            if showName {
+                senderNameLabel.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                }
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(senderNameLabel.snp.bottom).offset(nameGap)
+                    make.width.height.equalTo(imgSize)
+                }
+            } else {
+                bubbleView.snp.remakeConstraints { make in
+                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
+                    make.top.equalTo(avatarView)
+                    make.width.height.equalTo(imgSize)
                 }
             }
             timeLabel.snp.remakeConstraints { make in

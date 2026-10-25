@@ -9,118 +9,255 @@
 import UIKit
 import SnapKit
 
-// MARK: - 关于页面
+// MARK: - 关于我们（对照 Android WKAboutActivity）
 class AboutViewController: UIViewController {
 
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
 
-    private let sections: [(title: String?, items: [(title: String, detail: String?)])] = [
-        (nil, [
-            ("版本", "1.0.0"),
-        ]),
-        ("", [
-            ("用户协议", nil),
-            ("隐私政策", nil),
-            ("服务条款", nil),
-        ]),
-        ("", [
-            ("给我们评分", nil),
-            ("检查更新", nil),
-        ]),
+    /// 协议与隐私（URL 与 Android WKAboutActivity 一致）
+    private let legalItems: [(title: String, desc: String, url: String)] = [
+        ("用户协议", "查看使用服务需要遵守的条款", APIConfig.apiBaseURL + "/web/user_agreement.html"),
+        ("隐私政策", "了解个人信息的处理和保护方式", APIConfig.apiBaseURL + "/web/privacy_policy.html"),
+        ("第三方信息共享清单", "查看第三方 SDK 及信息共享说明", APIConfig.apiBaseURL + "/web/sdk_info.html"),
     ]
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        title = "关于我们"
+        view.backgroundColor = .themeBg
         setupUI()
     }
 
+    // MARK: - 布局
     private func setupUI() {
-        title = "关于我们"
-        view.backgroundColor = .themeBg
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = false
+        view.addSubview(scrollView)
+        scrollView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
 
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "AboutCell")
+        scrollView.addSubview(contentView)
+        contentView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.width.equalTo(scrollView)
+        }
 
-        // Logo Header
-        let headerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 180))
-        headerView.backgroundColor = .clear
+        // App 图标 + 名称 + 版本
+        let headerCard = makeGlassCard()
+        contentView.addSubview(headerCard)
+        headerCard.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(20)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+        }
 
         let logoImageView = UIImageView()
         logoImageView.image = UIImage(named: "AppIcon") ?? UIImage(systemName: "message.circle.fill")
         logoImageView.tintColor = .themeColorPrimary
         logoImageView.contentMode = .scaleAspectFit
-        logoImageView.layer.cornerRadius = 20
+        logoImageView.layer.cornerRadius = 16
         logoImageView.clipsToBounds = true
-        headerView.addSubview(logoImageView)
+        headerCard.addSubview(logoImageView)
         logoImageView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(20)
+            make.top.equalToSuperview().offset(36)
             make.centerX.equalToSuperview()
-            make.width.height.equalTo(80)
+            make.width.height.equalTo(72)
         }
 
         let appNameLabel = UILabel()
         appNameLabel.text = "Milo"
-        appNameLabel.font = ThemeFont.title1(20)
-        appNameLabel.textColor = .themeTextPrimary
+        appNameLabel.font = ScreenAdapter.boldFont(20)
+        appNameLabel.textColor = .label
         appNameLabel.textAlignment = .center
-        headerView.addSubview(appNameLabel)
+        headerCard.addSubview(appNameLabel)
         appNameLabel.snp.makeConstraints { make in
-            make.top.equalTo(logoImageView.snp.bottom).offset(12)
+            make.top.equalTo(logoImageView.snp.bottom).offset(16)
             make.centerX.equalToSuperview()
         }
 
-        let sloganLabel = UILabel()
-        sloganLabel.text = "让沟通更简单"
-        sloganLabel.font = ThemeFont.bodySmall(13)
-        sloganLabel.textColor = .themeTextSecondary
-        sloganLabel.textAlignment = .center
-        headerView.addSubview(sloganLabel)
-        sloganLabel.snp.makeConstraints { make in
-            make.top.equalTo(appNameLabel.snp.bottom).offset(4)
+        let versionLabel = UILabel()
+        versionLabel.text = "版本 \(appVersion)"
+        versionLabel.font = ScreenAdapter.font(14)
+        versionLabel.textColor = .secondaryLabel
+        versionLabel.textAlignment = .center
+        headerCard.addSubview(versionLabel)
+        versionLabel.snp.makeConstraints { make in
+            make.top.equalTo(appNameLabel.snp.bottom).offset(8)
             make.centerX.equalToSuperview()
+            make.bottom.equalToSuperview().offset(-36)
         }
 
-        tableView.tableHeaderView = headerView
-
-        view.addSubview(tableView)
-        tableView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+        // 协议与隐私
+        let legalLabel = makeSectionLabel("协议与隐私")
+        contentView.addSubview(legalLabel)
+        legalLabel.snp.makeConstraints { make in
+            make.top.equalTo(headerCard.snp.bottom).offset(20)
+            make.leading.equalToSuperview().offset(20)
         }
+
+        let legalRows: [UIView] = legalItems.map { item in
+            AboutRowView(title: item.title, subtitle: item.desc) { [weak self] in
+                self?.openURLString(item.url)
+            }
+        }
+        let legalCard = makeGlassCard(rows: legalRows)
+        contentView.addSubview(legalCard)
+        legalCard.snp.makeConstraints { make in
+            make.top.equalTo(legalLabel.snp.bottom).offset(8)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+        }
+
+        // 支持与反馈
+        let supportLabel = makeSectionLabel("支持与反馈")
+        contentView.addSubview(supportLabel)
+        supportLabel.snp.makeConstraints { make in
+            make.top.equalTo(legalCard.snp.bottom).offset(20)
+            make.leading.equalTo(legalLabel)
+        }
+
+        let checkUpdateRow = AboutRowView(
+            title: "检查更新",
+            subtitle: "检查当前版本是否有可用更新"
+        ) {
+            AppUtility.showToast("当前已是最新版本")
+        }
+        let supportCard = makeGlassCard(rows: [checkUpdateRow])
+        contentView.addSubview(supportCard)
+        supportCard.snp.makeConstraints { make in
+            make.top.equalTo(supportLabel.snp.bottom).offset(8)
+            make.leading.trailing.equalTo(legalCard)
+            make.bottom.equalToSuperview().offset(-30)
+        }
+    }
+
+    // MARK: - 打开链接
+    private func openURLString(_ urlString: String) {
+        guard let url = URL(string: urlString) else {
+            AppUtility.showToast("链接暂不可用")
+            return
+        }
+        UIApplication.shared.open(url)
+    }
+
+    // MARK: - UI 构建
+    private func makeSectionLabel(_ text: String) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = ScreenAdapter.font(13)
+        label.textColor = .secondaryLabel
+        return label
+    }
+
+    private func makeGlassCard() -> UIView {
+        let card = UIView()
+        card.backgroundColor = .clear
+        card.layer.cornerRadius = 16
+        card.applyLiquidGlassEffect(cornerRadius: 16)
+        return card
+    }
+
+    /// 液态玻璃卡片，内部按顺序纵向排列行
+    private func makeGlassCard(rows: [UIView]) -> UIView {
+        let card = makeGlassCard()
+
+        var previous: UIView?
+        for row in rows {
+            card.addSubview(row)
+            row.snp.makeConstraints { make in
+                make.leading.trailing.equalToSuperview()
+                if let previous = previous {
+                    make.top.equalTo(previous.snp.bottom).offset(0.5)
+                } else {
+                    make.top.equalToSuperview()
+                }
+            }
+            if previous != nil {
+                let separator = UIView()
+                separator.backgroundColor = .themeSeparatorLight
+                card.addSubview(separator)
+                separator.snp.makeConstraints { make in
+                    make.leading.equalToSuperview().offset(16)
+                    make.trailing.equalToSuperview()
+                    make.height.equalTo(0.5)
+                    make.bottom.equalTo(row.snp.top)
+                }
+            }
+            previous = row
+        }
+        previous?.snp.makeConstraints { make in
+            make.bottom.equalToSuperview()
+        }
+        return card
     }
 }
 
-extension AboutViewController: UITableViewDataSource, UITableViewDelegate {
+// MARK: - 关于我们行
+private final class AboutRowView: UIView {
 
-    func numberOfSections(in tableView: UITableView) -> Int {
-        return sections.count
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let arrowView = UIImageView()
+    private var onTap: (() -> Void)?
+
+    init(title: String, subtitle: String?, onTap: (() -> Void)? = nil) {
+        self.onTap = onTap
+        super.init(frame: .zero)
+        setupUI(title: title, subtitle: subtitle)
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return sections[section].items.count
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "AboutCell", for: indexPath)
-        let item = sections[indexPath.section].items[indexPath.row]
-        cell.textLabel?.text = item.title
-        cell.textLabel?.font = ThemeFont.body(16)
-        cell.textLabel?.textColor = .themeTextPrimary
+    private func setupUI(title: String, subtitle: String?) {
+        backgroundColor = .clear
 
-        if let detail = item.detail {
-            cell.detailTextLabel?.text = detail
-            cell.detailTextLabel?.font = ThemeFont.bodySmall(14)
-            cell.detailTextLabel?.textColor = .themeTextSecondary
-            cell.accessoryType = .none
-        } else {
-            cell.accessoryType = .disclosureIndicator
+        arrowView.image = UIImage(systemName: "chevron.right")
+        arrowView.tintColor = UIColor(white: 0.8, alpha: 1.0)
+        arrowView.contentMode = .scaleAspectFit
+        addSubview(arrowView)
+        arrowView.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(14)
         }
 
-        return cell
+        titleLabel.text = title
+        titleLabel.font = ScreenAdapter.font(16)
+        titleLabel.textColor = .label
+        addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.top.equalToSuperview().offset(14)
+            make.trailing.lessThanOrEqualTo(arrowView.snp.leading).offset(-8)
+        }
+
+        subtitleLabel.text = subtitle
+        subtitleLabel.font = ScreenAdapter.font(13)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.numberOfLines = 2
+        addSubview(subtitleLabel)
+        subtitleLabel.snp.makeConstraints { make in
+            make.leading.equalTo(titleLabel)
+            make.top.equalTo(titleLabel.snp.bottom).offset(3)
+            make.trailing.lessThanOrEqualTo(arrowView.snp.leading).offset(-8)
+            make.bottom.equalToSuperview().offset(-14)
+        }
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        addGestureRecognizer(tap)
+        isUserInteractionEnabled = true
     }
 
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
+    @objc private func handleTap() {
+        onTap?()
     }
 }
 

@@ -3,7 +3,7 @@ import SnapKit
 import Kingfisher
 
 // MARK: - 我的页面
-class MySettingViewController: UIViewController {
+class MySettingViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - UI 元素
     private let scrollView = UIScrollView()
@@ -14,8 +14,6 @@ class MySettingViewController: UIViewController {
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let idLabel = UILabel()
-    private let qrButton = UIButton(type: .custom)
-    private let arrowImageView = UIImageView()
 
     // 菜单项
     private let menuStackView = UIStackView()
@@ -83,11 +81,12 @@ class MySettingViewController: UIViewController {
             make.height.equalTo(24)
         }
 
-        // MARK: - 用户信息卡片
-        userInfoCard.backgroundColor = .white
-        userInfoCard.layer.cornerRadius = 12
-        userInfoCard.clipsToBounds = true
+        // MARK: - 用户信息卡片（液态玻璃，圆角 16）
+        userInfoCard.backgroundColor = .clear
+        userInfoCard.layer.cornerRadius = 16
+        userInfoCard.applyLiquidGlassEffect(cornerRadius: 16)
         let tap = UITapGestureRecognizer(target: self, action: #selector(showMyInfo))
+        tap.delegate = self
         userInfoCard.addGestureRecognizer(tap)
         userInfoCard.isUserInteractionEnabled = true
         contentView.addSubview(userInfoCard)
@@ -97,63 +96,43 @@ class MySettingViewController: UIViewController {
             make.trailing.equalToSuperview().offset(-16)
         }
 
-        // 头像
-        avatarImageView.layer.cornerRadius = 45
+        // 头像（点击进入头像查看页）
+        avatarImageView.layer.cornerRadius = 34
         avatarImageView.clipsToBounds = true
         avatarImageView.contentMode = .scaleAspectFill
+        avatarImageView.isUserInteractionEnabled = true
         avatarImageView.image = UIImage(systemName: "person.circle.fill")
         avatarImageView.tintColor = .systemGray5
+        let avatarTap = UITapGestureRecognizer(target: self, action: #selector(showHeadPortrait))
+        avatarImageView.addGestureRecognizer(avatarTap)
         userInfoCard.addSubview(avatarImageView)
         avatarImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(16)
+            make.leading.equalToSuperview().offset(20)
             make.top.equalToSuperview().offset(20)
             make.bottom.equalToSuperview().offset(-20)
-            make.width.height.equalTo(90)
-        }
-
-        // 二维码按钮
-        let qrConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-        qrButton.setImage(UIImage(systemName: "qrcode", withConfiguration: qrConfig), for: .normal)
-        qrButton.tintColor = .secondaryLabel
-        qrButton.addTarget(self, action: #selector(showMyQRCode), for: .touchUpInside)
-        userInfoCard.addSubview(qrButton)
-        qrButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
+            make.width.height.equalTo(68)
         }
 
         // 名字
-        nameLabel.font = ScreenAdapter.boldFont(20)
+        nameLabel.font = ScreenAdapter.mediumFont(17)
         nameLabel.textColor = .label
         nameLabel.text = "未登录"
         userInfoCard.addSubview(nameLabel)
         nameLabel.snp.makeConstraints { make in
-            make.leading.equalTo(avatarImageView.snp.trailing).offset(16)
-            make.top.equalTo(avatarImageView.snp.top).offset(12)
-            make.trailing.equalTo(qrButton.snp.leading).offset(-8)
+            make.leading.equalTo(avatarImageView.snp.trailing).offset(14)
+            make.top.equalTo(avatarImageView.snp.top).offset(13)
+            make.trailing.lessThanOrEqualToSuperview().offset(-20)
         }
 
         // Milo号
         idLabel.font = ScreenAdapter.font(13)
         idLabel.textColor = .secondaryLabel
-        idLabel.text = ""
+        idLabel.text = nil
         userInfoCard.addSubview(idLabel)
         idLabel.snp.makeConstraints { make in
             make.leading.equalTo(nameLabel)
-            make.top.equalTo(nameLabel.snp.bottom).offset(8)
-            make.trailing.equalTo(qrButton.snp.leading).offset(-8)
-        }
-
-        // 箭头
-        arrowImageView.image = UIImage(systemName: "chevron.right")
-        arrowImageView.tintColor = UIColor(white: 0.8, alpha: 1.0)
-        arrowImageView.contentMode = .scaleAspectFit
-        userInfoCard.addSubview(arrowImageView)
-        arrowImageView.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-16)
-            make.bottom.equalToSuperview().offset(-20)
-            make.width.height.equalTo(14)
+            make.top.equalTo(nameLabel.snp.bottom).offset(6)
+            make.trailing.lessThanOrEqualToSuperview().offset(-20)
         }
 
         // MARK: - 菜单项
@@ -205,27 +184,32 @@ class MySettingViewController: UIViewController {
             let name = defaults.string(forKey: "name") ?? ""
             nameLabel.text = name.isEmpty ? "Milo用户" : name
             let shortNo = defaults.string(forKey: "short_no") ?? ""
-            idLabel.text = "Milo号：\(shortNo.isEmpty ? uid : shortNo)"
+            idLabel.text = shortNo.isEmpty ? nil : "Milo号: \(shortNo)"
+            idLabel.isHidden = shortNo.isEmpty
             // 与Android一致：通过 /v1/users/{uid}/avatar 加载自己的头像
             AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: name, into: avatarImageView)
         } else {
             nameLabel.text = "点击登录"
-            idLabel.text = ""
+            idLabel.text = nil
+            idLabel.isHidden = true
             avatarImageView.image = AppUtility.defaultAvatarImage(name: "", size: 96)
         }
     }
 
     // MARK: - 页面跳转
     @objc private func showMyInfo() {
-        let myInfoVC = MyInfoViewController()
-        navigationController?.pushViewController(myInfoVC, animated: true)
+        navigationController?.pushViewController(MyInfoViewController(), animated: true)
     }
 
-    @objc private func showMyQRCode() {
-        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-        let name = UserDefaults.standard.string(forKey: "name") ?? ""
-        let qrVC = UserQRCodeViewController(uid: uid, name: name)
-        navigationController?.pushViewController(qrVC, animated: true)
+    @objc private func showHeadPortrait() {
+        navigationController?.pushViewController(MyHeadPortraitViewController(), animated: true)
+    }
+
+    // 头像区域点击交给头像自身的点击手势，其余区域进入个人信息页
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer.view == userInfoCard else { return true }
+        let point = touch.location(in: userInfoCard)
+        return !avatarImageView.frame.contains(point)
     }
 
     @objc private func showNotes() {

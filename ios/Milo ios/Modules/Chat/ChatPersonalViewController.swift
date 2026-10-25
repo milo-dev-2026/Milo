@@ -10,14 +10,13 @@ class ChatPersonalViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
     // 开关状态
-    private var flameOn = false
     private var muteOn = false
     private var topOn = false
 
     // Section 索引
     private enum Section: Int, CaseIterable {
-        case settings = 0   // 阅后即焚、消息免打扰、置顶聊天
-        case actions = 1    // 查找聊天内容、清空聊天记录
+        case settings = 0   // 消息免打扰、置顶聊天
+        case actions = 1    // 清空聊天记录
         case bottom = 2     // 添加群成员
     }
 
@@ -36,6 +35,15 @@ class ChatPersonalViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         loadChannelInfo()
+        loadLocalSettings()
+    }
+
+    // MARK: - 读取本地保存的免打扰 / 置顶状态
+    private func loadLocalSettings() {
+        let defaults = UserDefaults.standard
+        muteOn = defaults.bool(forKey: "chat_mute_\(channelId)")
+        topOn = defaults.bool(forKey: "chat_top_\(channelId)")
+        tableView.reloadData()
     }
 
     private func setupUI() {
@@ -182,18 +190,12 @@ class ChatPersonalViewController: UIViewController {
         }
     }
 
-    @objc private func toggleFlame(_ sender: UISwitch) {
-        updateSetting(key: "flame", value: sender.isOn, sender: sender,
-                      successMessage: sender.isOn ? "已开启阅后即焚" : "已关闭阅后即焚") { [weak self] v in
-            self?.flameOn = v
-        }
-    }
-
     @objc private func toggleMute(_ sender: UISwitch) {
         updateSetting(key: "mute", value: sender.isOn, sender: sender,
                       successMessage: sender.isOn ? "已开启消息免打扰" : "已关闭消息免打扰") { [weak self] v in
             guard let self = self else { return }
             self.muteOn = v
+            UserDefaults.standard.set(v, forKey: "chat_mute_\(self.channelId)")
             IMManager.shared.setChannelMute(channelId: self.channelId, channelType: self.channelType, mute: v)
         }
     }
@@ -203,6 +205,7 @@ class ChatPersonalViewController: UIViewController {
                       successMessage: sender.isOn ? "已置顶" : "已取消置顶") { [weak self] v in
             guard let self = self else { return }
             self.topOn = v
+            UserDefaults.standard.set(v, forKey: "chat_top_\(self.channelId)")
             IMManager.shared.setChannelStick(channelId: self.channelId, channelType: self.channelType, stick: v)
         }
     }
@@ -221,7 +224,7 @@ class ChatPersonalViewController: UIViewController {
 
     private func clearChatHistory() {
         IMManager.shared.clearMessages(channelId: channelId, channelType: channelType)
-        AppUtility.showToast("聊天记录已清空")
+        AppUtility.showToast("已清空")
     }
 
     // MARK: - 添加群成员（单聊转群聊）
@@ -271,7 +274,7 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
-        case .settings: return 3
+        case .settings: return 2
         case .actions: return 2
         case .bottom: return 1
         }
@@ -298,13 +301,7 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
     }
 
     func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        guard let sec = Section(rawValue: section) else { return nil }
-        switch sec {
-        case .settings:
-            return "对方阅读消息后，根据设置的时间自动销毁"
-        case .actions, .bottom:
-            return nil
-        }
+        return nil
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -318,12 +315,9 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
 
             switch indexPath.row {
             case 0:
-                cell.configure(title: "阅后即焚", icon: "flame", isOn: flameOn)
-                cell.switchControl.addTarget(self, action: #selector(toggleFlame(_:)), for: .valueChanged)
-            case 1:
                 cell.configure(title: "消息免打扰", icon: "bell.slash", isOn: muteOn)
                 cell.switchControl.addTarget(self, action: #selector(toggleMute(_:)), for: .valueChanged)
-            case 2:
+            case 1:
                 cell.configure(title: "置顶聊天", icon: "pin.fill", isOn: topOn)
                 cell.switchControl.addTarget(self, action: #selector(toggleTop(_:)), for: .valueChanged)
             default: break
@@ -335,16 +329,12 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
             cell.accessoryType = .disclosureIndicator
             cell.imageView?.tintColor = .themePrimary
             cell.textLabel?.font = ScreenAdapter.font(16)
+            // 复用重置：避免继承「添加群成员」行的红色/居中样式
+            cell.textLabel?.textColor = .label
+            cell.textLabel?.textAlignment = .natural
 
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = "查找聊天内容"
-                cell.imageView?.image = UIImage(systemName: "magnifyingglass")
-            case 1:
-                cell.textLabel?.text = "清空聊天记录"
-                cell.imageView?.image = UIImage(systemName: "trash")
-            default: break
-            }
+            cell.textLabel?.text = indexPath.row == 0 ? "聊天背景" : "清空聊天记录"
+            cell.imageView?.image = UIImage(systemName: indexPath.row == 0 ? "photo" : "trash")
             return cell
 
         case .bottom:
@@ -368,15 +358,11 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
             break // 开关操作已处理
 
         case .actions:
-            switch indexPath.row {
-            case 0:
-                // 查找聊天内容
-                let vc = SearchAllViewController()
+            if indexPath.row == 0 {
+                let vc = ChatBackgroundViewController(channelId: channelId, channelType: channelType)
                 navigationController?.pushViewController(vc, animated: true)
-            case 1:
-                // 清空聊天记录
+            } else {
                 confirmClearHistory()
-            default: break
             }
 
         case .bottom:

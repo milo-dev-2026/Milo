@@ -8,7 +8,7 @@ class UserQRCodeViewController: UIViewController {
     private let qrImageView = UIImageView()
     private let avatarView = UIImageView()
     private let nameLabel = UILabel()
-    private let uidLabel = UILabel()
+    private let shortNoLabel = UILabel()
     private let uid: String
     private let name: String
 
@@ -48,16 +48,28 @@ class UserQRCodeViewController: UIViewController {
         nameLabel.text = name
         nameLabel.font = ScreenAdapter.mediumFont(18)
         nameLabel.textColor = .label
+        nameLabel.textAlignment = .center
 
-        uidLabel.text = "ID: \(uid)"
-        uidLabel.font = ScreenAdapter.font(13)
-        uidLabel.textColor = .secondaryLabel
+        // 只展示 Milo 号，不再展示 uid
+        let shortNo = UserDefaults.standard.string(forKey: "short_no") ?? ""
+        shortNoLabel.text = "Milo号: \(shortNo)"
+        shortNoLabel.font = ScreenAdapter.font(13)
+        shortNoLabel.textColor = .secondaryLabel
+        shortNoLabel.textAlignment = .center
+        shortNoLabel.isHidden = shortNo.isEmpty
 
         qrImageView.contentMode = .scaleAspectFit
         qrImageView.backgroundColor = .white
         qrImageView.layer.cornerRadius = ScreenAdapter.scaleW(8)
 
-        cardView.addSubviews(avatarView, nameLabel, uidLabel, qrImageView)
+        // 头像 + 名称 + Milo号 居中纵向排列
+        let infoStack = UIStackView(arrangedSubviews: [avatarView, nameLabel, shortNoLabel])
+        infoStack.axis = .vertical
+        infoStack.alignment = .center
+        infoStack.spacing = ScreenAdapter.scaleH(4)
+        infoStack.setCustomSpacing(ScreenAdapter.scaleH(12), after: avatarView)
+
+        cardView.addSubviews(infoStack, qrImageView)
 
         view.addSubview(cardView)
         cardView.snp.makeConstraints { make in
@@ -67,29 +79,20 @@ class UserQRCodeViewController: UIViewController {
         }
 
         avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(24))
-            make.centerX.equalToSuperview()
             make.width.height.equalTo(ScreenAdapter.scaleW(60))
         }
 
-        nameLabel.snp.makeConstraints { make in
-            make.top.equalTo(avatarView.snp.bottom).offset(ScreenAdapter.scaleH(12))
-            make.centerX.equalToSuperview()
-        }
-
-        uidLabel.snp.makeConstraints { make in
-            make.top.equalTo(nameLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
-            make.centerX.equalToSuperview()
+        infoStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(24))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
         }
 
         qrImageView.snp.makeConstraints { make in
-            make.top.equalTo(uidLabel.snp.bottom).offset(ScreenAdapter.scaleH(20))
+            make.top.equalTo(infoStack.snp.bottom).offset(ScreenAdapter.scaleH(20))
             make.centerX.equalToSuperview()
             make.width.height.equalTo(ScreenAdapter.scaleW(200))
-        }
-
-        cardView.snp.makeConstraints { make in
-            make.bottom.equalTo(qrImageView).offset(ScreenAdapter.scaleH(24))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(24))
         }
     }
 

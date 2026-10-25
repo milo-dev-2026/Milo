@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import WuKongIMSDK
 
 // MARK: - 用户模型
 struct User: Codable {
@@ -40,6 +41,8 @@ struct ChannelInfo: Codable {
     var avatar: String?
     var remark: String?
     var online: Int?
+    /// 最后离线时间（秒级时间戳，与 Android lastOffline 一致）
+    var last_offline: Int?
     var status: Int?
     var follow: Int?
     var extra: [String: AnyCodable]?
@@ -241,18 +244,57 @@ struct WKMessageData: Codable {
         return client_msg_no ?? UUID().uuidString
     }
 
+    /// 将任意 JSON 对象归一化为字典（兼容 JSON 字符串外层再包一层的情况）
+    private static func dictionary(fromJSONObject object: Any) -> [String: Any]? {
+        if let dict = object as? [String: Any] { return dict }
+        if let str = object as? String,
+           let data = str.data(using: .utf8),
+           let inner = try? JSONSerialization.jsonObject(with: data) {
+            return dictionary(fromJSONObject: inner)
+        }
+        return nil
+    }
+
+    private static func dictionary(fromJSONString string: String) -> [String: Any]? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.hasPrefix("{") || trimmed.hasPrefix("\"") else { return nil }
+        guard let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return dictionary(fromJSONObject: object)
+    }
+
+    /// base64 → UTF-8 文本；仅接受可读文本，避免把普通字符串误判为 base64
+    private static func base64DecodedText(_ string: String) -> String? {
+        let compact = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard compact.count >= 8, !compact.contains("{"), !compact.contains("["),
+              let data = Data(base64Encoded: compact),
+              let text = String(data: data, encoding: .utf8),
+              !text.isEmpty else { return nil }
+        return text
+    }
+
+    /// 清理不可见控制字符与替换字符，避免出现乱码方框
+    private static func sanitizedText(_ text: String) -> String {
+        var result = ""
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" || scalar == "\t" || scalar == "\r" {
+                result.append(String(scalar))
+                continue
+            }
+            if CharacterSet.controlCharacters.contains(scalar) { continue }
+            if scalar.value == 0xFFFD { continue }
+            result.append(String(scalar))
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// 将payload字典归一化为 [String: Any]
     private var payloadJSONDict: [String: Any]? {
         if let dict = payloadDict { return dict }
         guard let payload = payload, !payload.isEmpty else { return nil }
-        if let data = Data(base64Encoded: payload),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            return json
-        }
-        if let data = payload.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            return json
-        }
+        if let dict = WKMessageData.dictionary(fromJSONString: payload) { return dict }
+        if let text = WKMessageData.base64DecodedText(payload),
+           let dict = WKMessageData.dictionary(fromJSONString: text) { return dict }
         return nil
     }
 
@@ -272,44 +314,59 @@ struct WKMessageData: Codable {
 
     /// 解析payload为 (type, content)，content格式与各消息Cell约定一致
     var decodedPayload: (type: Int, content: String) {
-        guard let dict = payloadJSONDict else {
-            // 回退：payload 不是 JSON 字典时，按纯文本处理，避免消息内容丢失显示为小点
-            if let payload = payload, !payload.isEmpty {
-                if let data = Data(base64Encoded: payload),
-                   let text = String(data: data, encoding: .utf8), !text.isEmpty {
-                    // base64 解码后若是 JSON 字符串字面量（带引号），去掉首尾引号
-                    if text.count > 1, text.hasPrefix("\""), text.hasSuffix("\"") {
-                        return (1, String(text.dropFirst().dropLast()))
-                    }
-                    return (1, text)
-                }
-                return (1, payload)
-            }
-            return (1, "")
+        // ① base64→JSON / ② 直接 JSON（含 JSON 字符串外层包裹）
+        if let dict = payloadJSONDict {
+            return WKMessageData.decode(dictionary: dict)
         }
-        let type = WKMessageData.anyToInt(dict["type"])
-        let str = { (key: String) -> String in dict[key] as? String ?? "" }
+        guard let raw = payload, !raw.isEmpty else { return (1, "") }
+        // ③ base64 解码出的纯文本（或再包一层的 JSON 字符串）
+        if let text = WKMessageData.base64DecodedText(raw) {
+            let cleaned = WKMessageData.sanitizedText(text)
+            if let dict = WKMessageData.dictionary(fromJSONString: cleaned) {
+                return WKMessageData.decode(dictionary: dict)
+            }
+            if !cleaned.isEmpty { return (1, cleaned) }
+        }
+        // ④ 原始 payload 本身就是可读文本
+        let cleanedRaw = WKMessageData.sanitizedText(raw)
+        if let dict = WKMessageData.dictionary(fromJSONString: cleanedRaw) {
+            return WKMessageData.decode(dictionary: dict)
+        }
+        // ⑤ 完全不可读：返回空文本，由上层过滤掉，避免乱码方框
+        return (1, cleanedRaw)
+    }
+
+    /// 按 payload 的 type 映射到各消息 Cell 约定的 content 格式
+    private static func decode(dictionary dict: [String: Any]) -> (type: Int, content: String) {
+        var type = anyToInt(dict["type"])
+        let str: (String) -> String = { key in
+            if let s = dict[key] as? String { return s }
+            if let n = dict[key] as? NSNumber { return n.stringValue }
+            return ""
+        }
         switch type {
         case 1: // 文本
             let c = str("content")
             return (type, c.isEmpty ? str("text") : c)
-        case 2: // 图片: content = url
-            return (type, str("url"))
+        case 2: // 图片: content = url（部分端把地址放在 content）
+            let url = str("url").isEmpty ? str("content") : str("url")
+            return (type, url)
         case 3: // 语音: "duration|url"
-            let duration = WKMessageData.anyToInt(dict["duration"] ?? dict["second"] ?? dict["time_tradition"])
-            return (type, "\(duration)|\(str("url"))")
+            let duration = anyToInt(dict["duration"] ?? dict["second"] ?? dict["time_tradition"])
+            let url = str("url").isEmpty ? str("voice_url") : str("url")
+            return (type, "\(duration)|\(url)")
         case 4: // 视频: "thumbURL|videoURL"
-            let thumb = dict["thumb_url"] as? String ?? dict["thumb"] as? String ?? ""
-            let video = dict["video_url"] as? String ?? str("url")
+            let thumb = str("thumb_url").isEmpty ? (str("thumb").isEmpty ? str("cover") : str("thumb")) : str("thumb_url")
+            let video = str("video_url").isEmpty ? str("url") : str("video_url")
             return (type, "\(thumb)|\(video)")
         case 5: // 文件: "fileName|fileSize|url"
-            let name = dict["file_name"] as? String ?? str("name")
-            let size = WKMessageData.anyToInt(dict["file_size"] ?? dict["size"])
+            let name = str("file_name").isEmpty ? str("name") : str("file_name")
+            let size = anyToInt(dict["file_size"] ?? dict["size"])
             return (type, "\(name)|\(size)|\(str("url"))")
         case 6: // 位置: "name|lat,lng"
             let name = str("name")
-            let lat = WKMessageData.anyToDouble(dict["latitude"] ?? dict["lat"])
-            let lng = WKMessageData.anyToDouble(dict["longitude"] ?? dict["lng"])
+            let lat = anyToDouble(dict["latitude"] ?? dict["lat"])
+            let lng = anyToDouble(dict["longitude"] ?? dict["lng"])
             return (type, "\(name)|\(lat),\(lng)")
         case 7: // 名片: "uid|name|avatar|vercode"
             return (type, "\(str("uid"))|\(str("name"))|\(str("avatar"))|\(str("vercode"))")
@@ -323,7 +380,12 @@ struct WKMessageData: Codable {
             }
             return (type, "")
         default:
-            return (type, str("content"))
+            // 未知/系统消息：优先可读文本，其次保留原始 type
+            let content = str("content")
+            if content.isEmpty {
+                type = 1
+            }
+            return (type, content)
         }
     }
 }
@@ -672,6 +734,86 @@ struct LoginResponse: Codable {
     var sex: Int?
     var short_status: Int?
     var server_id: Int?
+}
+
+// MARK: - WKMessage → 业务 Message（首屏读取 SDK 本地消息库时使用）
+extension WKMessage {
+    func toBusinessMessage() -> Message {
+        var body = ""
+        var type = MessageType.text
+
+        switch Int(content.realContentType) {
+        case 1: // 文本
+            if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+            type = .text
+        case 2: // 图片
+            if let imageContent = content as? WKImageMessageContent { body = imageContent.url }
+            type = .image
+        case 3: // 语音
+            if let voiceContent = content as? WKVoiceMessageContent {
+                body = "\(voiceContent.duration)|\(voiceContent.url)"
+            }
+            type = .voice
+        case 4: // 视频
+            if let videoContent = content as? WKVideoMessageContent {
+                body = "\(videoContent.thumbURL)|\(videoContent.videoURL)"
+            }
+            type = .video
+        case 5: // 文件
+            if let fileContent = content as? WKFileMessageContent {
+                body = "\(fileContent.fileName)|\(fileContent.fileSize)|\(fileContent.url)"
+            }
+            type = .file
+        case 6: // 位置
+            if let locationContent = content as? WKLocationMessageContent {
+                body = "\(locationContent.name)|\(locationContent.latitude),\(locationContent.longitude)"
+            }
+            type = .location
+        case 7: // 名片
+            if let cardContent = content as? WKCardMessageContent {
+                body = "\(cardContent.uid)|\(cardContent.name)|\(cardContent.avatar)|\(cardContent.vercode)"
+            }
+            type = .card
+        case 100: // 笔记
+            if let noteContent = content as? WKNoteMessageContent {
+                if !noteContent.noteJSON.isEmpty {
+                    body = noteContent.noteJSON
+                } else if let data = try? JSONSerialization.data(withJSONObject: [
+                    "id": noteContent.noteId,
+                    "title": noteContent.title,
+                    "content": noteContent.noteContent
+                ]), let str = String(data: data, encoding: .utf8) {
+                    body = str
+                }
+            }
+            type = .note
+        default:
+            if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+            type = .text
+        }
+
+        let sendStatus: Int
+        switch self.status.rawValue {
+        case 0, 3:
+            sendStatus = 0
+        case 4:
+            sendStatus = -1
+        default:
+            sendStatus = 1
+        }
+
+        return Message(
+            messageID: String(messageId),
+            channelID: channel.channelId ?? "",
+            channelType: Int(channel.channelType),
+            fromUID: fromUid ?? "",
+            content: body,
+            type: type,
+            timestamp: Int64(timestamp) * 1000,
+            status: sendStatus,
+            messageSeq: Int(messageSeq)
+        )
+    }
 }
 
 // MARK: - TRTC UserSig 响应

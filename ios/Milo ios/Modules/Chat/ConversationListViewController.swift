@@ -502,7 +502,9 @@ class PopupMenuView: UIView {
 class ConversationCell: UITableViewCell {
 
     private let avatarView = UIImageView()
+    private let nameRow = UIStackView()
     private let nameLabel = UILabel()
+    private let officialBadge = UIImageView()
     private let lastMessageLabel = UILabel()
     private let timeLabel = UILabel()
     private let unreadBadge = UIView()
@@ -535,6 +537,25 @@ class ConversationCell: UITableViewCell {
         // 名字
         nameLabel.font = ScreenAdapter.mediumFont(16)
         nameLabel.textColor = .label
+        nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        // 名称行：名称 + 官方机器人徽标（仅在特殊会话展示，可复用不重建）
+        officialBadge.image = UIImage(
+            systemName: "checkmark.seal.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        )
+        officialBadge.tintColor = .themePrimary
+        officialBadge.contentMode = .scaleAspectFit
+        officialBadge.setContentHuggingPriority(.required, for: .horizontal)
+        officialBadge.setContentCompressionResistancePriority(.required, for: .horizontal)
+        officialBadge.isHidden = true
+
+        nameRow.axis = .horizontal
+        nameRow.alignment = .center
+        nameRow.spacing = 4
+        nameRow.addArrangedSubview(nameLabel)
+        nameRow.addArrangedSubview(officialBadge)
 
         // 最后一条消息
         lastMessageLabel.font = ScreenAdapter.font(13)
@@ -562,7 +583,7 @@ class ConversationCell: UITableViewCell {
         muteIcon.contentMode = .scaleAspectFit
         muteIcon.isHidden = true
 
-        contentView.addSubviews(avatarView, nameLabel, lastMessageLabel, timeLabel, unreadBadge, muteIcon)
+        contentView.addSubviews(avatarView, nameRow, lastMessageLabel, timeLabel, unreadBadge, muteIcon)
         unreadBadge.addSubview(unreadLabel)
 
         avatarView.snp.makeConstraints { make in
@@ -571,14 +592,14 @@ class ConversationCell: UITableViewCell {
             make.width.height.equalTo(avatarSize)
         }
 
-        nameLabel.snp.makeConstraints { make in
+        nameRow.snp.makeConstraints { make in
             make.leading.equalTo(avatarView.snp.trailing).offset(hPad)
             make.top.equalTo(avatarView.snp.top).offset(2)
             make.trailing.lessThanOrEqualTo(timeLabel.snp.leading).offset(-8)
         }
 
         lastMessageLabel.snp.makeConstraints { make in
-            make.leading.equalTo(nameLabel)
+            make.leading.equalTo(nameRow)
             make.bottom.equalTo(avatarView.snp.bottom).offset(-2)
             make.trailing.lessThanOrEqualTo(unreadBadge.snp.leading).offset(-8)
         }
@@ -608,10 +629,31 @@ class ConversationCell: UITableViewCell {
         }
     }
 
+    /// 系统账号 / 官方会话：Android WKSystemAccount（fileHelper、u_10000）及官方、机器人命名规则
+    private static let officialChannelIDs: Set<String> = [
+        "system_file_helper", "filehelper", "system_notice", "system_team", "u_10000"
+    ]
+
+    static func isOfficialConversation(_ conversation: Conversation) -> Bool {
+        if officialChannelIDs.contains(conversation.channelID.lowercased()) {
+            return true
+        }
+        let name = conversation.name
+        let lower = name.lowercased()
+        return name.contains("官方") || name.contains("机器人")
+            || name.contains("系统通知") || name.contains("文件传输助手")
+            || lower.contains("official") || lower.contains("robot")
+    }
+
     func configure(with conversation: Conversation) {
         nameLabel.text = conversation.name
         lastMessageLabel.text = conversation.lastMessageDisplay
         timeLabel.text = conversation.timeString
+
+        // 特殊会话使用主题色并展示官方机器人徽标；普通会话恢复默认样式
+        let isOfficial = ConversationCell.isOfficialConversation(conversation)
+        nameLabel.textColor = isOfficial ? .themePrimary : .label
+        officialBadge.isHidden = !isOfficial
 
         // 与Android一致：通过 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar 加载
         AppUtility.loadChannelAvatar(

@@ -10,29 +10,24 @@ class ContactsViewController: UIViewController {
     private var contacts: [User] = []
     private var filteredContacts: [User] = []
     private var isSearching: Bool = false
+    private var groupedContacts: [(title: String, users: [User])] = []
 
     // MARK: - 标题栏
     private let titleBarView = UIView()
     private let titleLabel = UILabel()
-    private let searchButton = UIButton(type: .custom)
-    private let addButton = UIButton(type: .custom)
 
     // MARK: - 搜索栏
     private let searchContainer = UIView()
     private let searchIconImageView = UIImageView()
     private let searchTextField = UITextField()
 
-    // MARK: - 右侧字母索引条
-    private let indexSidebar = UIView()
-    private var indexButtons: [UIButton] = []
-
-    // MARK: - 入口项数据
-    private let headerEntries: [(icon: String, title: String, color: UIColor, action: Selector)] = [
-        ("person.fill.badge.plus", "新的朋友", UIColor(red: 1.0, green: 0.42, blue: 0.48, alpha: 1.0), #selector(showFriendApplyList)),
-        ("person.2.fill", "保存的群聊", UIColor(red: 0.36, green: 0.55, blue: 0.94, alpha: 1.0), #selector(showSavedGroups)),
-        ("person.3.fill", "加入的群聊", UIColor(red: 0.15, green: 0.65, blue: 0.60, alpha: 1.0), #selector(showJoinedGroups)),
-        ("doc.fill", "文件传输助手", UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0), #selector(showFileHelper)),
-        ("bell.badge.fill", "系统通知", UIColor(red: 1.0, green: 0.66, blue: 0.25, alpha: 1.0), #selector(showSystemNotice))
+    // MARK: - 入口项数据（与 Android 图标对应：新的朋友/保存的群聊/加入的群/文件传输助手/系统通知）
+    private let headerEntries: [(icon: String, title: String, action: Selector)] = [
+        ("person.badge.plus", "新的朋友", #selector(showFriendApplyList)),
+        ("square.grid.2x2.fill", "保存的群聊", #selector(showSavedGroups)),
+        ("person.3.fill", "加入的群聊", #selector(showJoinedGroups)),
+        ("folder.fill", "文件传输助手", #selector(showFileHelper)),
+        ("bell.badge.fill", "系统通知", #selector(showSystemNotice))
     ]
 
     override func viewDidLoad() {
@@ -83,30 +78,6 @@ class ContactsViewController: UIViewController {
         titleBarView.addSubview(titleLabel)
         titleLabel.snp.makeConstraints { make in
             make.center.equalToSuperview()
-        }
-
-        // 加号按钮
-        let addConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        addButton.setImage(UIImage(systemName: "person.badge.plus", withConfiguration: addConfig), for: .normal)
-        addButton.tintColor = .label
-        addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
-        titleBarView.addSubview(addButton)
-        addButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-12)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
-        }
-
-        // 搜索按钮
-        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
-        searchButton.tintColor = .label
-        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
-        titleBarView.addSubview(searchButton)
-        searchButton.snp.makeConstraints { make in
-            make.trailing.equalTo(addButton.snp.leading).offset(-8)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
         }
 
         // MARK: 搜索栏
@@ -171,53 +142,6 @@ class ContactsViewController: UIViewController {
             make.leading.trailing.equalToSuperview()
             make.bottom.equalToSuperview()
         }
-
-        // MARK: 右侧字母索引条
-        setupIndexSidebar()
-    }
-
-    private func setupIndexSidebar() {
-        indexSidebar.backgroundColor = .clear
-        view.addSubview(indexSidebar)
-        indexSidebar.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-4)
-            make.centerY.equalTo(tableView)
-            make.width.equalTo(20)
-        }
-
-        let letters = ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
-        var lastBtn: UIButton?
-        for letter in letters {
-            let btn = UIButton(type: .system)
-            btn.setTitle(letter, for: .normal)
-            btn.titleLabel?.font = ScreenAdapter.font(10, weight: .medium)
-            btn.setTitleColor(.themePrimary, for: .normal)
-            btn.addTarget(self, action: #selector(indexButtonTapped(_:)), for: .touchUpInside)
-            indexSidebar.addSubview(btn)
-            btn.snp.makeConstraints { make in
-                make.centerX.equalToSuperview()
-                make.width.equalTo(20)
-                make.height.equalTo(14)
-                if let last = lastBtn {
-                    make.top.equalTo(last.snp.bottom)
-                } else {
-                    make.top.equalToSuperview()
-                }
-            }
-            lastBtn = btn
-            indexButtons.append(btn)
-        }
-        lastBtn?.snp.makeConstraints { make in
-            make.bottom.equalToSuperview()
-        }
-    }
-
-    @objc private func indexButtonTapped(_ sender: UIButton) {
-        guard let letter = sender.titleLabel?.text else { return }
-        let sectionIndex = sectionTitles.firstIndex(of: letter) ?? 0
-        if sectionIndex < sectionTitles.count {
-            tableView.scrollToRow(at: IndexPath(row: 0, section: sectionIndex), at: .top, animated: true)
-        }
     }
 
     private func updateTableHeader() {
@@ -231,12 +155,6 @@ class ContactsViewController: UIViewController {
         if let header = tableView.tableHeaderView as? ContactsHeaderView {
             header.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: header.bounds.height)
         }
-    }
-
-    // MARK: - 按钮点击
-    @objc private func searchButtonTapped() {
-        let searchVC = GlobalSearchViewController()
-        navigationController?.pushViewController(searchVC, animated: true)
     }
 
     // MARK: - 入口项点击
@@ -256,59 +174,13 @@ class ContactsViewController: UIViewController {
     }
 
     @objc private func showFileHelper() {
-        let vc = FileHelperViewController()
+        let vc = FileHelperViewController(mode: .fileHelper)
         navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSystemNotice() {
-        let vc = SystemTeamViewController()
+        let vc = FileHelperViewController(mode: .systemNotice)
         navigationController?.pushViewController(vc, animated: true)
-    }
-
-    @objc private func startScan() {
-        let scanVC = ScanViewController()
-        scanVC.onScanResult = { [weak self] result in
-            self?.handleScanResult(result)
-        }
-        navigationController?.pushViewController(scanVC, animated: true)
-    }
-
-    @objc private func showAddMenu() {
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "添加好友", style: .default) { [weak self] _ in
-            self?.navigationController?.pushViewController(AddFriendViewController(), animated: true)
-        })
-        alert.addAction(UIAlertAction(title: "扫一扫", style: .default) { [weak self] _ in
-            self?.startScan()
-        })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        present(alert, animated: true)
-    }
-
-    private func handleScanResult(_ result: String) {
-        if result.hasPrefix("uid:") {
-            let uid = String(result.dropFirst(4))
-            applyFriend(uid: uid)
-        } else if result.count > 0 {
-            applyFriend(uid: result)
-        }
-    }
-
-    private func applyFriend(uid: String) {
-        Task {
-            do {
-                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: ""))
-                if response["status"] as? Int == 200 {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("好友申请已发送")
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    AppUtility.showToast("发送申请失败")
-                }
-            }
-        }
     }
 
     private func loadData() {
@@ -318,7 +190,7 @@ class ContactsViewController: UIViewController {
                 contacts = friends.map { $0.toUser() }.sorted { $0.name < $1.name }
                 filteredContacts = contacts
                 DispatchQueue.main.async {
-                    self.tableView.reloadData()
+                    self.rebuildSections()
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -333,7 +205,7 @@ class ContactsViewController: UIViewController {
         let searchText = textField.text ?? ""
         isSearching = !searchText.isEmpty
         filteredContacts = contacts.filter { $0.name.contains(searchText) }
-        tableView.reloadData()
+        rebuildSections()
     }
 
     private var displayContacts: [User] {
@@ -350,29 +222,28 @@ class ContactsViewController: UIViewController {
         CFStringTransform(mutableStr, nil, kCFStringTransformToLatin, false)
         CFStringTransform(mutableStr, nil, kCFStringTransformStripDiacritics, false)
         let pinyin = mutableStr as String
-        if let first = pinyin.first, first.isLetter {
+        if let first = pinyin.first, first.isLetter, first.isASCII {
             return String(first).uppercased()
         }
         return "#"
     }
 
-    // MARK: - A-Z 分组数据
-    private var sectionTitles: [String] {
-        let names = displayContacts.map { pinyinFirstLetter(of: $0.name) }
-        let letters = Set(names.map { $0.uppercased() })
-        return letters.sorted { (lhs, rhs) -> Bool in
+    /// 一次性构建分组快照，保证 sections 与 sectionIndexTitles 严格一一对应
+    private func rebuildSections() {
+        var buckets: [String: [User]] = [:]
+        for user in displayContacts {
+            let key = pinyinFirstLetter(of: user.name)
+            buckets[key, default: []].append(user)
+        }
+        let titles = buckets.keys.sorted { lhs, rhs -> Bool in
             if lhs == "#" { return false }
             if rhs == "#" { return true }
             return lhs < rhs
         }
-    }
-
-    private var sectionedContacts: [[User]] {
-        return sectionTitles.map { title in
-            displayContacts.filter { user in
-                pinyinFirstLetter(of: user.name) == title
-            }
+        groupedContacts = titles.map { title in
+            (title: title, users: buckets[title]?.sorted { $0.name < $1.name } ?? [])
         }
+        tableView.reloadData()
     }
 
     // MARK: - 获取联系人数量
@@ -385,11 +256,11 @@ class ContactsViewController: UIViewController {
 extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return sectionTitles.count
+        return groupedContacts.count
     }
 
     func sectionIndexTitles(for tableView: UITableView) -> [String]? {
-        return sectionTitles
+        return groupedContacts.map { $0.title }
     }
 
     func tableView(_ tableView: UITableView, sectionForSectionIndexTitle title: String, at index: Int) -> Int {
@@ -397,7 +268,7 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        return sectionTitles[section]
+        return groupedContacts[section].title
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
@@ -412,25 +283,25 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return sectionedContacts[section].count
+        return groupedContacts[section].users.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as! ContactCell
-        cell.configure(with: sectionedContacts[indexPath.section][indexPath.row])
+        cell.configure(with: groupedContacts[indexPath.section].users[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        let user = sectionedContacts[indexPath.section][indexPath.row]
+        let user = groupedContacts[indexPath.section].users[indexPath.row]
         let detailVC = ContactDetailViewController(uid: user.uid)
         navigationController?.pushViewController(detailVC, animated: true)
     }
 
     func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
         // 最后一个 section 的 footer 显示联系人总数
-        if section == sectionTitles.count - 1 {
+        if section == groupedContacts.count - 1 {
             let footerView = UIView()
             footerView.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
             let countLabel = UILabel()
@@ -448,7 +319,7 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-        if section == sectionTitles.count - 1 {
+        if section == groupedContacts.count - 1 {
             return 40
         }
         return 0.01
@@ -468,7 +339,7 @@ extension ContactsViewController: UITextFieldDelegate {
 class ContactsHeaderView: UIView {
     private let stackView = UIStackView()
 
-    init(entries: [(icon: String, title: String, color: UIColor, action: Selector)], target: Any?, frame: CGRect) {
+    init(entries: [(icon: String, title: String, action: Selector)], target: Any?, frame: CGRect) {
         super.init(frame: frame)
         setupUI(entries: entries, target: target)
     }
@@ -477,7 +348,7 @@ class ContactsHeaderView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private func setupUI(entries: [(icon: String, title: String, color: UIColor, action: Selector)], target: Any?) {
+    private func setupUI(entries: [(icon: String, title: String, action: Selector)], target: Any?) {
         backgroundColor = .white
 
         stackView.axis = .vertical
@@ -489,7 +360,7 @@ class ContactsHeaderView: UIView {
 
         for entry in entries {
             let cell = ContactsHeaderCell()
-            cell.configure(icon: entry.icon, title: entry.title, color: entry.color)
+            cell.configure(icon: entry.icon, title: entry.title)
             let tap = UITapGestureRecognizer(target: target, action: entry.action)
             cell.addGestureRecognizer(tap)
             cell.isUserInteractionEnabled = true
@@ -531,13 +402,19 @@ class ContactsHeaderCell: UIView {
         let iconSize: CGFloat = 40
         let hPad: CGFloat = 12
 
-        // 图标背景
-        iconView.layer.cornerRadius = 8
+        // 图标背景：浅色模式淡蓝 #E3F2FD
+        let iconBgColor = UIColor { trait in
+            if trait.userInterfaceStyle == .dark {
+                return UIColor(red: 0.11, green: 0.16, blue: 0.24, alpha: 1.0)
+            }
+            return UIColor(red: 227.0 / 255.0, green: 242.0 / 255.0, blue: 253.0 / 255.0, alpha: 1.0)
+        }
+
+        iconView.layer.cornerRadius = 10
         iconView.clipsToBounds = true
         iconView.contentMode = .center
-        iconView.tintColor = .white
-        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
-        iconView.preferredSymbolConfiguration = config
+        iconView.backgroundColor = iconBgColor
+        iconView.tintColor = .themeColorPrimary
         addSubview(iconView)
         iconView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
@@ -575,10 +452,9 @@ class ContactsHeaderCell: UIView {
         }
     }
 
-    func configure(icon: String, title: String, color: UIColor) {
-        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+    func configure(icon: String, title: String) {
+        let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .regular)
         iconView.image = UIImage(systemName: icon, withConfiguration: config)
-        iconView.backgroundColor = color
         titleLabel.text = title
     }
 }

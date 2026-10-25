@@ -15,7 +15,10 @@ private var actionWrapperKey: UInt8 = 0
 class ContactDetailViewController: UIViewController {
 
     private let uid: String
+    private let source: String?
     private var userInfo: ChannelInfo?
+    private var remarkTopToIdConstraint: Constraint?
+    private var remarkTopToNameConstraint: Constraint?
 
     // MARK: - 顶部用户信息
     private let scrollView = UIScrollView()
@@ -33,10 +36,10 @@ class ContactDetailViewController: UIViewController {
     // MARK: - 按钮区
     private let sendMsgButton = UIButton(type: .system)
     private let audioCallButton = UIButton(type: .system)
-    private let videoCallButton = UIButton(type: .system)
 
-    init(uid: String) {
+    init(uid: String, source: String? = nil) {
         self.uid = uid
+        self.source = source
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -107,6 +110,10 @@ class ContactDetailViewController: UIViewController {
             make.top.equalToSuperview().offset(20)
             make.width.height.equalTo(80)
         }
+        // 保证卡片高度不小于头像区域（Milo号隐藏时不塌陷）
+        headerCard.snp.makeConstraints { make in
+            make.bottom.greaterThanOrEqualTo(avatarImageView.snp.bottom).offset(20)
+        }
 
         // 名字
         nameLabel.font = ScreenAdapter.boldFont(20)
@@ -119,9 +126,10 @@ class ContactDetailViewController: UIViewController {
             make.trailing.equalToSuperview().offset(-16)
         }
 
-        // Milo号
+        // Milo号（无 short_no 时隐藏该行）
         idLabel.font = ScreenAdapter.font(13)
         idLabel.textColor = .secondaryLabel
+        idLabel.isHidden = true
         headerCard.addSubview(idLabel)
         idLabel.snp.makeConstraints { make in
             make.leading.equalTo(nameLabel)
@@ -136,10 +144,14 @@ class ContactDetailViewController: UIViewController {
         headerCard.addSubview(remarkLabel)
         remarkLabel.snp.makeConstraints { make in
             make.leading.equalTo(nameLabel)
-            make.top.equalTo(idLabel.snp.bottom).offset(4)
+            remarkTopToIdConstraint = make.top.equalTo(idLabel.snp.bottom).offset(4).constraint
+            remarkTopToNameConstraint = make.top.equalTo(nameLabel.snp.bottom).offset(6).constraint
             make.trailing.equalToSuperview().offset(-16)
             make.bottom.equalToSuperview().offset(-20)
         }
+        // 默认无 Milo 号时，备注直接跟在昵称下方
+        remarkTopToNameConstraint?.isActive = true
+        remarkTopToIdConstraint?.isActive = false
 
         // MARK: - 信息区（设置备注等）
         infoCard.backgroundColor = .white
@@ -191,15 +203,6 @@ class ContactDetailViewController: UIViewController {
         audioCallButton.addTarget(self, action: #selector(audioCallTapped), for: .touchUpInside)
         buttonsStack.addArrangedSubview(audioCallButton)
 
-        // 视频通话
-        videoCallButton.setImage(UIImage(systemName: "video.fill"), for: .normal)
-        videoCallButton.setTitle("  视频", for: .normal)
-        videoCallButton.tintColor = .themePrimary
-        videoCallButton.setTitleColor(.themePrimary, for: .normal)
-        videoCallButton.titleLabel?.font = ScreenAdapter.font(14)
-        videoCallButton.addTarget(self, action: #selector(videoCallTapped), for: .touchUpInside)
-        buttonsStack.addArrangedSubview(videoCallButton)
-
         // MARK: - 更多操作区
         let moreCard = UIView()
         moreCard.backgroundColor = .white
@@ -212,14 +215,16 @@ class ContactDetailViewController: UIViewController {
             make.trailing.equalToSuperview().offset(-16)
         }
 
-        addInfoRow(to: moreCard, title: "推荐给朋友", showArrow: true) {
-            AppUtility.showToast("推荐给朋友")
+        addInfoRow(to: moreCard, title: "来源", showArrow: false, detailText: source ?? "未知") {
+        }
+        addInfoRow(to: moreCard, title: "解除好友关系", showArrow: true, isDestructive: true) { [weak self] in
+            self?.confirmDeleteFriend()
         }
         addInfoRow(to: moreCard, title: "投诉", showArrow: true) { [weak self] in
             self?.showComplaintEditor()
         }
-        addInfoRow(to: moreCard, title: isBlacklisted ? "移出黑名单" : "加入黑名单", showArrow: false, isLast: true, isDestructive: true) { [weak self] in
-            self?.toggleBlacklist()
+        addInfoRow(to: moreCard, title: "加入黑名单", showArrow: false, isLast: true, isDestructive: true) { [weak self] in
+            self?.showBlockAlert()
         }
 
         // 底部约束
@@ -228,7 +233,7 @@ class ContactDetailViewController: UIViewController {
         }
     }
 
-    private func addInfoRow(to container: UIView, title: String, showArrow: Bool, isLast: Bool = false, isDestructive: Bool = false, action: @escaping () -> Void) {
+    private func addInfoRow(to container: UIView, title: String, showArrow: Bool, detailText: String? = nil, isLast: Bool = false, isDestructive: Bool = false, action: @escaping () -> Void) {
         let row = UIView()
         row.backgroundColor = .white
         row.isUserInteractionEnabled = true
@@ -258,6 +263,18 @@ class ContactDetailViewController: UIViewController {
                 make.trailing.equalToSuperview().offset(-16)
                 make.centerY.equalToSuperview()
                 make.width.height.equalTo(14)
+            }
+        } else if let detailText = detailText {
+            let valueLabel = UILabel()
+            valueLabel.text = detailText
+            valueLabel.font = ScreenAdapter.font(14)
+            valueLabel.textColor = .secondaryLabel
+            valueLabel.textAlignment = .right
+            row.addSubview(valueLabel)
+            valueLabel.snp.makeConstraints { make in
+                make.trailing.equalToSuperview().offset(-16)
+                make.centerY.equalToSuperview()
+                make.leading.greaterThanOrEqualTo(titleLabel.snp.trailing).offset(8)
             }
         }
 
@@ -304,7 +321,6 @@ class ContactDetailViewController: UIViewController {
                 self.userInfo = info
                 DispatchQueue.main.async {
                     self.nameLabel.text = info.displayName
-                    self.idLabel.text = "Milo号：\(info.channel_id ?? "")"
                     AppUtility.loadChannelAvatar(channelId: self.uid, channelType: 1, name: info.displayName, into: self.avatarImageView)
                     if let remark = info.remark, !remark.isEmpty {
                         self.remarkLabel.text = "备注：\(remark)"
@@ -318,14 +334,51 @@ class ContactDetailViewController: UIViewController {
                 }
             }
         }
+        loadMiloNo()
+    }
+
+    /// 从 /v1/user/search 读取 short_no（Milo号），无数据时隐藏该行
+    private func loadMiloNo() {
+        Task {
+            do {
+                let resp = try await APIClient.shared.requestRaw(.searchUser(keyword: uid, page: 1, pageSize: 1))
+                var payload: [String: Any] = resp
+                if let wrapped = resp["data"] as? [String: Any], wrapped["exist"] != nil {
+                    payload = wrapped
+                }
+                let existValue = payload["exist"]
+                let exist: Int = (existValue as? Int) ?? Int((existValue as? String) ?? "") ?? 0
+                var shortNo = ""
+                if exist == 1, let dict = payload["data"] as? [String: Any] {
+                    if let s = dict["short_no"] as? String {
+                        shortNo = s
+                    } else if let n = dict["short_no"] as? Int {
+                        shortNo = String(n)
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.updateMiloNo(shortNo)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.updateMiloNo("")
+                }
+            }
+        }
+    }
+
+    private func updateMiloNo(_ shortNo: String) {
+        let hasMiloNo = !shortNo.isEmpty
+        idLabel.isHidden = !hasMiloNo
+        idLabel.text = hasMiloNo ? "Milo号：\(shortNo)" : nil
+        remarkTopToIdConstraint?.isActive = hasMiloNo
+        remarkTopToNameConstraint?.isActive = !hasMiloNo
     }
 
     // MARK: - 按钮操作
     @objc private func backTapped() {
         navigationController?.popViewController(animated: true)
     }
-
-    private var isBlacklisted = false
 
     // MARK: - 显示备注编辑
     private func showRemarkEditor() {
@@ -361,17 +414,20 @@ class ContactDetailViewController: UIViewController {
         }
     }
 
-    // MARK: - 显示投诉编辑
+    // MARK: - 显示投诉编辑（原因选择）
     private func showComplaintEditor() {
-        let alert = UIAlertController(title: "投诉", message: "请描述投诉原因", preferredStyle: .alert)
-        alert.addTextField { textField in
-            textField.placeholder = "请输入投诉原因"
+        let reasons = ["骚扰/辱骂", "广告/营销", "欺诈/诈骗", "色情/违法", "其他"]
+        let alert = UIAlertController(title: "投诉", message: "请选择投诉原因", preferredStyle: .actionSheet)
+        for reason in reasons {
+            alert.addAction(UIAlertAction(title: reason, style: .default) { [weak self] _ in
+                self?.submitComplaint(reason: reason)
+            })
         }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "提交", style: .destructive) { [weak self] _ in
-            guard let self = self, let reason = alert.textFields?.first?.text, !reason.isEmpty else { return }
-            self.submitComplaint(reason: reason)
-        })
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+        }
         present(alert, animated: true)
     }
 
@@ -390,22 +446,24 @@ class ContactDetailViewController: UIViewController {
         }
     }
 
-    // MARK: - 黑名单切换
-    private func toggleBlacklist() {
-        if isBlacklisted {
-            removeFromBlacklist()
-        } else {
-            showBlockAlert()
-        }
+    // MARK: - 解除好友关系
+    private func confirmDeleteFriend() {
+        let alert = UIAlertController(title: "解除好友关系", message: "确认删除该好友？删除后将同时清空聊天记录", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.deleteFriend()
+        })
+        present(alert, animated: true)
     }
 
-    private func addToBlacklist() {
+    private func deleteFriend() {
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.addBlackList(uid: uid))
+                _ = try await APIClient.shared.requestRaw(.deleteFriend(uid: uid))
                 DispatchQueue.main.async {
-                    AppUtility.showToast("已加入黑名单")
-                    self.isBlacklisted = true
+                    AppUtility.showToast("已解除好友关系")
+                    NotificationCenter.default.post(name: NSNotification.Name("ContactsSynced"), object: nil)
+                    self.navigationController?.popViewController(animated: true)
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -415,13 +473,13 @@ class ContactDetailViewController: UIViewController {
         }
     }
 
-    private func removeFromBlacklist() {
+    // MARK: - 加入黑名单
+    private func addToBlacklist() {
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.removeBlackList(uid: uid))
+                _ = try await APIClient.shared.requestRaw(.addBlackList(uid: uid))
                 DispatchQueue.main.async {
-                    AppUtility.showToast("已移出黑名单")
-                    self.isBlacklisted = false
+                    AppUtility.showToast("已加入黑名单")
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -447,15 +505,11 @@ class ContactDetailViewController: UIViewController {
         AppUtility.showToast("发起语音通话")
     }
 
-    @objc private func videoCallTapped() {
-        AppUtility.showToast("发起视频通话")
-    }
-
     private func showBlockAlert() {
         let alert = UIAlertController(title: "加入黑名单", message: "加入黑名单后将不再接收对方消息", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { _ in
-            AppUtility.showToast("已加入黑名单")
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
+            self?.addToBlacklist()
         })
         present(alert, animated: true)
     }
