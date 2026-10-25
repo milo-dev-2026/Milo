@@ -49,7 +49,7 @@ class DataSyncManager {
         }
     }
 
-    private func syncFriends() {
+    func syncFriends() {
         guard let token = UserDefaults.standard.string(forKey: "token"), !token.isEmpty else { return }
         Task {
             do {

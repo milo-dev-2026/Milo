@@ -624,6 +624,8 @@ extension IMManager: WKConnectionManagerDelegate {
             case 3: // WKConnected
                 print("[IM] 连接成功")
                 isConnected = true
+                // 连接成功后拉取离线 CMD（好友申请等系统消息）
+                WKSDK.shared().cmdManager.pullCMDMessages()
             case 4: // WKDisconnected
                 print("[IM] 断开连接, reason: \(reasonCode.rawValue)")
                 isConnected = false
@@ -994,8 +996,29 @@ extension IMManager: WKCMDManagerDelegate {
     func cmdManager(_ manager: WKCMDManager, onCMD model: WKCMDModel) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.handleSystemCMD(model)
             self.onCMDReceived?(model)
             NotificationCenter.default.post(name: IMManager.cmdReceivedNotification, object: model)
+        }
+    }
+
+    /// 处理好友相关系统 CMD（对齐 Android WKIMUtils 的处理）
+    private func handleSystemCMD(_ model: WKCMDModel) {
+        let cmd = (model.cmd ?? "").lowercased()
+        let param = (model.param as? [String: Any]) ?? [:]
+
+        if cmd.contains("friendrequest") {
+            // 收到好友申请：写入本地申请列表
+            FriendApplyStore.shared.saveFromCMD(param)
+        } else if cmd.contains("friendaccept") {
+            // 对方同意了我的申请
+            let uid = (param["from_uid"] as? String) ?? (param["to_uid"] as? String) ?? ""
+            if !uid.isEmpty {
+                FriendApplyStore.shared.markStatus(uid: uid, status: 1)
+            }
+            DataSyncManager.shared.syncFriends()
+        } else if cmd.contains("frienddeleted") {
+            DataSyncManager.shared.syncFriends()
         }
     }
 }

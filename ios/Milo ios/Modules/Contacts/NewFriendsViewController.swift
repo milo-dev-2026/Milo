@@ -13,6 +13,17 @@ class NewFriendsViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         loadData()
+        // 收到新的好友申请 CMD 时实时刷新（对齐Android ApplyDB + EndpointManager）
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleApplyChanged),
+            name: FriendApplyStore.changedNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleApplyChanged() {
+        loadData()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -63,21 +74,11 @@ class NewFriendsViewController: UIViewController {
     }
 
     private func loadData() {
-        Task {
-            do {
-                let list: [FriendApply] = try await APIClient.shared.requestFlexible(.getFriendsApply)
-                DispatchQueue.main.async {
-                    self.applies = list
-                    self.emptyLabel.isHidden = !list.isEmpty
-                    self.tableView.reloadData()
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    AppUtility.showToast("加载失败")
-                    self.emptyLabel.isHidden = !self.applies.isEmpty
-                }
-            }
-        }
+        // 与Android一致：申请记录来自 IM 的 system CMD，持久化在本地
+        let list = FriendApplyStore.shared.all()
+        applies = list
+        emptyLabel.isHidden = !list.isEmpty
+        tableView.reloadData()
     }
 
     private func acceptApply(_ apply: FriendApply) {
@@ -87,6 +88,8 @@ class NewFriendsViewController: UIViewController {
                 let status = response["status"] as? Int
                 if status == nil || status == 200 {
                     AppUtility.showToast("已同意")
+                    FriendApplyStore.shared.markStatus(uid: apply.uid, status: 1)
+                    DataSyncManager.shared.syncFriends()
                     loadData()
                 } else {
                     AppUtility.showToast(response["msg"] as? String ?? "操作失败")
@@ -273,9 +276,10 @@ class FriendApplyCell: UITableViewCell {
         AppUtility.loadChannelAvatar(channelId: apply.uid, channelType: 1, name: apply.name, into: avatarView)
 
         if apply.status == 0 {
-            // 等待验证：显示同意/拒绝按钮
+            // 等待验证：显示同意/拒绝按钮（Android 好友申请只显示"同意"）
             statusLabel.isHidden = true
             buttonStack.isHidden = false
+            rejectButton.isHidden = true
         } else {
             // 已同意/已拒绝：显示状态文字
             statusLabel.isHidden = false
