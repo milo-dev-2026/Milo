@@ -221,7 +221,7 @@ class ChatFileViewController: UIViewController, UITableViewDataSource, UITableVi
         // 从 IM SDK 获取频道历史消息，筛选文件类型
         Task {
             do {
-                let messages = try await withCheckedThrowingContinuation { continuation in
+                let messages: [WKMessage] = try await withCheckedThrowingContinuation { continuation in
                     IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 200) { msgs, error in
                         if let error = error { continuation.resume(throwing: error) }
                         else { continuation.resume(returning: msgs ?? []) }

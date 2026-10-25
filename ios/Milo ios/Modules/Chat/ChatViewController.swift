@@ -168,21 +168,23 @@ class ChatViewController: UIViewController {
                 let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
                     .getChannelInfo(channelId: channelId, channelType: channelType)
                 )
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
                     navTitleLabel.text = channelInfo.displayName
                     AppUtility.loadChannelAvatar(
-                        channelId: channelId,
-                        channelType: channelType,
+                        channelId: self.channelId,
+                        channelType: self.channelType,
                         name: channelInfo.displayName,
                         into: navAvatar
                     )
                 }
             } catch {
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
                     AppUtility.loadChannelAvatar(
-                        channelId: channelId,
-                        channelType: channelType,
-                        name: titleText,
+                        channelId: self.channelId,
+                        channelType: self.channelType,
+                        name: self.titleText,
                         into: navAvatar
                     )
                 }

@@ -371,7 +371,7 @@ class SavedGroupsViewController: UIViewController, UITableViewDataSource, UITabl
             guard let self = self else { return }
             Task {
                 do {
-                    let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: "", memberUids: uids))
+                    let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: "", uids: uids))
                     _ = response
                     DispatchQueue.main.async {
                         AppUtility.showToast("创建成功")

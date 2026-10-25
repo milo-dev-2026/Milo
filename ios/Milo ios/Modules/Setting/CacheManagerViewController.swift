@@ -124,7 +124,7 @@ class CacheManagerViewController: UIViewController, UITableViewDataSource, UITab
             var sizes: [CacheCategory: UInt64] = [:]
 
             // 图片缓存 = Kingfisher 磁盘缓存 + Caches/image
-            let kfSize = UInt64((try? ImageCache.default.diskStorageSize) ?? 0)
+            let kfSize = UInt64(ImageCache.default.diskStorageSize)
             sizes[.image] = kfSize + self.folderSize(self.cachesURL.appendingPathComponent("image", isDirectory: true))
 
             for category in [CacheCategory.video, .voice, .file] {

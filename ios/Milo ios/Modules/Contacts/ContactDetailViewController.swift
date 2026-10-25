@@ -399,15 +399,6 @@ class ContactDetailViewController: UIViewController {
         }
     }
 
-    private func showBlockAlert() {
-        let alert = UIAlertController(title: "加入黑名单", message: "加入黑名单后将不再接收对方消息", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
-            self?.addToBlacklist()
-        })
-        present(alert, animated: true)
-    }
-
     private func addToBlacklist() {
         Task {
             do {
