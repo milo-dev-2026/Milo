@@ -235,7 +235,7 @@ class ChatFileViewController: UIViewController, UITableViewDataSource, UITableVi
                         let fileName = content.isEmpty ? "未知文件" : content
                         let fileSize = "\((msg.content as? WKFileMessageContent)?.fileSize ?? 0)"
                         let fileUrl = (msg.content as? WKFileMessageContent)?.url ?? ""
-                        let date = AppUtility.formatTimestamp(msg.timestamp)
+                        let date = AppUtility.formatTimestamp(Int64(msg.timestamp))
                         let ext = (fileName as NSString).pathExtension.lowercased()
                         list.append((name: fileName, size: fileSize, type: ext, date: date, url: fileUrl))
                     }
