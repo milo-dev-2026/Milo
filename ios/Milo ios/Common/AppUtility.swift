@@ -1,8 +1,9 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 import Kingfisher
 
 // MARK: - 通用工具类
+// Build trigger: ebe76ee
 class AppUtility {
 
     static let shared = AppUtility()
@@ -286,3 +287,4 @@ extension UILabel {
         self.font = ScreenAdapter.font(size, weight: weight)
     }
 }
+
