@@ -29,8 +29,8 @@ enum APIRouter: URLRequestConvertible {
     case getGroupInfo(groupId: String)
     case uploadFile(fileName: String, data: Data)
     case getFriendsApply
-    case applyFriend(uid: String, remark: String)
-    case acceptFriendApply(uid: String)
+    case applyFriend(uid: String, remark: String, vercode: String)
+    case acceptFriendApply(token: String)
     case deleteFriend(uid: String)
     case getTRTCUserSig
     case searchMessages(keyword: String)
@@ -222,10 +222,10 @@ enum APIRouter: URLRequestConvertible {
             request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
         case let .uploadFile(fileName, data):
             request.setValue("multipart/form-data", forHTTPHeaderField: "Content-Type")
-        case let .applyFriend(uid, remark):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid, "remark": remark])
-        case let .acceptFriendApply(uid):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
+        case let .applyFriend(uid, remark, vercode):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["to_uid": uid, "remark": remark, "vercode": vercode])
+        case let .acceptFriendApply(token):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["token": token])
         case let .deleteFriend(uid):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["uid": uid])
         case .logout:
@@ -405,9 +405,9 @@ enum APIRouter: URLRequestConvertible {
         case .updateUserInfo, .updateUserInfoFields: return "/v1/user/current"
         case .getGroupInfo: return "/v1/groups/info"
         case .uploadFile: return "/v1/files/upload"
-        case .getFriendsApply: return "/v1/friends/apply"
-        case .applyFriend: return "/v1/friends/apply"
-        case .acceptFriendApply: return "/v1/friends/accept"
+        case .getFriendsApply: return "/v1/friend/apply"
+        case .applyFriend: return "/v1/friend/apply"
+        case .acceptFriendApply: return "/v1/friend/sure"
         case .deleteFriend: return "/v1/friends/delete"
         case .logout: return "/v1/user/logout"
         case .getTRTCUserSig: return "/v1/trtc/usersig"

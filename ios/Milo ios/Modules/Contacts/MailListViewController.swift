@@ -275,7 +275,7 @@ class MailListViewController: UIViewController {
         Task {
             do {
                 let response = try await APIClient.shared.requestRaw(
-                    .applyFriend(uid: uid, remark: remark)
+                    .applyFriend(uid: uid, remark: remark, vercode: "")
                 )
                 DispatchQueue.main.async {
                     if response["status"] as? Int == 200 {

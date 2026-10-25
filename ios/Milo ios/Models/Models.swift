@@ -709,6 +709,7 @@ struct FriendApply: Codable {
     var avatar: String?
     var remark: String?
     var status: Int
+    var token: String?
 }
 
 // MARK: - API响应包装

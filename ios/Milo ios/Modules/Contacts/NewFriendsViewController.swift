@@ -83,7 +83,7 @@ class NewFriendsViewController: UIViewController {
     private func acceptApply(_ apply: FriendApply) {
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.acceptFriendApply(uid: apply.uid))
+                let response = try await APIClient.shared.requestRaw(.acceptFriendApply(token: apply.token ?? ""))
                 let status = response["status"] as? Int
                 if status == nil || status == 200 {
                     AppUtility.showToast("已同意")

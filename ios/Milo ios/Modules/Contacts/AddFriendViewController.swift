@@ -8,6 +8,7 @@ private struct AddFriendSearchResult {
     let username: String
     let name: String
     let shortNo: String
+    let vercode: String
 
     var displayName: String {
         if !name.isEmpty { return name }
@@ -128,7 +129,8 @@ class AddFriendViewController: UIViewController {
                             uid: uid,
                             username: (dict["username"] as? String) ?? "",
                             name: (dict["name"] as? String) ?? "",
-                            shortNo: shortNo
+                            shortNo: shortNo,
+                            vercode: (dict["vercode"] as? String) ?? ""
                         ))
                     }
                 }
@@ -155,7 +157,7 @@ class AddFriendViewController: UIViewController {
         guard !addedUids.contains(user.uid) else { return }
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: user.uid, remark: ""))
+                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: user.uid, remark: "", vercode: user.vercode))
                 // 后端成功时可能直接返回空对象，无 status 字段也视为成功
                 let status = response["status"] as? Int
                 if status == nil || status == 200 {
@@ -352,7 +354,7 @@ class FriendApplyListViewController: UIViewController {
     private func acceptApply(_ apply: FriendApply) {
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.acceptFriendApply(uid: apply.uid))
+                let response = try await APIClient.shared.requestRaw(.acceptFriendApply(token: apply.token ?? ""))
                 if response["status"] as? Int == 200 {
                     AppUtility.showToast("已添加好友")
                     loadData()

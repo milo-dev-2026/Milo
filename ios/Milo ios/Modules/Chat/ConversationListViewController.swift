@@ -281,7 +281,7 @@ class ConversationListViewController: UIViewController {
         }
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: ""))
+                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: "", vercode: ""))
                 if response["status"] as? Int == 200 {
                     DispatchQueue.main.async {
                         AppUtility.showToast("好友申请已发送")
