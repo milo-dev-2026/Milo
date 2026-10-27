@@ -398,15 +398,23 @@ class SearchResultViewController: UIViewController {
         messages = remoteMsgs.map { dict in
             let content = dict["content"] as? String ?? ""
             let typeRaw = dict["type"] as? Int ?? 1
+            // 服务端消息含内嵌 channel 对象（对齐安卓 GlobalMessage）
+            let channel = dict["channel"] as? [String: Any] ?? [:]
+            let ts = (dict["timestamp"] as? NSNumber)?.int64Value ?? 0
+            let timeString = ts > 0 ? AppUtility.formatTimestamp(ts > 10_000_000_000 ? ts : ts * 1000) : ""
+            let msgId: String
+            if let s = dict["message_id"] as? String { msgId = s }
+            else if let n = dict["message_seq"] as? NSNumber { msgId = n.stringValue }
+            else { msgId = "" }
             return SearchMessageResult(
-                messageId: dict["message_id"] as? String ?? "",
-                channelId: dict["channel_id"] as? String ?? "",
-                channelName: dict["channel_name"] as? String ?? "",
+                messageId: msgId,
+                channelId: channel["channel_id"] as? String ?? "",
+                channelName: channel["channel_name"] as? String ?? "",
                 fromUID: dict["from_uid"] as? String ?? "",
-                fromName: dict["from_name"] as? String ?? "",
-                avatar: dict["avatar"] as? String,
+                fromName: "",
+                avatar: channel["avatar"] as? String,
                 content: content,
-                timeString: dict["created_at"] as? String ?? "",
+                timeString: timeString,
                 messageType: MessageType(rawValue: typeRaw) ?? .text
             )
         }
@@ -416,7 +424,7 @@ class SearchResultViewController: UIViewController {
         contacts = remoteFriends.map { dict in
             SearchContactResult(
                 uid: dict["channel_id"] as? String ?? "",
-                name: dict["name"] as? String ?? "",
+                name: dict["channel_name"] as? String ?? dict["remark"] as? String ?? "",
                 avatar: dict["avatar"] as? String
             )
         }
@@ -427,7 +435,7 @@ class SearchResultViewController: UIViewController {
             conversations = remoteGroups.map { dict in
                 SearchConversationResult(
                     channelId: dict["channel_id"] as? String ?? "",
-                    name: dict["name"] as? String ?? "",
+                    name: dict["channel_name"] as? String ?? "",
                     avatar: dict["avatar"] as? String,
                     channelType: 2,
                     lastMessage: nil,

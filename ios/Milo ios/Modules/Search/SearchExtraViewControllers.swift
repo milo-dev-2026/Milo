@@ -37,7 +37,7 @@ class SearchUserViewController: UIViewController, UITableViewDataSource, UITable
             do {
                 let resp = try await APIClient.shared.requestRaw(.globalSearch(keyword: keyword, page: 1))
                 if let data = resp["data"] as? [String: Any], let friends = data["friends"] as? [[String: Any]] {
-                    results = friends.map { ($0["channel_id"] as? String ?? "", $0["name"] as? String ?? "") }
+                    results = friends.map { ($0["channel_id"] as? String ?? "", $0["channel_name"] as? String ?? $0["remark"] as? String ?? "") }
                     DispatchQueue.main.async { self.tableView.reloadData() }
                 }
             } catch {

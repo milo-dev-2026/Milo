@@ -295,7 +295,9 @@ class ChatSearchViewController: UIViewController {
         }
         var list: [ChatSearchResult] = []
         for dict in messages {
-            let cid = dict["channel_id"] as? String ?? ""
+            // 服务端返回的消息含内嵌 channel 对象（对齐安卓 GlobalMessage）
+            let channel = dict["channel"] as? [String: Any] ?? [:]
+            let cid = channel["channel_id"] as? String ?? ""
             guard cid == channelId else { continue }
 
             let type = (dict["type"] as? NSNumber)?.intValue ?? 1
@@ -305,6 +307,8 @@ class ChatSearchViewController: UIViewController {
             if let s = dict["message_id"] as? String {
                 messageId = s
             } else if let n = dict["message_id"] as? NSNumber {
+                messageId = n.stringValue
+            } else if let n = dict["message_seq"] as? NSNumber {
                 messageId = n.stringValue
             } else {
                 messageId = ""

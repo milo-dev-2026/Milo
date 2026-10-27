@@ -74,7 +74,7 @@ class SearchAllViewController: UIViewController {
                             searchResults.append(SearchResultItem(
                                 type: .user,
                                 uid: f["channel_id"] as? String ?? "",
-                                name: f["name"] as? String,
+                                name: f["channel_name"] as? String ?? f["remark"] as? String,
                                 content: nil
                             ))
                         }
@@ -84,7 +84,7 @@ class SearchAllViewController: UIViewController {
                             searchResults.append(SearchResultItem(
                                 type: .group,
                                 uid: g["channel_id"] as? String ?? "",
-                                name: g["name"] as? String,
+                                name: g["channel_name"] as? String,
                                 content: nil
                             ))
                         }
@@ -92,12 +92,13 @@ class SearchAllViewController: UIViewController {
                     if let messages = data["messages"] as? [[String: Any]] {
                         for m in messages {
                             let content = m["content"] as? String ?? ""
-                            let channelId = m["channel_id"] as? String ?? ""
+                            let channel = m["channel"] as? [String: Any] ?? [:]
+                            let channelId = channel["channel_id"] as? String ?? ""
                             if !content.isEmpty {
                                 searchResults.append(SearchResultItem(
                                     type: .message,
                                     uid: channelId,
-                                    name: m["channel_name"] as? String,
+                                    name: channel["channel_name"] as? String,
                                     content: content
                                 ))
                             }

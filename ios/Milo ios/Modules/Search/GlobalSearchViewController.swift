@@ -23,6 +23,7 @@ struct GlobalMessage {
     let messageId: String
     let channelId: String
     let channelName: String
+    let channelType: Int
     let fromUID: String
     let fromName: String
     let avatar: String?
@@ -289,23 +290,32 @@ class GlobalSearchViewController: UIViewController {
     private func parseChannel(_ dict: [String: Any], type: Int) -> GlobalChannel {
         GlobalChannel(
             channelId: dict["channel_id"] as? String ?? "",
-            name: dict["name"] as? String ?? "",
+            name: dict["channel_name"] as? String ?? dict["remark"] as? String ?? "",
             avatar: dict["avatar"] as? String,
             channelType: dict["channel_type"] as? Int ?? type
         )
     }
 
     private func parseMessage(_ dict: [String: Any]) -> GlobalMessage {
-        GlobalMessage(
-            messageId: dict["message_id"] as? String ?? "",
-            channelId: dict["channel_id"] as? String ?? "",
-            channelName: dict["channel_name"] as? String ?? "",
+        // 服务端返回结构对齐安卓 GlobalMessage：消息本体 + 内嵌 channel 对象
+        let channel = dict["channel"] as? [String: Any] ?? [:]
+        let seq = (dict["message_seq"] as? NSNumber)?.intValue ?? 0
+        var createdAt = ""
+        if let ts = (dict["timestamp"] as? NSNumber)?.int64Value, ts > 0 {
+            let ms = ts > 10_000_000_000 ? ts : ts * 1000
+            createdAt = AppUtility.formatTimestamp(ms)
+        }
+        return GlobalMessage(
+            messageId: seq > 0 ? "\(seq)" : "",
+            channelId: channel["channel_id"] as? String ?? "",
+            channelName: channel["channel_name"] as? String ?? "",
+            channelType: channel["channel_type"] as? Int ?? 1,
             fromUID: dict["from_uid"] as? String ?? "",
-            fromName: dict["from_name"] as? String ?? "",
-            avatar: dict["avatar"] as? String,
+            fromName: "",
+            avatar: channel["avatar"] as? String,
             content: dict["content"] as? String ?? "",
-            createdAt: dict["created_at"] as? String ?? "",
-            orderSeq: dict["order_seq"] as? Int ?? 0
+            createdAt: createdAt,
+            orderSeq: seq
         )
     }
 }
@@ -526,7 +536,7 @@ private class GlobalMessageCell: UITableViewCell {
         nameLabel.text = msg.fromName.isEmpty ? msg.channelName : msg.fromName
         timeLabel.text = msg.createdAt
         contentLabel.attributedText = highlightKeyword(msg.content, keyword: keyword)
-        AppUtility.loadChannelAvatar(channelId: msg.fromUID.isEmpty ? msg.channelId : msg.fromUID, channelType: 1, name: msg.fromName, into: avatarView)
+        AppUtility.loadChannelAvatar(channelId: msg.channelId, channelType: msg.channelType, name: msg.channelName, into: avatarView)
     }
 }
 

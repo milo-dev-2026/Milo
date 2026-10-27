@@ -183,18 +183,37 @@ class ContactsViewController: UIViewController {
         navigationController?.pushViewController(vc, animated: true)
     }
 
+    /// 通讯录本地缓存（先渲染缓存再拉网络，对齐安卓本地优先）
+    private static let contactsCacheKey = "contacts_cache_v1"
+
     private func loadData() {
+        // 先渲染本地缓存好友列表，避免空白等待
+        if let data = UserDefaults.standard.data(forKey: ContactsViewController.contactsCacheKey),
+           let cached = try? JSONDecoder().decode([User].self, from: data),
+           !cached.isEmpty {
+            contacts = cached
+            filteredContacts = cached
+            rebuildSections()
+        }
+
         Task {
             do {
                 let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
-                contacts = friends.map { $0.toUser() }.sorted { $0.name < $1.name }
-                filteredContacts = contacts
+                let list = friends.map { $0.toUser() }.sorted { $0.name < $1.name }
+                // 写入本地缓存供下次秒开
+                if let data = try? JSONEncoder().encode(list) {
+                    UserDefaults.standard.set(data, forKey: ContactsViewController.contactsCacheKey)
+                }
+                contacts = list
+                filteredContacts = list
                 DispatchQueue.main.async {
                     self.rebuildSections()
                 }
             } catch {
                 DispatchQueue.main.async {
-                    AppUtility.showToast("加载通讯录失败")
+                    if self.contacts.isEmpty {
+                        AppUtility.showToast("加载通讯录失败")
+                    }
                 }
             }
         }

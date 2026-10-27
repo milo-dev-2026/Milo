@@ -832,7 +832,7 @@ extension IMManager {
             var lastType = 1
             var timestamp: Int64?
             var seq = 0
-            if let item = conv.lastMsgItem {
+            if let item = conv.lastMessage {
                 let m = convertWKMessageToMessage(item)
                 lastMsg = m.content
                 lastType = m.type.rawValue
