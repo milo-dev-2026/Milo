@@ -10,6 +10,7 @@ class FileMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var currentMessageID = ""
     private var isFromMe = false
 
@@ -33,7 +34,7 @@ class FileMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.backgroundColor = .white
 
         fileIcon.image = UIImage(systemName: "doc.fill")
@@ -60,7 +61,7 @@ class FileMessageCell: UITableViewCell {
 
         bubbleView.addSubview(fileIcon)
         bubbleView.addSubview(infoStack)
-        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
 
         avatarView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(vPad)
@@ -80,10 +81,11 @@ class FileMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -164,6 +166,7 @@ class FileMessageCell: UITableViewCell {
                 make.width.equalTo(bubbleWidth)
                 make.height.equalTo(bubbleHeight)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -195,6 +198,7 @@ class FileMessageCell: UITableViewCell {
                     make.height.equalTo(bubbleHeight)
                 }
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

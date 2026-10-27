@@ -85,6 +85,7 @@ class GIFMessageCell: UITableViewCell {
     private let imageView_ = UIImageView()
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
+    private let tailView = ChatBubbleTailView()
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
     private var isFromMe = false
 
@@ -153,7 +154,7 @@ class GIFMessageCell: UITableViewCell {
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .center
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
@@ -181,7 +182,7 @@ class GIFMessageCell: UITableViewCell {
         bubbleView.addSubview(progressRingView)
         bubbleView.addSubview(retryImageView)
         bubbleView.addSubview(gifBadgeView)
-        contentView.addSubviews(timeHeaderLabel, avatarView, bubbleView, timeLabel, readCountLabel)
+        contentView.addSubviews(timeHeaderLabel, avatarView, tailView, bubbleView, timeLabel, readCountLabel)
 
         timeHeaderLabel.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(8)
@@ -499,9 +500,10 @@ class GIFMessageCell: UITableViewCell {
     }
 
     // MARK: - 配置消息
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -537,6 +539,7 @@ class GIFMessageCell: UITableViewCell {
                 make.width.equalTo(displaySize.width)
                 make.height.equalTo(displaySize.height)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -554,6 +557,7 @@ class GIFMessageCell: UITableViewCell {
                 make.width.equalTo(displaySize.width)
                 make.height.equalTo(displaySize.height)
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

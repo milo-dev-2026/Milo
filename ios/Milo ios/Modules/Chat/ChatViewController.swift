@@ -707,7 +707,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         if (message.type == .image || message.type == .video), pendingMedia[message.messageID] != nil {
             let cell = tableView.dequeueReusableCell(withIdentifier: "PendingMediaMessageCell", for: indexPath) as! PendingMediaMessageCell
             let messageID = message.messageID
-            cell.configure(with: message, thumbnail: pendingMedia[messageID]) { [weak self] in
+            cell.configure(with: message, thumbnail: pendingMedia[messageID], showTail: isLastInRun) { [weak self] in
                 self?.retryUpload(messageID: messageID)
             }
             return cell
@@ -715,31 +715,31 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         switch message.type {
         case .image:
             let cell = tableView.dequeueReusableCell(withIdentifier: "ImageMessageCell", for: indexPath) as! ImageMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .voice:
             let cell = tableView.dequeueReusableCell(withIdentifier: "VoiceMessageCell", for: indexPath) as! VoiceMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .video:
             let cell = tableView.dequeueReusableCell(withIdentifier: "VideoMessageCell", for: indexPath) as! VideoMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .file:
             let cell = tableView.dequeueReusableCell(withIdentifier: "FileMessageCell", for: indexPath) as! FileMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .location:
             let cell = tableView.dequeueReusableCell(withIdentifier: "LocationMessageCell", for: indexPath) as! LocationMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .card:
             let cell = tableView.dequeueReusableCell(withIdentifier: "CardMessageCell", for: indexPath) as! CardMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         case .note:
             let cell = tableView.dequeueReusableCell(withIdentifier: "NoteMessageCell", for: indexPath) as! NoteMessageCell
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell
@@ -1564,43 +1564,6 @@ extension ChatViewController: UIDocumentPickerDelegate {
 }
 
 // MARK: - 消息Cell
-/// 气泡小尾巴（iMessage 风格）：连续同方向消息只在末条显示
-final class ChatBubbleTailView: UIView {
-    enum Direction { case incoming, outgoing }
-    var direction: Direction = .outgoing { didSet { setNeedsDisplay() } }
-    var fillColor: UIColor = .white { didSet { setNeedsDisplay() } }
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        isOpaque = false
-    }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func draw(_ rect: CGRect) {
-        let path = UIBezierPath()
-        let w = rect.width, h = rect.height
-        switch direction {
-        case .outgoing:
-            path.move(to: CGPoint(x: 0, y: 0))
-            path.addCurve(to: CGPoint(x: w, y: h),
-                          controlPoint1: CGPoint(x: w * 0.30, y: h * 0.15),
-                          controlPoint2: CGPoint(x: w * 0.75, y: h * 0.85))
-            path.addLine(to: CGPoint(x: 0, y: h))
-            path.close()
-        case .incoming:
-            path.move(to: CGPoint(x: w, y: 0))
-            path.addCurve(to: CGPoint(x: 0, y: h),
-                          controlPoint1: CGPoint(x: w * 0.70, y: h * 0.15),
-                          controlPoint2: CGPoint(x: w * 0.25, y: h * 0.85))
-            path.addLine(to: CGPoint(x: w, y: h))
-            path.close()
-        }
-        fillColor.setFill()
-        path.fill()
-    }
-}
-
 class TextMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
@@ -1649,7 +1612,7 @@ class TextMessageCell: UITableViewCell {
         senderNameLabel.font = ScreenAdapter.font(12)
         senderNameLabel.textColor = .secondaryLabel
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
 
         // 气泡尾巴：默认隐藏，仅在连续同方向消息的末条显示
@@ -1805,6 +1768,7 @@ final class PendingMediaMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var isFromMe = false
     private var currentMessageID = ""
     private var onRetry: (() -> Void)?
@@ -1821,7 +1785,7 @@ final class PendingMediaMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .systemGray6
 
@@ -1860,7 +1824,7 @@ final class PendingMediaMessageCell: UITableViewCell {
         senderNameLabel.isHidden = true
 
         bubbleView.addSubviews(thumbnailView, dimOverlay, playIcon, spinner, statusLabel)
-        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
 
         thumbnailView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -1893,12 +1857,14 @@ final class PendingMediaMessageCell: UITableViewCell {
         onRetry?()
     }
 
-    func configure(with message: Message, thumbnail: UIImage?, onRetry: (() -> Void)?) {
+    func configure(with message: Message, thumbnail: UIImage?, showTail: Bool = false, onRetry: (() -> Void)?) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         self.onRetry = onRetry
         timeLabel.text = message.timeString
         thumbnailView.image = thumbnail ?? UIImage(systemName: message.type == .video ? "video" : "photo")
+        // 尾巴：仅连续同方向消息的末条显示
+        tailView.isHidden = !showTail
 
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
 
@@ -1942,6 +1908,7 @@ final class PendingMediaMessageCell: UITableViewCell {
                 make.top.equalTo(avatarView)
                 make.width.height.equalTo(imgSize)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -1970,6 +1937,7 @@ final class PendingMediaMessageCell: UITableViewCell {
                     make.width.height.equalTo(imgSize)
                 }
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

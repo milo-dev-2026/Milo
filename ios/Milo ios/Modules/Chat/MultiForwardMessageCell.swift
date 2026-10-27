@@ -79,6 +79,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
     let bubbleView = UIView()
     let timeLabel = UILabel()
     let avatarView = UIImageView()
+    private let tailView = ChatBubbleTailView()
 
     // 气泡内部元素
     private let titleLabel = UILabel()
@@ -117,7 +118,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
         let avatarSize = ScreenAdapter.scaleW(36)
 
         // 气泡
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(12)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.backgroundColor = .white
         bubbleView.isUserInteractionEnabled = true
         bubbleView.layer.shadowColor = UIColor.black.cgColor
@@ -171,7 +172,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
 
         // 组装视图
         bubbleView.addSubviews(titleIcon, titleLabel, dividerLine, summaryStackView, bottomLabel, bottomArrow)
-        contentView.addSubviews(timeHeaderLabel, avatarView, bubbleView, timeLabel)
+        contentView.addSubviews(timeHeaderLabel, avatarView, tailView, bubbleView, timeLabel)
 
         // 时间分隔头约束
         timeHeaderLabel.snp.makeConstraints { make in
@@ -235,9 +236,10 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
     }
 
     // MARK: - 配置数据
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -324,6 +326,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
                 make.top.equalTo(avatarView)
                 make.width.equalTo(bubbleWidth)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -348,6 +351,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
                 make.top.equalTo(avatarView)
                 make.width.equalTo(bubbleWidth)
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

@@ -8,6 +8,7 @@ class NoteMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var currentMessageID = ""
     private var isFromMe = false
 
@@ -43,7 +44,7 @@ class NoteMessageCell: UITableViewCell {
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .center
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(12)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .white
 
@@ -87,7 +88,7 @@ class NoteMessageCell: UITableViewCell {
 
         noteContainer.addSubviews(noteIconView, noteTitleLabel, notePreviewLabel, noteArrowView)
         bubbleView.addSubview(noteContainer)
-        contentView.addSubviews(timeHeaderLabel, avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(timeHeaderLabel, avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
 
         timeHeaderLabel.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(8)
@@ -169,10 +170,11 @@ class NoteMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -220,6 +222,7 @@ class NoteMessageCell: UITableViewCell {
                 make.top.equalTo(avatarView)
                 make.width.equalTo(bubbleWidth)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -251,6 +254,7 @@ class NoteMessageCell: UITableViewCell {
                     make.width.equalTo(bubbleWidth)
                 }
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

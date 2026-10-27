@@ -11,6 +11,7 @@ class VideoMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var currentMessageID = ""
     private var isFromMe = false
     private var videoURL: URL?
@@ -34,7 +35,7 @@ class VideoMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
@@ -54,7 +55,7 @@ class VideoMessageCell: UITableViewCell {
 
         bubbleView.addSubview(thumbnailView)
         bubbleView.addSubview(playIcon)
-        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
 
         avatarView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(vPad)
@@ -71,10 +72,11 @@ class VideoMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -140,6 +142,7 @@ class VideoMessageCell: UITableViewCell {
                 make.top.equalTo(avatarView)
                 make.width.height.equalTo(imgSize)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -168,6 +171,7 @@ class VideoMessageCell: UITableViewCell {
                     make.width.height.equalTo(imgSize)
                 }
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

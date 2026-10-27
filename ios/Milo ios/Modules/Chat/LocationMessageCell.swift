@@ -13,6 +13,7 @@ class LocationMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var currentMessageID = ""
     private var isFromMe = false
     private var locationCoord: CLLocationCoordinate2D?
@@ -37,7 +38,7 @@ class LocationMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .systemGray6
 
@@ -89,7 +90,7 @@ class LocationMessageCell: UITableViewCell {
             make.height.equalTo(ScreenAdapter.scaleH(36))
         }
 
-        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
 
         avatarView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(vPad)
@@ -97,10 +98,11 @@ class LocationMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         timeLabel.text = message.timeString
+        tailView.isHidden = !showTail
 
         // 发送者头像（与Android一致）
         AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
@@ -150,6 +152,7 @@ class LocationMessageCell: UITableViewCell {
                 make.top.equalTo(avatarView)
                 make.width.equalTo(mapSize)
             }
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
@@ -178,6 +181,7 @@ class LocationMessageCell: UITableViewCell {
                     make.width.equalTo(mapSize)
                 }
             }
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)
                 make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)

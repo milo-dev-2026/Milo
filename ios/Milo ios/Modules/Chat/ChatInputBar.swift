@@ -34,6 +34,8 @@ class ChatInputBar: UIView {
 
     /// 输入行胶囊玻璃容器（包含语音/输入框/发送/+）
     private let pillContainer = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    /// 胶囊顶部 1px 发丝高光，营造玻璃厚度感
+    private let pillHighlight = UIView()
     private let inputRow = UIView()
     private let textView = UITextView()
     private let sendButton = UIButton(type: .system)
@@ -166,6 +168,22 @@ class ChatInputBar: UIView {
         // 输入控件全部放进胶囊玻璃容器
         pill.addSubviews(voiceButton, textView, holdToTalkButton, sendButton, moreButton)
 
+        // 顶部发丝高光：横向内缩，避让胶囊圆角
+        pillHighlight.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        pillHighlight.isUserInteractionEnabled = false
+        pillContainer.contentView.addSubview(pillHighlight)
+        pillHighlight.snp.makeConstraints { make in
+            make.top.equalTo(pill)
+            make.leading.equalTo(pill).offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalTo(pill).offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(1)
+        }
+
+        // 图标按钮按压回弹
+        installPressAnimation(on: sendButton)
+        installPressAnimation(on: moreButton)
+        installPressAnimation(on: voiceButton)
+
         moreButton.snp.makeConstraints { make in
             make.trailing.equalTo(pill).offset(-hPad)
             make.centerY.equalTo(textView)
@@ -214,6 +232,35 @@ class ChatInputBar: UIView {
         delegate?.didSendTextMessage(text)
         textView.text = ""
         textViewDidChange(textView)
+    }
+
+    // MARK: - 按键按压回弹
+
+    /// 按下缩到 0.96，抬起用 spring 回弹到 1.0
+    private func installPressAnimation(on button: UIButton) {
+        button.addTarget(self, action: #selector(pressDown(_:)), for: [.touchDown, .touchDragEnter])
+        button.addTarget(self, action: #selector(pressUp(_:)),
+                         for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+    }
+
+    @objc private func pressDown(_ sender: UIButton) {
+        guard AnimationIntegration.shared.config.enableButtonPressAnimation else { return }
+        UIView.animate(withDuration: 0.12,
+                       delay: 0,
+                       options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]) {
+            sender.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+        }
+    }
+
+    @objc private func pressUp(_ sender: UIButton) {
+        guard AnimationIntegration.shared.config.enableButtonPressAnimation else { return }
+        UIView.animate(withDuration: 0.35,
+                       delay: 0,
+                       usingSpringWithDamping: 0.55,
+                       initialSpringVelocity: 0.6,
+                       options: [.allowUserInteraction, .beginFromCurrentState]) {
+            sender.transform = .identity
+        }
     }
 
     @objc private func toggleMorePanel() {

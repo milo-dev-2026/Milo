@@ -421,7 +421,10 @@ extension RobotChatViewController: UITableViewDataSource, UITableViewDelegate {
 
         let cell = tableView.dequeueReusableCell(withIdentifier: "RobotTextMessageCell", for: indexPath) as! RobotTextMessageCell
         let message = messages[indexPath.row]
-        cell.configure(with: message, avatar: robot.avatar)
+        // 是否为连续同方向消息的末条（用于显示气泡尾巴）
+        let nextIdx = indexPath.row + 1
+        let isLastInRun = nextIdx >= messages.count || messages[nextIdx].isFromMe != message.isFromMe
+        cell.configure(with: message, avatar: robot.avatar, showTail: isLastInRun)
         return cell
     }
 
@@ -448,6 +451,7 @@ class RobotTextMessageCell: UITableViewCell {
     private let bubbleView = UIView()
     private let messageLabel = UILabel()
     private let timeLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
 
     // MARK: - 约束
     private var bubbleLeadingConstraint: Constraint!
@@ -486,8 +490,9 @@ class RobotTextMessageCell: UITableViewCell {
         avatarTrailingConstraint.deactivate()
 
         // 气泡
-        bubbleView.layer.cornerRadius = 16
+        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
         bubbleView.clipsToBounds = true
+        contentView.addSubview(tailView)
         contentView.addSubview(bubbleView)
         bubbleView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(6)
@@ -522,10 +527,11 @@ class RobotTextMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: RobotMessage, avatar: String) {
+    func configure(with message: RobotMessage, avatar: String, showTail: Bool = false) {
         messageLabel.text = message.content
         timeLabel.text = message.timeString
         avatarLabel.text = avatar
+        tailView.isHidden = !showTail
 
         if message.isFromMe {
             // 自己的消息 - 右侧
@@ -540,6 +546,7 @@ class RobotTextMessageCell: UITableViewCell {
 
             // 气泡圆角调整（右边方一点）
             bubbleView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner]
+            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
         } else {
             // 机器人消息 - 左侧
             bubbleView.backgroundColor = .themeBubbleReceive
@@ -553,6 +560,7 @@ class RobotTextMessageCell: UITableViewCell {
 
             // 气泡圆角调整（左边方一点）
             bubbleView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
         }
     }
 }
