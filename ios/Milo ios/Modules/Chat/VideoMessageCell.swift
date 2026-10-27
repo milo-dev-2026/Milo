@@ -93,7 +93,8 @@ class VideoMessageCell: UITableViewCell {
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
             fillColor: fillColor,
-            avatar: message.chatAvatar
+            avatar: message.chatAvatar,
+            status: message.isFromMe ? message.status : nil
         )
     }
 

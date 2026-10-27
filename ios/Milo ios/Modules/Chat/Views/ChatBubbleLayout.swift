@@ -41,6 +41,7 @@ enum ChatBubbleLayout {
 
     private static let timeHeaderTag = 987_001
     private static let avatarTag = 987_002
+    private static let statusTag = 987_003
 
     private static let hmFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -72,6 +73,7 @@ enum ChatBubbleLayout {
     ///   - timeHeader: 非空时在气泡上方插入居中时间分隔文字
     ///   - groupedAbove / groupedBelow: 与上/下一条同方向消息时间距收紧
     ///   - avatar: 非空时在气泡外侧显示发送者头像（顶部与气泡对齐）
+    ///   - status: 己方消息状态（0 发送中 / 1 已发送 / 2 已读 / -1 失败），nil 不显示
     static func install(bubble: UIView,
                         tail: ChatBubbleTailView,
                         isFromMe: Bool,
@@ -82,7 +84,8 @@ enum ChatBubbleLayout {
                         groupedAbove: Bool = false,
                         groupedBelow: Bool = false,
                         fillColor: UIColor,
-                        avatar: ChatAvatarSource? = nil) {
+                        avatar: ChatAvatarSource? = nil,
+                        status: Int? = nil) {
         // 参考样式不显示尾巴
         tail.isHidden = true
 
@@ -151,6 +154,72 @@ enum ChatBubbleLayout {
                 make.height.greaterThanOrEqualTo(minHeight)
             }
         }
+
+        // 己方消息状态图标（发送中/单勾/双勾/失败），放在气泡左下外侧空白区（对齐安卓）
+        let statusView = statusIconView(in: contentView)
+        if isFromMe, let status = status {
+            statusView.isHidden = false
+            configureStatusView(statusView, status: status)
+            statusView.snp.remakeConstraints { make in
+                make.trailing.equalTo(bubble.snp.leading).offset(-ScreenAdapter.scaleW(4))
+                make.bottom.equalTo(bubble.snp.bottom)
+                make.width.equalTo(ScreenAdapter.scaleW(20))
+                make.height.equalTo(ScreenAdapter.scaleH(14))
+            }
+        } else {
+            statusView.isHidden = true
+        }
+    }
+
+    /// 状态图标内容：0 时钟 / 1 单勾 / 2 双勾（主题色） / -1 红色感叹号
+    private static func configureStatusView(_ container: UIView, status: Int) {
+        container.subviews.forEach { $0.removeFromSuperview() }
+
+        let config = UIImage.SymbolConfiguration(pointSize: 9, weight: .medium)
+        func makeIcon(_ name: String, _ color: UIColor) -> UIImageView {
+            let iv = UIImageView(image: UIImage(systemName: name, withConfiguration: config))
+            iv.tintColor = color
+            iv.contentMode = .scaleAspectFit
+            return iv
+        }
+
+        switch status {
+        case 0:
+            let iv = makeIcon("clock", .tertiaryLabel)
+            container.addSubview(iv)
+            iv.snp.makeConstraints { make in make.center.equalToSuperview() }
+        case 2:
+            // 双勾：两个对勾错位叠加
+            let iv1 = makeIcon("checkmark", .themePrimary)
+            let iv2 = makeIcon("checkmark", .themePrimary)
+            container.addSubviews(iv1, iv2)
+            iv1.snp.makeConstraints { make in
+                make.leading.centerY.equalToSuperview()
+            }
+            iv2.snp.makeConstraints { make in
+                make.leading.equalTo(iv1.snp.centerX).offset(1)
+                make.centerY.equalToSuperview()
+            }
+        case -1:
+            let iv = makeIcon("exclamationmark.circle.fill", .systemRed)
+            container.addSubview(iv)
+            iv.snp.makeConstraints { make in make.center.equalToSuperview() }
+        default:
+            // 1 = 已发送：单勾
+            let iv = makeIcon("checkmark", .tertiaryLabel)
+            container.addSubview(iv)
+            iv.snp.makeConstraints { make in make.center.equalToSuperview() }
+        }
+    }
+
+    /// 每个 cell contentView 内复用同一个状态图标容器（按 tag 查找，缺失则创建）
+    private static func statusIconView(in contentView: UIView) -> UIView {
+        if let view = contentView.viewWithTag(statusTag) { return view }
+        let view = UIView()
+        view.tag = statusTag
+        view.isUserInteractionEnabled = false
+        contentView.addSubview(view)
+        return view
     }
 
     /// 每个 cell contentView 内复用同一个头像视图（按 tag 查找，缺失则创建）

@@ -186,8 +186,7 @@ class ChatViewController: UIViewController {
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = ScreenAdapter.scaleH(64)
 
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-        tableView.addGestureRecognizer(longPress)
+        // 长按菜单使用 iOS 原生 ContextMenu（气泡弹出 + 菜单），见 UITableViewDelegate 扩展
 
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
@@ -318,6 +317,10 @@ class ChatViewController: UIViewController {
         0xF3E5F5, 0xE0F7FA, 0xEFEBE9, 0xECEFF1, 0xFFFDE7, 0xF1F8E9
     ].map { UIColor.hex(String(format: "%06X", $0)) }
 
+    /// 默认聊天背景图（品牌渐变，固定在 view 上不随消息滚动）
+    private let chatBgImageView = UIImageView()
+    private var chatBgImageInstalled = false
+
     private func applyChatBackground() {
         let defaults = UserDefaults.standard
         var color: UIColor?
@@ -337,8 +340,47 @@ class ChatViewController: UIViewController {
                 color = ChatViewController.androidChatBgColors[index]
             }
         }
-        view.backgroundColor = color ?? .themeChatBackground
+
+        if let color = color {
+            // 用户自定义纯色背景
+            chatBgImageView.isHidden = true
+            view.backgroundColor = color
+        } else {
+            // 默认品牌渐变背景图：固定在 view 上（不随列表滚动）
+            view.backgroundColor = .themeChatBackground
+            if !chatBgImageInstalled {
+                chatBgImageInstalled = true
+                chatBgImageView.contentMode = .scaleAspectFill
+                chatBgImageView.isUserInteractionEnabled = false
+                chatBgImageView.image = ChatViewController.makeDefaultChatBackground()
+                view.insertSubview(chatBgImageView, at: 0)
+                chatBgImageView.snp.makeConstraints { make in
+                    make.edges.equalToSuperview()
+                }
+            }
+            chatBgImageView.isHidden = false
+        }
         tableView.backgroundColor = .clear
+    }
+
+    /// 生成默认聊天背景：柔和的品牌蓝紫渐变（与启动页同色系）
+    private static func makeDefaultChatBackground() -> UIImage {
+        let size = CGSize(width: ScreenAdapter.screenWidth, height: ScreenAdapter.screenHeight)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let colors = [
+                UIColor.hex("F8F9FE").cgColor,
+                UIColor.hex("EFF2FB").cgColor,
+                UIColor.hex("EAEEF9").cgColor
+            ]
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                      colors: colors as CFArray,
+                                      locations: [0, 0.55, 1])!
+            ctx.cgContext.drawLinearGradient(gradient,
+                                             start: .zero,
+                                             end: CGPoint(x: 0, y: size.height),
+                                             options: [])
+        }
     }
 
     private static func color(from storedValue: String) -> UIColor? {
@@ -848,6 +890,68 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         }
     }
 
+    // MARK: - 长按气泡菜单（iMessage 式：气泡弹出 + 操作菜单）
+    func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        let message = messages[indexPath.row]
+        guard message.type != .system else { return nil }
+        return UIContextMenuConfiguration(identifier: indexPath as NSIndexPath, previewProvider: nil) { [weak self] _ in
+            guard let self = self else { return nil }
+            var actions: [UIMenuElement] = []
+
+            // 复制（仅文本类消息）
+            if message.type == .text {
+                actions.append(UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { _ in
+                    UIPasteboard.general.string = message.content
+                    AppUtility.showToast("已复制")
+                })
+            }
+            // 转发
+            actions.append(UIAction(title: "转发", image: UIImage(systemName: "arrowshape.turn.up.right")) { [weak self] _ in
+                self?.forwardMessage(message)
+            })
+            // 收藏
+            actions.append(UIAction(title: "收藏", image: UIImage(systemName: "star")) { [weak self] _ in
+                self?.favoriteMessage(message)
+            })
+            // 表情回应
+            actions.append(UIAction(title: "回复表情", image: UIImage(systemName: "face.smiling")) { [weak self] _ in
+                guard let self = self else { return }
+                MessageReactionView.showReactionPicker(for: message.messageID, from: self.tableView) { emoji in
+                    self.sendReaction(message: message, emoji: emoji)
+                }
+            })
+            // 撤回（仅自己的消息）
+            if message.isFromMe {
+                actions.append(UIAction(title: "撤回", image: UIImage(systemName: "arrow.uturn.backward")) { [weak self] _ in
+                    self?.recallMessage(message)
+                })
+            }
+            // 删除
+            actions.append(UIAction(title: "删除", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                self?.deleteMessage(message)
+            })
+
+            return UIMenu(title: "", children: actions)
+        }
+    }
+
+    /// 菜单弹出时高亮区域对准气泡（而非整行），呈现 iMessage 式气泡浮起效果
+    func tableView(_ tableView: UITableView, previewForHighlightingContextMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        return targetedBubblePreview(configuration: configuration)
+    }
+
+    func tableView(_ tableView: UITableView, previewForDismissingContextMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        return targetedBubblePreview(configuration: configuration)
+    }
+
+    private func targetedBubblePreview(configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        guard let indexPath = configuration.identifier as? IndexPath,
+              let cell = tableView.cellForRow(at: indexPath) else { return nil }
+        let params = UIPreviewParameters()
+        params.backgroundColor = .clear
+        return UITargetedPreview(view: cell.contentView, parameters: params)
+    }
+
     // MARK: - 已读回执
     private func markMessagesAsRead() {
         Task {
@@ -857,41 +961,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                 } catch { }
             }
         }
-    }
-
-    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
-        let point = gesture.location(in: tableView)
-        guard let indexPath = tableView.indexPathForRow(at: point) else { return }
-        let message = messages[indexPath.row]
-
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        if message.isFromMe {
-            alert.addAction(UIAlertAction(title: "撤回", style: .default) { [weak self] _ in
-                self?.recallMessage(message)
-            })
-        }
-        alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
-            UIPasteboard.general.string = message.content
-            AppUtility.showToast("已复制")
-        })
-        alert.addAction(UIAlertAction(title: "收藏", style: .default) { [weak self] _ in
-            self?.favoriteMessage(message)
-        })
-        alert.addAction(UIAlertAction(title: "回复表情", style: .default) { [weak self] _ in
-            guard let self = self else { return }
-            MessageReactionView.showReactionPicker(for: message.messageID, from: self.tableView) { emoji in
-                self.sendReaction(message: message, emoji: emoji)
-            }
-        })
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
-            self?.deleteMessage(message)
-        })
-        alert.addAction(UIAlertAction(title: "转发", style: .default) { [weak self] _ in
-            self?.forwardMessage(message)
-        })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        present(alert, animated: true)
     }
 
     private func recallMessage(_ message: Message) {
@@ -1669,7 +1738,8 @@ class TextMessageCell: UITableViewCell {
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
             fillColor: fillColor,
-            avatar: message.chatAvatar
+            avatar: message.chatAvatar,
+            status: message.isFromMe ? message.status : nil
         )
     }
 }
@@ -1781,7 +1851,8 @@ final class PendingMediaMessageCell: UITableViewCell {
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
             fillColor: fillColor,
-            avatar: message.chatAvatar
+            avatar: message.chatAvatar,
+            status: message.isFromMe ? message.status : nil
         )
     }
 }

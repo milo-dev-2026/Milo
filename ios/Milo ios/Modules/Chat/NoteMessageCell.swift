@@ -156,7 +156,8 @@ class NoteMessageCell: UITableViewCell {
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
             fillColor: fillColor,
-            avatar: message.chatAvatar
+            avatar: message.chatAvatar,
+            status: message.isFromMe ? message.status : nil
         )
 
         // 笔记容器布局
