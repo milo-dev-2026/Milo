@@ -35,7 +35,7 @@ class VoiceMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.backgroundColor = .white
 
         voiceIcon.image = UIImage(systemName: "speaker.wave.2.fill")

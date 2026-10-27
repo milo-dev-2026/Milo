@@ -35,7 +35,7 @@ class VideoMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)

@@ -38,7 +38,7 @@ class LocationMessageCell: UITableViewCell {
         timeLabel.font = ScreenAdapter.font(11)
         timeLabel.textColor = .tertiaryLabel
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .systemGray6
 

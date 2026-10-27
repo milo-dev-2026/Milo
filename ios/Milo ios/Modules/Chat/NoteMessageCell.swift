@@ -44,7 +44,7 @@ class NoteMessageCell: UITableViewCell {
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .center
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .white
 

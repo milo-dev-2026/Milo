@@ -154,7 +154,7 @@ class GIFMessageCell: UITableViewCell {
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .center
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
 
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)

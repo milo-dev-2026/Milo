@@ -118,7 +118,7 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
         let avatarSize = ScreenAdapter.scaleW(36)
 
         // 气泡
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.backgroundColor = .white
         bubbleView.isUserInteractionEnabled = true
         bubbleView.layer.shadowColor = UIColor.black.cgColor

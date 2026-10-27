@@ -1612,7 +1612,7 @@ class TextMessageCell: UITableViewCell {
         senderNameLabel.font = ScreenAdapter.font(12)
         senderNameLabel.textColor = .secondaryLabel
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
 
         // 气泡尾巴：默认隐藏，仅在连续同方向消息的末条显示
@@ -1785,7 +1785,7 @@ final class PendingMediaMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .systemGray6
 

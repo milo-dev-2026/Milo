@@ -490,7 +490,7 @@ class RobotTextMessageCell: UITableViewCell {
         avatarTrailingConstraint.deactivate()
 
         // 气泡
-        bubbleView.layer.cornerRadius = ThemeDimensions.bubbleCornerRadius
+        bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         contentView.addSubview(tailView)
         contentView.addSubview(bubbleView)
