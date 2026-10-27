@@ -1,8 +1,22 @@
 import UIKit
 import SnapKit
 
+/// 头像来源（加载走 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar）
+struct ChatAvatarSource {
+    let channelId: String
+    let channelType: Int
+    let name: String
+}
+
+extension Message {
+    /// 聊天页气泡头像来源（发送者个人头像）
+    var chatAvatar: ChatAvatarSource {
+        ChatAvatarSource(channelId: fromUID, channelType: 1, name: fromUID)
+    }
+}
+
 /// 聊天页统一气泡版式（对齐 iMessage 参考图）：
-/// 不显示头像、昵称、气泡外时间与尾巴；气泡紧贴左右 16pt，最宽为屏宽 82%；
+/// 不显示昵称、气泡外时间与尾巴；气泡连同头像紧贴左右 16pt，气泡最宽不超过屏宽 82%；
 /// 同方向连续消息间距收紧，跨方向放宽；相隔超过 5 分钟的消息之间插入居中时间分隔。
 enum ChatBubbleLayout {
 
@@ -14,6 +28,9 @@ enum ChatBubbleLayout {
     static let groupGap = ScreenAdapter.scaleH(5)
     /// 气泡最大宽度
     static let maxWidth: CGFloat = ScreenAdapter.screenWidth * 0.82
+    /// 头像尺寸与头像-气泡间距
+    static let avatarSize = ScreenAdapter.scaleW(36)
+    static let avatarGap = ScreenAdapter.scaleW(8)
     /// 文字气泡左右内边距
     static let textPadLR = ScreenAdapter.scaleW(14)
     /// 文字气泡上下内边距
@@ -23,6 +40,7 @@ enum ChatBubbleLayout {
     static var timeHeaderHeight: CGFloat { ScreenAdapter.scaleH(26) }
 
     private static let timeHeaderTag = 987_001
+    private static let avatarTag = 987_002
 
     private static let hmFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -53,6 +71,7 @@ enum ChatBubbleLayout {
     ///   - minHeight: 最小高度（height 为 nil 时生效）
     ///   - timeHeader: 非空时在气泡上方插入居中时间分隔文字
     ///   - groupedAbove / groupedBelow: 与上/下一条同方向消息时间距收紧
+    ///   - avatar: 非空时在气泡外侧显示发送者头像（顶部与气泡对齐）
     static func install(bubble: UIView,
                         tail: ChatBubbleTailView,
                         isFromMe: Bool,
@@ -62,7 +81,8 @@ enum ChatBubbleLayout {
                         timeHeader: String? = nil,
                         groupedAbove: Bool = false,
                         groupedBelow: Bool = false,
-                        fillColor: UIColor) {
+                        fillColor: UIColor,
+                        avatar: ChatAvatarSource? = nil) {
         // 参考样式不显示尾巴
         tail.isHidden = true
 
@@ -79,14 +99,50 @@ enum ChatBubbleLayout {
             headerH = 0
         }
 
-        let clampedWidth = min(width, maxWidth)
+        // 头像（每个 cell contentView 内按 tag 复用）
+        let avatarView = avatarImageView(in: contentView)
+        if let avatar = avatar {
+            avatarView.isHidden = false
+            AppUtility.loadChannelAvatar(
+                channelId: avatar.channelId,
+                channelType: avatar.channelType,
+                name: avatar.name,
+                into: avatarView
+            )
+            avatarView.snp.remakeConstraints { make in
+                if isFromMe {
+                    make.trailing.equalToSuperview().offset(-sideInset)
+                } else {
+                    make.leading.equalToSuperview().offset(sideInset)
+                }
+                make.top.equalTo(bubble.snp.top)
+                make.width.height.equalTo(avatarSize)
+            }
+        } else {
+            avatarView.isHidden = true
+        }
+
+        var available = maxWidth
+        if avatar != nil {
+            // 带头像时整行宽 = sideInset + 头像 + 间距 + 气泡，不超出屏幕
+            available = min(available, ScreenAdapter.screenWidth - sideInset * 2 - avatarSize - avatarGap)
+        }
+        let clampedWidth = min(width, available)
         bubble.snp.remakeConstraints { make in
             make.top.equalToSuperview().offset(headerH + (groupedAbove ? runGap : groupGap))
             make.bottom.equalToSuperview().offset(-(groupedBelow ? runGap : groupGap))
             if isFromMe {
-                make.trailing.equalToSuperview().offset(-sideInset)
+                if avatar != nil {
+                    make.trailing.equalTo(avatarView.snp.leading).offset(-avatarGap)
+                } else {
+                    make.trailing.equalToSuperview().offset(-sideInset)
+                }
             } else {
-                make.leading.equalToSuperview().offset(sideInset)
+                if avatar != nil {
+                    make.leading.equalTo(avatarView.snp.trailing).offset(avatarGap)
+                } else {
+                    make.leading.equalToSuperview().offset(sideInset)
+                }
             }
             make.width.equalTo(clampedWidth)
             if let height = height {
@@ -95,6 +151,19 @@ enum ChatBubbleLayout {
                 make.height.greaterThanOrEqualTo(minHeight)
             }
         }
+    }
+
+    /// 每个 cell contentView 内复用同一个头像视图（按 tag 查找，缺失则创建）
+    private static func avatarImageView(in contentView: UIView) -> UIImageView {
+        if let imageView = contentView.viewWithTag(avatarTag) as? UIImageView { return imageView }
+        let imageView = UIImageView()
+        imageView.tag = avatarTag
+        imageView.layer.cornerRadius = ScreenAdapter.scaleW(6)
+        imageView.clipsToBounds = true
+        imageView.contentMode = .scaleAspectFill
+        imageView.isUserInteractionEnabled = false
+        contentView.addSubview(imageView)
+        return imageView
     }
 
     /// 每个 cell contentView 内复用同一个时间分隔 label（按 tag 查找，缺失则创建）

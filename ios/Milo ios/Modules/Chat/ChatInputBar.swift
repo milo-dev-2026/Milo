@@ -191,14 +191,15 @@ class ChatInputBar: UIView {
         installPressAnimation(on: moreButton)
         installPressAnimation(on: voiceButton)
 
-        moreButton.snp.makeConstraints { make in
+        // 左侧语音/键盘切换按钮（对齐安卓/微信位置）
+        voiceButton.snp.makeConstraints { make in
             make.leading.equalTo(pill).offset(hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
 
-        // 右侧固定槽位：有文字时显示发送，无文字时显示麦克风（iMessage 式）
-        voiceButton.snp.makeConstraints { make in
+        // 右侧固定槽位：有文字时显示发送，无文字时显示＋（对齐安卓/微信）
+        moreButton.snp.makeConstraints { make in
             make.trailing.equalTo(pill).offset(-hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
@@ -211,11 +212,11 @@ class ChatInputBar: UIView {
         }
 
         textView.snp.makeConstraints { make in
-            make.leading.equalTo(moreButton.snp.trailing).offset(ScreenAdapter.scaleW(6))
+            make.leading.equalTo(voiceButton.snp.trailing).offset(ScreenAdapter.scaleW(6))
             make.top.equalTo(pill).offset(vPad)
             make.bottom.equalTo(pill).offset(-vPad)
             self.textViewHeight = make.height.equalTo(minH).constraint
-            make.trailing.equalTo(voiceButton.snp.leading).offset(-ScreenAdapter.scaleW(6))
+            make.trailing.equalTo(moreButton.snp.leading).offset(-ScreenAdapter.scaleW(6))
         }
 
         placeholderLabel.snp.makeConstraints { make in
@@ -247,17 +248,18 @@ class ChatInputBar: UIView {
         textViewDidChange(textView)
     }
 
-    /// 右侧按钮在「麦克风 / 发送」间切换，并同步占位文案
+    /// 左侧常驻语音/键盘切换；右侧按钮在「＋ / 发送」间切换，并同步占位文案
     private func updateInputControls() {
         let hasText = !(textView.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        voiceButton.isHidden = false
         if isVoiceMode {
             sendButton.isHidden = true
-            voiceButton.isHidden = false
+            moreButton.isHidden = false
             voiceButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
             placeholderLabel.isHidden = true
         } else {
             sendButton.isHidden = !hasText
-            voiceButton.isHidden = hasText
+            moreButton.isHidden = hasText
             voiceButton.setImage(UIImage(systemName: "mic"), for: .normal)
             placeholderLabel.isHidden = hasText
         }

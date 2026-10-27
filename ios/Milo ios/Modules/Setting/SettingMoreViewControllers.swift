@@ -58,9 +58,10 @@ class AboutViewController: UIViewController {
         }
 
         let logoImageView = UIImageView()
-        logoImageView.image = UIImage(named: "AppIcon") ?? UIImage(systemName: "message.circle.fill")
+        // 使用 App 真实图标（LoginLogo 与启动页/登录页同一 logo 资源）
+        logoImageView.image = UIImage(named: "LoginLogo") ?? UIImage(systemName: "message.circle.fill")
         logoImageView.tintColor = .themeColorPrimary
-        logoImageView.contentMode = .scaleAspectFit
+        logoImageView.contentMode = .scaleAspectFill
         logoImageView.layer.cornerRadius = 16
         logoImageView.clipsToBounds = true
         headerCard.addSubview(logoImageView)

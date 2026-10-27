@@ -64,7 +64,8 @@ class ImageMessageCell: UITableViewCell {
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
-            fillColor: fillColor
+            fillColor: fillColor,
+            avatar: message.chatAvatar
         )
     }
 }

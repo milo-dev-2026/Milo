@@ -11,7 +11,6 @@ class ConversationListViewController: UIViewController {
     // MARK: - 顶部标题栏
     private let titleBarView = UIView()
     private let titleLabel = UILabel()
-    private let searchButton = UIButton(type: .custom)
     private let addButton = UIButton(type: .custom)
 
     // MARK: - 搜索栏
@@ -97,17 +96,7 @@ class ConversationListViewController: UIViewController {
             make.width.height.equalTo(40)
         }
 
-        // 右侧搜索按钮
-        let searchConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        searchButton.setImage(UIImage(systemName: "magnifyingglass", withConfiguration: searchConfig), for: .normal)
-        searchButton.tintColor = .label
-        searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
-        titleBarView.addSubview(searchButton)
-        searchButton.snp.makeConstraints { make in
-            make.trailing.equalTo(addButton.snp.leading).offset(-8)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
-        }
+        // 右侧搜索按钮已移除（下方搜索栏已覆盖入口）
 
         // MARK: - 搜索栏
         searchBarContainer.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
@@ -132,7 +121,7 @@ class ConversationListViewController: UIViewController {
             make.width.height.equalTo(16)
         }
 
-        // 搜索输入框
+        // 搜索输入框（只读，点击跳转全局搜索页）
         searchTextField.placeholder = "搜索"
         searchTextField.font = ScreenAdapter.font(14)
         searchTextField.textColor = .label
@@ -140,7 +129,6 @@ class ConversationListViewController: UIViewController {
         searchTextField.returnKeyType = .search
         searchTextField.clearButtonMode = .whileEditing
         searchTextField.delegate = self
-        searchTextField.addTarget(self, action: #selector(searchTextChanged(_:)), for: .editingChanged)
         searchBarContainer.addSubview(searchTextField)
         searchTextField.snp.makeConstraints { make in
             make.leading.equalTo(searchIconView.snp.trailing).offset(8)
@@ -169,10 +157,7 @@ class ConversationListViewController: UIViewController {
     }
 
     // MARK: - 按钮点击
-    @objc private func searchButtonTapped() {
-        let searchVC = SearchAllViewController()
-        navigationController?.pushViewController(searchVC, animated: true)
-    }
+    // 顶部右侧放大镜已移除；全局搜索入口保留下方搜索栏
 
     // MARK: - 连接状态标题
     @objc private func handleConnectionStatusChanged(_ notification: Notification) {
@@ -266,6 +251,8 @@ class ConversationListViewController: UIViewController {
 
     private func startScan() {
         let scanVC = ScanViewController()
+        // 扫码页全屏：隐藏底部 TabBar（对齐安卓）
+        scanVC.hidesBottomBarWhenPushed = true
         scanVC.onScanResult = { [weak self] result in
             self?.handleScanResult(result)
         }
@@ -349,9 +336,7 @@ class ConversationListViewController: UIViewController {
     }
 
     // MARK: - 搜索
-    @objc private func searchTextChanged(_ textField: UITextField) {
-        // 实时搜索过滤
-    }
+    // 搜索栏已改为跳转全局搜索页入口（见 UITextFieldDelegate）
 }
 
 // MARK: - UITableViewDataSource
@@ -395,6 +380,13 @@ extension ConversationListViewController: UITableViewDelegate {
 
 // MARK: - UITextFieldDelegate
 extension ConversationListViewController: UITextFieldDelegate {
+    func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
+        // 搜索栏作为入口：点击跳转全局搜索页
+        let searchVC = SearchAllViewController()
+        navigationController?.pushViewController(searchVC, animated: true)
+        return false
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true

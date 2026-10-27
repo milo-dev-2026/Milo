@@ -183,7 +183,8 @@ class CardMessageCell: UITableViewCell {
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
-            fillColor: fillColor
+            fillColor: fillColor,
+            avatar: message.chatAvatar
         )
         
         // 名片容器布局

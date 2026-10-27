@@ -89,7 +89,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
         }
         UINavigationBar.appearance().compactAppearance = navBarAppearance
-        UINavigationBar.appearance().prefersLargeTitles = true
+        UINavigationBar.appearance().prefersLargeTitles = false
 
         // TabBar 全局外观
         let tabBarAppearance = UITabBarAppearance()

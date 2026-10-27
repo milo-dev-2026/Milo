@@ -1668,7 +1668,8 @@ class TextMessageCell: UITableViewCell {
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
-            fillColor: fillColor
+            fillColor: fillColor,
+            avatar: message.chatAvatar
         )
     }
 }
@@ -1779,7 +1780,8 @@ final class PendingMediaMessageCell: UITableViewCell {
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
-            fillColor: fillColor
+            fillColor: fillColor,
+            avatar: message.chatAvatar
         )
     }
 }

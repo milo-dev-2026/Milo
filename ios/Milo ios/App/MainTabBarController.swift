@@ -67,10 +67,10 @@ class MainTabBarController: UITabBarController {
         let contactsNav = BaseNavigationController(rootViewController: contactsVC)
         let myNav = BaseNavigationController(rootViewController: myVC)
 
-        // 一级页面启用大标题
-        chatNav.navigationBar.prefersLargeTitles = true
-        contactsNav.navigationBar.prefersLargeTitles = true
-        myNav.navigationBar.prefersLargeTitles = true
+        // 一级页面使用顶部小字体标题（避免被灵动岛遮挡）
+        chatNav.navigationBar.prefersLargeTitles = false
+        contactsNav.navigationBar.prefersLargeTitles = false
+        myNav.navigationBar.prefersLargeTitles = false
 
         viewControllers = [chatNav, contactsNav, myNav]
     }

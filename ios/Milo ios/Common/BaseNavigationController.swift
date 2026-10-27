@@ -39,8 +39,8 @@ class BaseNavigationController: UINavigationController {
         }
         navigationBar.compactAppearance = appearance
 
-        // 启用大标题（一级页面使用）
-        navigationBar.prefersLargeTitles = true
+        // 使用顶部小字体标题（避免被灵动岛遮挡，对齐安卓）
+        navigationBar.prefersLargeTitles = false
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
