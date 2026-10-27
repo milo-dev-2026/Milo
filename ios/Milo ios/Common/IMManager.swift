@@ -1,5 +1,6 @@
 import Foundation
 import WuKongIMSDK
+import AudioToolbox
 
 // MARK: - IM连接管理器
 class IMManager: NSObject {
@@ -489,6 +490,34 @@ extension IMManager: WKChatManagerDelegate {
         DispatchQueue.main.async {
             self.onMessageReceived?(msg)
             NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: msg)
+            self.playInAppMessageAlertIfNeeded(msg)
+        }
+    }
+
+    /// 应用内新消息提醒：遵循「设置-消息通知」开关（总开关/声音/震动/免打扰时段），对齐安卓行为
+    private func playInAppMessageAlertIfNeeded(_ msg: Message) {
+        // 自己发送的消息不提醒
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        if !myUid.isEmpty, msg.fromUID == myUid { return }
+        guard LocalStore.shared.isMessageNotificationEnabled else { return }
+
+        // 免打扰时段（支持跨天，如 22:00-08:00）
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "notify_dnd_on") {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            let now = formatter.string(from: Date())
+            let start = defaults.string(forKey: "notify_dnd_start") ?? "22:00"
+            let end = defaults.string(forKey: "notify_dnd_end") ?? "08:00"
+            let inDnd = start <= end ? (now >= start && now < end) : (now >= start || now < end)
+            if inDnd { return }
+        }
+
+        if LocalStore.shared.isSoundEnabled {
+            AudioServicesPlaySystemSound(1007) // 系统短信提示音
+        }
+        if LocalStore.shared.isVibrationEnabled {
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         }
     }
 
@@ -830,13 +859,16 @@ extension IMManager {
             let name = getChannelInfo(channelId: chId, channelType: chType)?.name ?? ""
             var lastMsg: String?
             var lastType = 1
-            if let r = conv.recents?.last {
-                let decoded = r.decodedPayload
-                lastMsg = decoded.content
-                lastType = decoded.type
+            var timestamp: Int64?
+            var seq = 0
+            // SDK WKConversation.lastMessage 为非可选类型（可能为空壳），用 lastMessageSeq 判断是否有消息
+            if conv.lastMessageSeq > 0 {
+                let m = convertWKMessageToMessage(conv.lastMessage)
+                lastMsg = m.content
+                lastType = m.type.rawValue
+                timestamp = m.timestamp
+                seq = m.messageSeq
             }
-            let timestamp: Int64? = conv.timestamp.map { $0 * 1000 }
-            let seq = conv.last_msg_seq ?? 0
             return Conversation(
                 channelID: chId,
                 channelType: chType,
