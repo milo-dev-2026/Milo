@@ -475,6 +475,25 @@ class ContactsHeaderCell: UIView {
         let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .regular)
         iconView.image = UIImage(systemName: icon, withConfiguration: config)
         titleLabel.text = title
+
+        // 特殊账号图标配色对齐安卓 ContactsHeaderAdapter：系统通知 #FFA940 橙，文件传输助手 #4CAF50 绿
+        switch title {
+        case "系统通知":
+            iconView.backgroundColor = UIColor(red: 1.0, green: 169.0/255.0, blue: 64.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        case "文件传输助手":
+            iconView.backgroundColor = UIColor(red: 76.0/255.0, green: 175.0/255.0, blue: 80.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        case "新的朋友":
+            iconView.backgroundColor = UIColor(red: 250.0/255.0, green: 140.0/255.0, blue: 22.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        case "保存的群聊", "加入的群聊":
+            iconView.backgroundColor = UIColor(red: 74.0/255.0, green: 144.0/255.0, blue: 217.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        default:
+            iconView.backgroundColor = UIColor(white: 0.92, alpha: 1.0)
+            iconView.tintColor = .themeColorPrimary
+        }
     }
 }
 

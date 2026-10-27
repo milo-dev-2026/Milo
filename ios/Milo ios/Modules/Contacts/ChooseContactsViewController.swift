@@ -281,9 +281,9 @@ class ChooseContactsViewController: UIViewController {
             return String(first).uppercased()
         }
         // 中文转拼音取首字母
-        let mutable = NSMutableString(string: String(first))
-        if CFStringTransform(&mutable, nil, kCFStringTransformToLatin, false),
-           CFStringTransform(&mutable, nil, kCFStringTransformStripDiacritics, false),
+        let mutable = NSMutableString(string: String(first)) as CFMutableString
+        if CFStringTransform(mutable, nil, kCFStringTransformToLatin, false),
+           CFStringTransform(mutable, nil, kCFStringTransformStripDiacritics, false),
            let ch = (mutable as String).uppercased().first, ch.isASCII, ch.isLetter {
             return String(ch)
         }
