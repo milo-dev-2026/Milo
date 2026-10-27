@@ -830,15 +830,13 @@ extension IMManager {
             let name = getChannelInfo(channelId: chId, channelType: chType)?.name ?? ""
             var lastMsg: String?
             var lastType = 1
-            var timestamp: Int64?
-            var seq = 0
-            if let item = conv.lastMessage {
-                let m = convertWKMessageToMessage(item)
-                lastMsg = m.content
-                lastType = m.type.rawValue
-                timestamp = m.timestamp
-                seq = m.messageSeq
+            if let r = conv.recents?.last {
+                let decoded = r.decodedPayload
+                lastMsg = decoded.content
+                lastType = decoded.type
             }
+            let timestamp: Int64? = conv.timestamp.map { $0 * 1000 }
+            let seq = conv.last_msg_seq ?? 0
             return Conversation(
                 channelID: chId,
                 channelType: chType,
