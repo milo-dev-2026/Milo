@@ -38,6 +38,8 @@ class ChatInputBar: UIView {
     private let pillHighlight = UIView()
     private let inputRow = UIView()
     private let textView = UITextView()
+    /// 输入框占位文案（UITextView 无原生 placeholder）
+    private let placeholderLabel = UILabel()
     private let sendButton = UIButton(type: .system)
     private let moreButton = UIButton(type: .system)
     /// 左侧语音/键盘切换按钮
@@ -109,7 +111,7 @@ class ChatInputBar: UIView {
         ])
 
         let minH = ScreenAdapter.scaleH(36)
-        let hPad = ScreenAdapter.scaleW(8)
+        let hPad = ScreenAdapter.scaleW(12)
         let vPad = ScreenAdapter.scaleH(6)
 
         backgroundTapGesture.cancelsTouchesInView = false
@@ -135,17 +137,22 @@ class ChatInputBar: UIView {
         }
         let pill = pillContainer.contentView
 
-        textView.font = ScreenAdapter.font(15)
+        textView.font = ScreenAdapter.font(16)
         textView.layer.cornerRadius = ScreenAdapter.scaleW(8)
         textView.backgroundColor = .clear
         textView.delegate = self
         textView.isScrollEnabled = false
         textView.textContainerInset = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
 
-        sendButton.setTitle("发送", for: .normal)
-        sendButton.setTitleColor(.themePrimary, for: .normal)
-        sendButton.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        sendButton.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
+        sendButton.tintColor = .themePrimary
+        sendButton.isHidden = true
         sendButton.addTarget(self, action: #selector(send), for: .touchUpInside)
+
+        placeholderLabel.text = "消息"
+        placeholderLabel.font = ScreenAdapter.font(16)
+        placeholderLabel.textColor = .tertiaryLabel
+        placeholderLabel.isUserInteractionEnabled = false
 
         moreButton.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
         moreButton.tintColor = .themePrimary
@@ -166,7 +173,7 @@ class ChatInputBar: UIView {
         holdToTalkButton.addGestureRecognizer(talkGesture)
 
         // 输入控件全部放进胶囊玻璃容器
-        pill.addSubviews(voiceButton, textView, holdToTalkButton, sendButton, moreButton)
+        pill.addSubviews(textView, placeholderLabel, holdToTalkButton, voiceButton, sendButton, moreButton)
 
         // 顶部发丝高光：横向内缩，避让胶囊圆角
         pillHighlight.backgroundColor = UIColor.white.withAlphaComponent(0.5)
@@ -185,30 +192,36 @@ class ChatInputBar: UIView {
         installPressAnimation(on: voiceButton)
 
         moreButton.snp.makeConstraints { make in
+            make.leading.equalTo(pill).offset(hPad)
+            make.centerY.equalTo(textView)
+            make.width.height.equalTo(ScreenAdapter.scaleW(28))
+        }
+
+        // 右侧固定槽位：有文字时显示发送，无文字时显示麦克风（iMessage 式）
+        voiceButton.snp.makeConstraints { make in
             make.trailing.equalTo(pill).offset(-hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
 
         sendButton.snp.makeConstraints { make in
-            make.trailing.equalTo(moreButton.snp.leading).offset(-hPad)
-            make.centerY.equalTo(textView)
-            make.width.equalTo(ScreenAdapter.scaleW(44))
-            make.height.equalTo(ScreenAdapter.scaleH(36))
-        }
-
-        voiceButton.snp.makeConstraints { make in
-            make.leading.equalTo(pill).offset(hPad)
+            make.trailing.equalTo(pill).offset(-hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
 
         textView.snp.makeConstraints { make in
-            make.leading.equalTo(voiceButton.snp.trailing).offset(hPad)
+            make.leading.equalTo(moreButton.snp.trailing).offset(ScreenAdapter.scaleW(6))
             make.top.equalTo(pill).offset(vPad)
             make.bottom.equalTo(pill).offset(-vPad)
             self.textViewHeight = make.height.equalTo(minH).constraint
-            make.trailing.equalTo(sendButton.snp.leading).offset(-hPad)
+            make.trailing.equalTo(voiceButton.snp.leading).offset(-ScreenAdapter.scaleW(6))
+        }
+
+        placeholderLabel.snp.makeConstraints { make in
+            make.leading.equalTo(textView).offset(4)
+            make.centerY.equalTo(textView)
+            make.trailing.lessThanOrEqualTo(textView)
         }
 
         holdToTalkButton.snp.makeConstraints { make in
@@ -232,6 +245,22 @@ class ChatInputBar: UIView {
         delegate?.didSendTextMessage(text)
         textView.text = ""
         textViewDidChange(textView)
+    }
+
+    /// 右侧按钮在「麦克风 / 发送」间切换，并同步占位文案
+    private func updateInputControls() {
+        let hasText = !(textView.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if isVoiceMode {
+            sendButton.isHidden = true
+            voiceButton.isHidden = false
+            voiceButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
+            placeholderLabel.isHidden = true
+        } else {
+            sendButton.isHidden = !hasText
+            voiceButton.isHidden = hasText
+            voiceButton.setImage(UIImage(systemName: "mic"), for: .normal)
+            placeholderLabel.isHidden = hasText
+        }
     }
 
     // MARK: - 按键按压回弹
@@ -295,14 +324,13 @@ class ChatInputBar: UIView {
             textView.resignFirstResponder()
             textView.isHidden = true
             holdToTalkButton.isHidden = false
-            voiceButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
             textViewHeight.update(offset: ScreenAdapter.scaleH(36))
         } else {
             textView.isHidden = false
             holdToTalkButton.isHidden = true
-            voiceButton.setImage(UIImage(systemName: "mic"), for: .normal)
             textView.becomeFirstResponder()
         }
+        updateInputControls()
         superview?.layoutIfNeeded()
     }
 
@@ -442,7 +470,7 @@ class ChatInputBar: UIView {
             isVoiceMode = false
             textView.isHidden = false
             holdToTalkButton.isHidden = true
-            voiceButton.setImage(UIImage(systemName: "mic"), for: .normal)
+            updateInputControls()
         }
         let current = textView.text ?? ""
         textView.text = current + text
@@ -644,6 +672,7 @@ extension ChatInputBar: UITextViewDelegate {
         let height = min(max(fitSize.height, minH), maxH)
         textView.isScrollEnabled = fitSize.height > maxH
         textViewHeight.update(offset: height)
+        updateInputControls()
         superview?.layoutIfNeeded()
 
         if textView.text?.isEmpty == true {

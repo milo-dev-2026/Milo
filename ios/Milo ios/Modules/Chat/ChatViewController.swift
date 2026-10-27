@@ -333,59 +333,49 @@ class ChatViewController: UIViewController {
     }
 
     private func setupNavBar() {
-        // 自定义标题视图（头像 + 名字 + 在线状态）
+        // 自定义标题视图（名字 + 在线状态，居中显示）
         let titleView = UIView()
-        titleView.frame = CGRect(x: 0, y: 0, width: 210, height: 44)
-
-        // 头像
-        let navAvatar = UIImageView()
-        navAvatar.layer.cornerRadius = 16
-        navAvatar.clipsToBounds = true
-        navAvatar.contentMode = .scaleAspectFill
-        navAvatar.image = UIImage(systemName: "person.circle.fill")
-        navAvatar.tintColor = .systemGray5
-        titleView.addSubview(navAvatar)
-        navAvatar.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(32)
-        }
+        titleView.frame = CGRect(x: 0, y: 0, width: 220, height: 44)
 
         // 名字
         let navTitleLabel = UILabel()
         navTitleLabel.text = titleText
         navTitleLabel.font = ScreenAdapter.mediumFont(16)
         navTitleLabel.textColor = .label
+        navTitleLabel.textAlignment = .center
         navTitleLabel.lineBreakMode = .byTruncatingTail
         titleView.addSubview(navTitleLabel)
 
         // 单聊在线状态（在线 / 离线X分钟），无数据时隐藏
         onlineStatusLabel.font = ScreenAdapter.font(11)
         onlineStatusLabel.textColor = .secondaryLabel
+        onlineStatusLabel.textAlignment = .center
         onlineStatusLabel.isHidden = true
         titleView.addSubview(onlineStatusLabel)
 
         let hasStatus = channelType == 1
         if hasStatus {
             navTitleLabel.snp.makeConstraints { make in
-                make.leading.equalTo(navAvatar.snp.trailing).offset(8)
+                make.centerX.equalToSuperview()
+                make.leading.greaterThanOrEqualToSuperview()
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalToSuperview().offset(ScreenAdapter.scaleH(7))
             }
             onlineStatusLabel.snp.makeConstraints { make in
-                make.leading.equalTo(navTitleLabel)
+                make.centerX.equalToSuperview()
+                make.leading.greaterThanOrEqualToSuperview()
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalTo(navTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(1))
             }
         } else {
             navTitleLabel.snp.makeConstraints { make in
-                make.leading.equalTo(navAvatar.snp.trailing).offset(8)
+                make.center.equalToSuperview()
+                make.leading.greaterThanOrEqualToSuperview()
                 make.trailing.lessThanOrEqualToSuperview()
-                make.centerY.equalToSuperview()
             }
         }
 
-        // 加载头像与在线状态（与Android一致：通过频道ID获取频道信息）
+        // 加载频道名称与在线状态（与Android一致：通过频道ID获取频道信息）
         Task {
             do {
                 let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
@@ -394,12 +384,6 @@ class ChatViewController: UIViewController {
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     navTitleLabel.text = channelInfo.displayName
-                    AppUtility.loadChannelAvatar(
-                        channelId: self.channelId,
-                        channelType: self.channelType,
-                        name: channelInfo.displayName,
-                        into: navAvatar
-                    )
                     self.updateOnlineStatus(
                         online: (channelInfo.online ?? 0) == 1,
                         lastOffline: channelInfo.last_offline
@@ -407,14 +391,7 @@ class ChatViewController: UIViewController {
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    AppUtility.loadChannelAvatar(
-                        channelId: self.channelId,
-                        channelType: self.channelType,
-                        name: self.titleText,
-                        into: navAvatar
-                    )
-                    self.refreshCachedOnlineStatus()
+                    self?.refreshCachedOnlineStatus()
                 }
             }
         }
@@ -743,10 +720,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell
-            // 点击头像查看个人名片（自己不发响应）
-            cell.onAvatarTap = { [weak self] uid in
-                self?.openContactDetail(uid: uid)
-            }
             cell.configure(with: message, showTail: isLastInRun)
             return cell
         }
@@ -1568,49 +1541,22 @@ class TextMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
     private let messageLabel = UILabel()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var isFromMe = false
-    private var currentMessageID = ""
-    private var senderUID = ""
-    /// 点击头像查看个人名片
-    var onAvatarTap: ((String) -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
-        avatarView.isUserInteractionEnabled = true
-        avatarView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(avatarTapped)))
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    @objc private func avatarTapped() {
-        onAvatarTap?(senderUID)
-    }
-
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let vPad = ScreenAdapter.scaleH(12)
-        // Android 规格：chat_bubble_padding_lr=15dp、chat_bubble_padding_tb=5dp、chat_radius=10dp
-        let bubblePadLR = ScreenAdapter.scaleW(15)
-        let bubblePadTB = ScreenAdapter.scaleH(5)
-
-        messageLabel.font = ScreenAdapter.font(15)
+        messageLabel.font = ScreenAdapter.font(16)
         messageLabel.numberOfLines = 0
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-        timeLabel.textAlignment = .center
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
 
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
@@ -1619,60 +1565,25 @@ class TextMessageCell: UITableViewCell {
         tailView.isHidden = true
         tailView.translatesAutoresizingMaskIntoConstraints = false
 
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
+        contentView.addSubviews(tailView, bubbleView)
         bubbleView.addSubview(messageLabel)
 
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
-
         messageLabel.snp.makeConstraints { make in
-            make.centerY.equalToSuperview()
-            make.top.greaterThanOrEqualToSuperview().offset(bubblePadTB)
-            make.bottom.lessThanOrEqualToSuperview().offset(-bubblePadTB)
-            make.leading.equalToSuperview().offset(bubblePadLR)
-            make.trailing.equalToSuperview().offset(-bubblePadLR)
+            make.top.equalToSuperview().offset(ChatBubbleLayout.textPadTB)
+            make.bottom.equalToSuperview().offset(-ChatBubbleLayout.textPadTB)
+            make.leading.equalToSuperview().offset(ChatBubbleLayout.textPadLR)
+            make.trailing.equalToSuperview().offset(-ChatBubbleLayout.textPadLR)
         }
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        senderUID = message.fromUID
         messageLabel.text = message.content
-        timeLabel.text = message.timeString
 
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let nameGap = ScreenAdapter.scaleH(2)
-        let maxWidth = ScreenAdapter.screenWidth * 0.66
-        let font = ScreenAdapter.font(15)
-        let innerPad = ScreenAdapter.scaleW(30)
+        let isFromMe = message.isFromMe
+        let font = ScreenAdapter.font(16)
+        let innerPad = ChatBubbleLayout.textPadLR * 2
         // 多行测量：按最大文本宽度换行计算实际所需宽度，避免单行测量导致气泡过宽或过窄
-        let maxTextWidth = maxWidth - innerPad
+        let maxTextWidth = ChatBubbleLayout.maxWidth - innerPad
         let content = message.content.isEmpty ? " " : message.content
         let textRect = (content as NSString).boundingRect(
             with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
@@ -1680,79 +1591,21 @@ class TextMessageCell: UITableViewCell {
             attributes: [.font: font],
             context: nil
         )
-        let bubbleWidth = min(max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40)), maxWidth)
+        let bubbleWidth = max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40))
 
-        // 尾巴：仅连续同方向消息的末条显示
-        tailView.isHidden = !showTail
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        messageLabel.textColor = isFromMe ? .themeBubbleSendText : .themeBubbleReceiveText
 
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themePrimary
-            messageLabel.textColor = .themeBubbleSendText
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
-                make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
-            }
-            tailView.direction = .outgoing
-            tailView.fillColor = .themePrimary
-            tailView.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing).offset(ScreenAdapter.scaleW(3))
-                make.bottom.equalTo(bubbleView.snp.bottom).offset(-ScreenAdapter.scaleW(2))
-                make.width.equalTo(ScreenAdapter.scaleW(9))
-                make.height.equalTo(ScreenAdapter.scaleW(13))
-            }
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleIncoming
-            messageLabel.textColor = .themeBubbleReceiveText
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(nameGap)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
-                }
-            }
-            tailView.direction = .incoming
-            tailView.fillColor = .themeBubbleIncoming
-            tailView.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading).offset(-ScreenAdapter.scaleW(3))
-                make.bottom.equalTo(bubbleView.snp.bottom).offset(-ScreenAdapter.scaleW(2))
-                make.width.equalTo(ScreenAdapter.scaleW(9))
-                make.height.equalTo(ScreenAdapter.scaleW(13))
-            }
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: bubbleWidth,
+            minHeight: ScreenAdapter.scaleH(38),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 }
 
@@ -1765,12 +1618,7 @@ final class PendingMediaMessageCell: UITableViewCell {
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
     private let playIcon = UIImageView()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var isFromMe = false
-    private var currentMessageID = ""
     private var onRetry: (() -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -1811,20 +1659,8 @@ final class PendingMediaMessageCell: UITableViewCell {
         playIcon.contentMode = .center
         playIcon.isHidden = true
 
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-        timeLabel.textAlignment = .center
-
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
-        senderNameLabel.isHidden = true
-
         bubbleView.addSubviews(thumbnailView, dimOverlay, playIcon, spinner, statusLabel)
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
+        contentView.addSubviews(tailView, bubbleView)
 
         thumbnailView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -1843,10 +1679,6 @@ final class PendingMediaMessageCell: UITableViewCell {
             make.center.equalToSuperview()
             make.leading.trailing.equalToSuperview().inset(ScreenAdapter.scaleW(8))
         }
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(12))
-            make.width.height.equalTo(ScreenAdapter.scaleW(36))
-        }
 
         // 失败时点击气泡重试
         bubbleView.isUserInteractionEnabled = true
@@ -1858,26 +1690,9 @@ final class PendingMediaMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, thumbnail: UIImage?, showTail: Bool = false, onRetry: (() -> Void)?) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
+        let isFromMe = message.isFromMe
         self.onRetry = onRetry
-        timeLabel.text = message.timeString
         thumbnailView.image = thumbnail ?? UIImage(systemName: message.type == .video ? "video" : "photo")
-        // 尾巴：仅连续同方向消息的末条显示
-        tailView.isHidden = !showTail
-
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
 
         let failed = message.status == -1
         dimOverlay.isHidden = !failed
@@ -1889,60 +1704,16 @@ final class PendingMediaMessageCell: UITableViewCell {
             spinner.startAnimating()
         }
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let nameGap = ScreenAdapter.scaleH(2)
-        let imgSize = ScreenAdapter.scaleW(160)
-
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.height.equalTo(imgSize)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(nameGap)
-                    make.width.height.equalTo(imgSize)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.height.equalTo(imgSize)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.scaleW(180),
+            height: ScreenAdapter.scaleW(180),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 }

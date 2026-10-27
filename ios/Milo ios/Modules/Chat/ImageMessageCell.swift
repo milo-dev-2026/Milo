@@ -6,12 +6,7 @@ class ImageMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
     private let imageView_ = UIImageView()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -25,37 +20,15 @@ class ImageMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-        timeLabel.textAlignment = .center
-
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
-
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
 
         imageView_.contentMode = .scaleAspectFill
         imageView_.clipsToBounds = true
         imageView_.backgroundColor = .systemGray6
 
         bubbleView.addSubview(imageView_)
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
+        contentView.addSubviews(tailView, bubbleView)
 
         imageView_.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -63,33 +36,6 @@ class ImageMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
-
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let imgSize = ScreenAdapter.scaleW(160)
-
         let content = message.content
         let imgURL: URL?
         if content.hasPrefix("http") {
@@ -100,58 +46,23 @@ class ImageMessageCell: UITableViewCell {
             imgURL = URL(string: APIConfig.apiBaseURL + "/" + content)
         }
 
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.height.equalTo(imgSize)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.height.equalTo(imgSize)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.height.equalTo(imgSize)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
-
         if let url = imgURL {
             imageView_.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))
         } else {
             imageView_.image = UIImage(systemName: "photo")
         }
+
+        let isFromMe = message.isFromMe
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.scaleW(180),
+            height: ScreenAdapter.scaleW(180),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 }

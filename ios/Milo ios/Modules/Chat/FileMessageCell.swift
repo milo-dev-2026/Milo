@@ -7,12 +7,7 @@ class FileMessageCell: UITableViewCell {
     private let fileIcon = UIImageView()
     private let nameLabel = UILabel()
     private let sizeLabel = UILabel()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -26,16 +21,9 @@ class FileMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubblePad = ScreenAdapter.scaleW(10)
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
+        let bubblePad = ScreenAdapter.scaleW(12)
 
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
-        bubbleView.backgroundColor = .white
 
         fileIcon.image = UIImage(systemName: "doc.fill")
         fileIcon.tintColor = .themePrimary
@@ -48,25 +36,13 @@ class FileMessageCell: UITableViewCell {
         sizeLabel.font = ScreenAdapter.font(12)
         sizeLabel.textColor = .secondaryLabel
 
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
-
         let infoStack = UIStackView(arrangedSubviews: [nameLabel, sizeLabel])
         infoStack.axis = .vertical
         infoStack.spacing = ScreenAdapter.scaleH(2)
 
         bubbleView.addSubview(fileIcon)
         bubbleView.addSubview(infoStack)
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
+        contentView.addSubviews(tailView, bubbleView)
 
         fileIcon.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(bubblePad)
@@ -82,26 +58,6 @@ class FileMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
-
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-
         let parts = message.content.split(separator: "|")
         let fileName: String
         let fileSize: String
@@ -145,65 +101,21 @@ class FileMessageCell: UITableViewCell {
             fileIcon.image = UIImage(systemName: "doc.fill")
         }
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let bubbleWidth = ScreenAdapter.scaleW(220)
-        let bubbleHeight = ScreenAdapter.scaleH(56)
+        let isFromMe = message.isFromMe
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        nameLabel.textColor = isFromMe ? .themeBubbleSendText : .themeBubbleReceiveText
+        sizeLabel.textColor = isFromMe ? UIColor.white.withAlphaComponent(0.8) : .secondaryLabel
+        if isFromMe { fileIcon.tintColor = .white }
 
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleOutgoing
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
-                make.height.equalTo(bubbleHeight)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleIncoming
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.equalTo(bubbleHeight)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.equalTo(bubbleHeight)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.scaleW(240),
+            height: ScreenAdapter.scaleH(56),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 }

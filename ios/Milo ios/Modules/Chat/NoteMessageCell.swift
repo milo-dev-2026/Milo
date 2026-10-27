@@ -5,12 +5,7 @@ import SnapKit
 class NoteMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
 
     // 笔记内容
     private let noteContainer = UIView()
@@ -18,10 +13,6 @@ class NoteMessageCell: UITableViewCell {
     private let noteTitleLabel = UILabel()
     private let notePreviewLabel = UILabel()
     private let noteArrowView = UIImageView()
-
-    // MARK: - 时间分隔头
-    let timeHeaderLabel = UILabel()
-    private var showsTimeHeader = false
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -36,24 +27,9 @@ class NoteMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-        timeLabel.textAlignment = .center
-
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .white
-
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
 
         // 笔记卡片容器
         noteContainer.backgroundColor = .white
@@ -79,29 +55,9 @@ class NoteMessageCell: UITableViewCell {
         noteArrowView.tintColor = .systemGray3
         noteArrowView.contentMode = .scaleAspectFit
 
-        // 时间分隔头
-        timeHeaderLabel.font = ScreenAdapter.font(12)
-        timeHeaderLabel.textColor = .tertiaryLabel
-        timeHeaderLabel.textAlignment = .center
-        timeHeaderLabel.isHidden = true
-        timeHeaderLabel.alpha = 0
-
         noteContainer.addSubviews(noteIconView, noteTitleLabel, notePreviewLabel, noteArrowView)
         bubbleView.addSubview(noteContainer)
-        contentView.addSubviews(timeHeaderLabel, avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-
-        timeHeaderLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(8)
-            make.centerX.equalToSuperview()
-            make.leading.greaterThanOrEqualToSuperview().offset(16)
-            make.trailing.lessThanOrEqualToSuperview().offset(-16)
-            make.height.equalTo(0)
-        }
-
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
+        contentView.addSubviews(tailView, bubbleView)
 
         // 笔记内部布局
         noteIconView.snp.makeConstraints { make in
@@ -171,25 +127,7 @@ class NoteMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
-
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
+        let isFromMe = message.isFromMe
 
         // 解析笔记消息内容
         if let data = message.content.data(using: .utf8),
@@ -201,133 +139,27 @@ class NoteMessageCell: UITableViewCell {
             notePreviewLabel.text = message.content
         }
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let bubbleWidth = ScreenAdapter.screenWidth * 0.72
+        noteTitleLabel.textColor = isFromMe ? .themeBubbleSendText : .label
+        notePreviewLabel.textColor = isFromMe ? UIColor.white.withAlphaComponent(0.8) : .secondaryLabel
+        noteIconView.tintColor = isFromMe ? .white : .systemOrange
+        noteArrowView.tintColor = isFromMe ? UIColor.white.withAlphaComponent(0.7) : .systemGray3
+        noteContainer.backgroundColor = isFromMe ? UIColor.white.withAlphaComponent(0.16) : .white
 
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleOutgoing
-            noteTitleLabel.textColor = .white
-            notePreviewLabel.textColor = UIColor.white.withAlphaComponent(0.8)
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleIncoming
-            noteTitleLabel.textColor = .label
-            notePreviewLabel.textColor = .secondaryLabel
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.equalTo(bubbleWidth)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(bubbleWidth)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.screenWidth * 0.72,
+            showTail: showTail,
+            fillColor: fillColor
+        )
 
         // 笔记容器布局
         noteContainer.snp.remakeConstraints { make in
             make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))
             make.height.equalTo(ScreenAdapter.scaleH(72))
-        }
-    }
-
-    // MARK: - 时间分隔头配置
-
-    func configureTimeHeader(text: String?, isNew: Bool = false) {
-        let shouldShow = text != nil
-        showsTimeHeader = shouldShow
-
-        let vPad = ScreenAdapter.scaleH(12)
-
-        if shouldShow {
-            timeHeaderLabel.text = text
-            timeHeaderLabel.isHidden = false
-            timeHeaderLabel.snp.updateConstraints { make in
-                make.height.equalTo(18)
-            }
-        } else {
-            timeHeaderLabel.text = nil
-            timeHeaderLabel.isHidden = true
-            timeHeaderLabel.alpha = 0
-            timeHeaderLabel.snp.updateConstraints { make in
-                make.height.equalTo(0)
-            }
-        }
-
-        // 更新头像顶部约束
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
-                if shouldShow {
-                    make.top.equalTo(timeHeaderLabel.snp.bottom).offset(vPad)
-                } else {
-                    make.top.equalToSuperview().offset(vPad)
-                }
-                make.width.height.equalTo(ScreenAdapter.scaleW(36))
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
-                if shouldShow {
-                    make.top.equalTo(timeHeaderLabel.snp.bottom).offset(vPad)
-                } else {
-                    make.top.equalToSuperview().offset(vPad)
-                }
-                make.width.height.equalTo(ScreenAdapter.scaleW(36))
-            }
-        }
-
-        // 新时间分隔头动画
-        if shouldShow && isNew && AnimationIntegration.shared.config.enableListEntranceAnimation {
-            timeHeaderLabel.alpha = 0
-            timeHeaderLabel.transform = CGAffineTransform(translationX: 0, y: -5)
-            UIView.animate(withDuration: 0.25,
-                           delay: 0,
-                           options: .curveEaseOut) {
-                self.timeHeaderLabel.alpha = 1
-                self.timeHeaderLabel.transform = .identity
-            }
-        } else if shouldShow {
-            timeHeaderLabel.alpha = 1
-            timeHeaderLabel.transform = .identity
         }
     }
 }

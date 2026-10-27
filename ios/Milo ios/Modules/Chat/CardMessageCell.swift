@@ -48,12 +48,7 @@ struct CardMessageInfo {
 class CardMessageCell: UITableViewCell {
     
     private let bubbleView = UIView()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
     
     // 名片内容
     private let cardContainer = UIView()
@@ -74,26 +69,11 @@ class CardMessageCell: UITableViewCell {
     
     private func setupUI() {
         selectionStyle = .none
-        
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-        timeLabel.textAlignment = .center
-        
+
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .white
         
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
-
         // 名片卡片
         cardContainer.backgroundColor = .white
         cardContainer.layer.cornerRadius = ScreenAdapter.scaleW(10)
@@ -131,12 +111,7 @@ class CardMessageCell: UITableViewCell {
         
         cardContainer.addSubviews(cardAvatarView, cardNameLabel, cardTagLabel, cardVercodeLabel, cardArrowView)
         bubbleView.addSubview(cardContainer)
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-        
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
+        contentView.addSubviews(tailView, bubbleView)
         
         // 名片内部布局
         cardAvatarView.snp.makeConstraints { make in
@@ -172,26 +147,8 @@ class CardMessageCell: UITableViewCell {
     }
     
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
+        let isFromMe = message.isFromMe
 
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-        
         // 解析名片信息
         let cardInfo = CardMessageInfo.parse(from: message.content)
         cardNameLabel.text = cardInfo?.name ?? "未知用户"
@@ -207,63 +164,25 @@ class CardMessageCell: UITableViewCell {
         } else {
             cardAvatarView.image = AppUtility.defaultAvatarImage(name: cardInfo?.name ?? "", size: 88)
         }
-        
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let bubbleWidth = ScreenAdapter.screenWidth * 0.72
-        
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleOutgoing
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleIncoming
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.equalTo(bubbleWidth)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(bubbleWidth)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+
+        // 发送方气泡为品牌色时，名片内部转为深色文字反白
+        cardContainer.backgroundColor = isFromMe ? UIColor.white.withAlphaComponent(0.16) : .white
+        cardNameLabel.textColor = isFromMe ? .themeBubbleSendText : .label
+        cardVercodeLabel.textColor = isFromMe ? UIColor.white.withAlphaComponent(0.8) : .secondaryLabel
+        cardTagLabel.textColor = isFromMe ? .white : .themePrimary
+        cardTagLabel.backgroundColor = isFromMe ? UIColor.white.withAlphaComponent(0.2) : UIColor.themePrimary.withAlphaComponent(0.1)
+        cardArrowView.tintColor = isFromMe ? UIColor.white.withAlphaComponent(0.7) : .systemGray3
+
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.screenWidth * 0.72,
+            showTail: showTail,
+            fillColor: fillColor
+        )
         
         // 名片容器布局
         cardContainer.snp.remakeConstraints { make in

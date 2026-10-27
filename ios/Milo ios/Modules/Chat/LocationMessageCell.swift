@@ -10,12 +10,7 @@ class LocationMessageCell: UITableViewCell {
     private let mapContainer = UIView()
     private let pinIcon = UIImageView()
     private let nameLabel = UILabel()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
     private var locationCoord: CLLocationCoordinate2D?
     private var mapView: MAMapView?
 
@@ -31,23 +26,9 @@ class LocationMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true
         bubbleView.backgroundColor = .systemGray6
-
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
 
         nameLabel.font = ScreenAdapter.font(13)
         nameLabel.textColor = .label
@@ -66,8 +47,8 @@ class LocationMessageCell: UITableViewCell {
         stack.alignment = .center
         infoBar.addSubview(stack)
         stack.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(8))
-            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(8))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
             make.centerY.equalToSuperview()
             make.height.equalToSuperview()
         }
@@ -78,6 +59,7 @@ class LocationMessageCell: UITableViewCell {
 
         bubbleView.addSubview(mapContainer)
         bubbleView.addSubview(infoBar)
+        contentView.addSubviews(tailView, bubbleView)
 
         mapContainer.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
@@ -87,38 +69,11 @@ class LocationMessageCell: UITableViewCell {
         infoBar.snp.makeConstraints { make in
             make.top.equalTo(mapContainer.snp.bottom)
             make.leading.trailing.bottom.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(36))
-        }
-
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
+            make.height.equalTo(ScreenAdapter.scaleH(38))
         }
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
-
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-
         let content = message.content
         if content.hasPrefix("[位置] ") {
             let parts = content.replacingOccurrences(of: "[位置] ", with: "").components(separatedBy: ",")
@@ -134,60 +89,17 @@ class LocationMessageCell: UITableViewCell {
             nameLabel.text = content
         }
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let mapSize = ScreenAdapter.scaleW(180)
-
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(mapSize)
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleSend)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.equalTo(mapSize)
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(mapSize)
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleReceive)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        let isFromMe = message.isFromMe
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: ScreenAdapter.scaleW(200),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 
     private func updateMapView(lat: Double, lon: Double) {
@@ -213,7 +125,7 @@ class LocationMessageCell: UITableViewCell {
     }
 
     func openLocationMap(from vc: UIViewController) {
-        guard let coord = locationCoord else { return }
+        guard locationCoord != nil else { return }
         let picker = LocationPickerViewController()
         vc.navigationController?.pushViewController(picker, animated: true)
     }

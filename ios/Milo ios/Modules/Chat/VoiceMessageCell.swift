@@ -7,12 +7,7 @@ class VoiceMessageCell: UITableViewCell {
     private let bubbleView = UIView()
     private let durationLabel = UILabel()
     private let voiceIcon = UIImageView()
-    private let timeLabel = UILabel()
-    private let avatarView = UIImageView()
-    private let senderNameLabel = UILabel()
     private let tailView = ChatBubbleTailView()
-    private var currentMessageID = ""
-    private var isFromMe = false
     private var voiceURL: URL?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -27,16 +22,7 @@ class VoiceMessageCell: UITableViewCell {
     private func setupUI() {
         selectionStyle = .none
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubblePad = ScreenAdapter.scaleW(10)
-
-        timeLabel.font = ScreenAdapter.font(11)
-        timeLabel.textColor = .tertiaryLabel
-
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
-        bubbleView.backgroundColor = .white
 
         voiceIcon.image = UIImage(systemName: "speaker.wave.2.fill")
         voiceIcon.tintColor = .themePrimary
@@ -45,61 +31,31 @@ class VoiceMessageCell: UITableViewCell {
         durationLabel.font = ScreenAdapter.font(14)
         durationLabel.textColor = .label
 
-        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
-        avatarView.clipsToBounds = true
-        avatarView.contentMode = .scaleAspectFill
-
-        senderNameLabel.font = ScreenAdapter.font(12)
-        senderNameLabel.textColor = .secondaryLabel
-
         bubbleView.addSubview(voiceIcon)
         bubbleView.addSubview(durationLabel)
-        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
-
-        avatarView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(vPad)
-            make.width.height.equalTo(avatarSize)
-        }
+        contentView.addSubviews(tailView, bubbleView)
 
         voiceIcon.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(bubblePad)
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
             make.centerY.equalToSuperview()
             make.width.height.equalTo(ScreenAdapter.scaleW(20))
         }
 
         durationLabel.snp.makeConstraints { make in
             make.leading.equalTo(voiceIcon.snp.trailing).offset(ScreenAdapter.scaleW(6))
-            make.trailing.equalToSuperview().offset(-bubblePad)
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
             make.centerY.equalToSuperview()
         }
     }
 
     func configure(with message: Message, showTail: Bool = false) {
-        isFromMe = message.isFromMe
-        currentMessageID = message.messageID
-        timeLabel.text = message.timeString
-        tailView.isHidden = !showTail
-
-        // 发送者头像（与Android一致）
-        AppUtility.loadChannelAvatar(channelId: message.fromUID, channelType: 1, name: message.fromUID, into: avatarView)
-
-        // 群聊且他人消息时显示发送者昵称（与Android一致）
-        let showName = message.channelType == 2 && !isFromMe
-        senderNameLabel.isHidden = !showName
-        if showName {
-            let mid = message.messageID
-            senderNameLabel.text = nil
-            AppUtility.displayName(for: message.fromUID) { [weak self] name in
-                guard let self = self, self.currentMessageID == mid else { return }
-                self.senderNameLabel.text = name
-            }
-        }
-
         let parts = message.content.split(separator: "|")
         let duration: String
         let path: String
+        var seconds: Double = 0
 
         if parts.count >= 2 {
+            seconds = Double(parts[0]) ?? 0
             duration = String(parts[0]) + "\""
             path = String(parts[1])
         } else {
@@ -116,65 +72,23 @@ class VoiceMessageCell: UITableViewCell {
             voiceURL = URL(string: APIConfig.apiBaseURL + "/" + path)
         }
 
-        let avatarSize = ScreenAdapter.scaleW(36)
-        let hPad = ScreenAdapter.scaleW(12)
-        let vPad = ScreenAdapter.scaleH(12)
-        let bubbleGap = ScreenAdapter.scaleW(8)
-        let timeGap = ScreenAdapter.scaleH(4)
-        let bubbleWidth = ScreenAdapter.scaleW(100)
+        let isFromMe = message.isFromMe
+        // 时长越长气泡越宽（与 iMessage 语音条一致）：70pt 起步，每秒 +4pt，上限 190pt
+        let bubbleWidth = ScreenAdapter.scaleW(70 + min(seconds, 30) * 4)
+        let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
+        bubbleView.backgroundColor = fillColor
+        durationLabel.textColor = isFromMe ? .themeBubbleSendText : .themeBubbleReceiveText
+        voiceIcon.tintColor = isFromMe ? .white : .themePrimary
 
-        if isFromMe {
-            avatarView.snp.remakeConstraints { make in
-                make.trailing.equalToSuperview().offset(-hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleOutgoing
-            bubbleView.snp.remakeConstraints { make in
-                make.trailing.equalTo(avatarView.snp.leading).offset(-bubbleGap)
-                make.top.equalTo(avatarView)
-                make.width.equalTo(bubbleWidth)
-                make.height.equalTo(ScreenAdapter.scaleH(36))
-            }
-            tailView.attach(to: bubbleView, direction: .outgoing, fillColor: .themeBubbleOutgoing)
-            timeLabel.snp.remakeConstraints { make in
-                make.trailing.equalTo(bubbleView.snp.trailing)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        } else {
-            avatarView.snp.remakeConstraints { make in
-                make.leading.equalToSuperview().offset(hPad)
-                make.top.equalToSuperview().offset(vPad)
-                make.width.height.equalTo(avatarSize)
-            }
-            bubbleView.backgroundColor = .themeBubbleIncoming
-            if showName {
-                senderNameLabel.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                }
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(senderNameLabel.snp.bottom).offset(2)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.equalTo(ScreenAdapter.scaleH(36))
-                }
-            } else {
-                bubbleView.snp.remakeConstraints { make in
-                    make.leading.equalTo(avatarView.snp.trailing).offset(bubbleGap)
-                    make.top.equalTo(avatarView)
-                    make.width.equalTo(bubbleWidth)
-                    make.height.equalTo(ScreenAdapter.scaleH(36))
-                }
-            }
-            tailView.attach(to: bubbleView, direction: .incoming, fillColor: .themeBubbleIncoming)
-            timeLabel.snp.remakeConstraints { make in
-                make.leading.equalTo(bubbleView.snp.leading)
-                make.top.equalTo(bubbleView.snp.bottom).offset(timeGap)
-                make.bottom.equalToSuperview().offset(-vPad)
-            }
-        }
+        ChatBubbleLayout.install(
+            bubble: bubbleView,
+            tail: tailView,
+            isFromMe: isFromMe,
+            width: bubbleWidth,
+            height: ScreenAdapter.scaleH(38),
+            showTail: showTail,
+            fillColor: fillColor
+        )
     }
 
     func playVoice() {

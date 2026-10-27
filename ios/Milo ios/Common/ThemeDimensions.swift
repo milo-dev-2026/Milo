@@ -102,10 +102,10 @@ struct ThemeDimension {
     static var avatarXXL: CGFloat { ScreenAdapter.scaleW(100) }
 
     // MARK: - 聊天气泡
-    /// 气泡最大宽度比例 0.7
-    static var bubbleMaxWidthRatio: CGFloat { 0.7 }
-    /// 气泡圆角 12pt
-    static var bubbleCornerRadius: CGFloat { ScreenAdapter.scaleW(12) }
+    /// 气泡最大宽度比例（对齐参考图，接近整行）
+    static var bubbleMaxWidthRatio: CGFloat { 0.82 }
+    /// 气泡圆角 18pt
+    static var bubbleCornerRadius: CGFloat { ScreenAdapter.scaleW(18) }
     /// 气泡内边距 10pt
     static var bubblePadding: CGFloat { ScreenAdapter.scaleW(10) }
 
