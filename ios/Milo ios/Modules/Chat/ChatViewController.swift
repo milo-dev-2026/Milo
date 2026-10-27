@@ -20,8 +20,6 @@ class ChatViewController: UIViewController {
     private let inputBar = ChatInputBar()
     private var messages: [Message] = []
     private var imagePicker: UIImagePickerController?
-    private var typingTimer: Timer?
-    private var isTyping = false
 
     /// 上传中的本地缩略图（messageID → 图片），用于立刻展示占位气泡
     private var pendingMedia: [String: UIImage] = [:]
@@ -35,6 +33,12 @@ class ChatViewController: UIViewController {
     private let emptyLabel = UILabel()
     private let onlineStatusLabel = UILabel()
     private var hasFinishedLoading = false
+    /// 待执行弹性浮现动画的新消息 ID
+    private var pendingAppearIDs = Set<String>()
+    /// 回到底部悬浮按钮（远离底部时浮现）
+    private let scrollDownButton = UIButton(type: .system)
+    /// 最近一次在线状态文案，供「正在输入」切换后还原
+    private var lastOnlineStatusText: String?
 
     /// 聊天文件上传专用会话（默认 30/60 秒对原图/视频不够）
     private let uploadSession: URLSession = {
@@ -139,6 +143,13 @@ class ChatViewController: UIViewController {
             return
         }
         messages.append(msg)
+        if msg.isFromMe {
+            pendingAppearIDs.insert(msg.messageID)
+        } else {
+            pendingAppearIDs.insert(msg.messageID)
+            // 收到对方消息时的轻触感反馈（与系统信息一致）
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
@@ -188,6 +199,26 @@ class ChatViewController: UIViewController {
         tableView.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
             make.bottom.equalTo(inputBar.snp.top)
+        }
+
+        // 回到底部悬浮按钮：圆形描边 + 阴影，远离底部时浮现
+        scrollDownButton.setImage(UIImage(systemName: "chevron.down"), for: .normal)
+        scrollDownButton.tintColor = .label
+        scrollDownButton.backgroundColor = .themeBg
+        scrollDownButton.layer.cornerRadius = ScreenAdapter.scaleW(18)
+        scrollDownButton.layer.borderWidth = 0.5
+        scrollDownButton.layer.borderColor = UIColor.themeSeparator.cgColor
+        scrollDownButton.layer.shadowColor = UIColor.black.cgColor
+        scrollDownButton.layer.shadowOpacity = 0.12
+        scrollDownButton.layer.shadowOffset = CGSize(width: 0, height: 2)
+        scrollDownButton.layer.shadowRadius = 6
+        scrollDownButton.alpha = 0
+        scrollDownButton.addTarget(self, action: #selector(scrollDownTapped), for: .touchUpInside)
+        view.addSubview(scrollDownButton)
+        scrollDownButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.bottom.equalTo(inputBar.snp.top).offset(-ScreenAdapter.scaleH(12))
+            make.width.height.equalTo(ScreenAdapter.scaleW(36))
         }
 
         inputBar.snp.makeConstraints { make in
@@ -473,19 +504,18 @@ class ChatViewController: UIViewController {
     private func updateOnlineStatus(online: Bool, lastOffline: Int?) {
         guard channelType == 1 else {
             onlineStatusLabel.isHidden = true
+            lastOnlineStatusText = nil
             return
         }
         if online {
-            onlineStatusLabel.text = "在线"
-            onlineStatusLabel.isHidden = false
-            return
+            lastOnlineStatusText = "在线"
+        } else if let lastOffline = lastOffline, lastOffline > 0 {
+            lastOnlineStatusText = ChatViewController.offlineText(seconds: lastOffline)
+        } else {
+            lastOnlineStatusText = nil
         }
-        guard let lastOffline = lastOffline, lastOffline > 0 else {
-            onlineStatusLabel.isHidden = true
-            return
-        }
-        onlineStatusLabel.text = ChatViewController.offlineText(seconds: lastOffline)
-        onlineStatusLabel.isHidden = false
+        onlineStatusLabel.text = lastOnlineStatusText
+        onlineStatusLabel.isHidden = lastOnlineStatusText == nil
     }
 
     /// 优先使用 IMManager 已缓存的频道信息（仅能判断在线，无 last_offline 时隐藏）
@@ -636,6 +666,26 @@ class ChatViewController: UIViewController {
         guard !messages.isEmpty else { return }
         let indexPath = IndexPath(row: messages.count - 1, section: 0)
         tableView.scrollToRow(at: indexPath, at: .bottom, animated: false)
+        updateScrollDownButtonVisibility()
+    }
+
+    @objc private func scrollDownTapped() {
+        guard !messages.isEmpty else { return }
+        let indexPath = IndexPath(row: messages.count - 1, section: 0)
+        tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
+        updateScrollDownButtonVisibility()
+    }
+
+    /// 离底部超过一屏左右时显示「回到底部」按钮
+    private func updateScrollDownButtonVisibility() {
+        guard tableView.bounds.height > 0 else { return }
+        let distance = tableView.contentSize.height - tableView.contentOffset.y - tableView.bounds.height
+        let shouldShow = distance > ScreenAdapter.scaleH(240) && !messages.isEmpty
+        let isShown = scrollDownButton.alpha > 0.5
+        guard shouldShow != isShown else { return }
+        UIView.animate(withDuration: 0.2) {
+            self.scrollDownButton.alpha = shouldShow ? 1 : 0
+        }
     }
 
     private func setupKeyboardObserver() {
@@ -677,14 +727,23 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let message = messages[indexPath.row]
-        // 是否为连续同方向消息的末条（用于显示气泡尾巴）
-        let nextIdx = indexPath.row + 1
-        let isLastInRun = nextIdx >= messages.count || messages[nextIdx].isFromMe != message.isFromMe
+        // 分组间距：与相邻同方向消息收紧间距
+        let prevMsg = indexPath.row > 0 ? messages[indexPath.row - 1] : nil
+        let nextMsg = indexPath.row + 1 < messages.count ? messages[indexPath.row + 1] : nil
+        let groupedAbove = prevMsg?.isFromMe == message.isFromMe
+        let groupedBelow = nextMsg?.isFromMe == message.isFromMe
+        // 时间分隔：与上一条相隔超过 5 分钟（或是首条）时，在气泡上方显示居中时间
+        let timeHeader: String?
+        if let prev = prevMsg, message.timestamp - prev.timestamp <= 5 * 60 * 1000 {
+            timeHeader = nil
+        } else {
+            timeHeader = ChatBubbleLayout.clusterTimeText(timestampMs: message.timestamp)
+        }
         // 上传中的图片/视频：先展示本地缩略图占位气泡
         if (message.type == .image || message.type == .video), pendingMedia[message.messageID] != nil {
             let cell = tableView.dequeueReusableCell(withIdentifier: "PendingMediaMessageCell", for: indexPath) as! PendingMediaMessageCell
             let messageID = message.messageID
-            cell.configure(with: message, thumbnail: pendingMedia[messageID], showTail: isLastInRun) { [weak self] in
+            cell.configure(with: message, thumbnail: pendingMedia[messageID], timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow) { [weak self] in
                 self?.retryUpload(messageID: messageID)
             }
             return cell
@@ -692,37 +751,54 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         switch message.type {
         case .image:
             let cell = tableView.dequeueReusableCell(withIdentifier: "ImageMessageCell", for: indexPath) as! ImageMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .voice:
             let cell = tableView.dequeueReusableCell(withIdentifier: "VoiceMessageCell", for: indexPath) as! VoiceMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .video:
             let cell = tableView.dequeueReusableCell(withIdentifier: "VideoMessageCell", for: indexPath) as! VideoMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .file:
             let cell = tableView.dequeueReusableCell(withIdentifier: "FileMessageCell", for: indexPath) as! FileMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .location:
             let cell = tableView.dequeueReusableCell(withIdentifier: "LocationMessageCell", for: indexPath) as! LocationMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .card:
             let cell = tableView.dequeueReusableCell(withIdentifier: "CardMessageCell", for: indexPath) as! CardMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         case .note:
             let cell = tableView.dequeueReusableCell(withIdentifier: "NoteMessageCell", for: indexPath) as! NoteMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell
-            cell.configure(with: message, showTail: isLastInRun)
+            cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
             return cell
         }
+    }
+
+    /// 新消息进入时的弹性浮现动画（只作用于刚插入的行）
+    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        guard indexPath.row < messages.count else { return }
+        let id = messages[indexPath.row].messageID
+        guard pendingAppearIDs.remove(id) != nil else { return }
+        cell.contentView.transform = CGAffineTransform(translationX: 0, y: 24).scaledBy(x: 0.96, y: 0.96)
+        cell.contentView.alpha = 0
+        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.4, options: [.curveEaseOut, .allowUserInteraction]) {
+            cell.contentView.transform = .identity
+            cell.contentView.alpha = 1
+        }
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateScrollDownButtonVisibility()
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -781,28 +857,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                 } catch { }
             }
         }
-    }
-
-    // MARK: - 正在输入提示
-    private func updateTypingStatus(isTyping: Bool) {
-        if isTyping {
-            guard !self.isTyping else { return }
-            self.isTyping = true
-            title = "\(titleText) 正在输入..."
-            typingTimer?.invalidate()
-            typingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-                self?.resetTypingStatus()
-            }
-        } else {
-            resetTypingStatus()
-        }
-    }
-
-    private func resetTypingStatus() {
-        guard isTyping else { return }
-        isTyping = false
-        title = titleText
-        typingTimer?.invalidate()
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -972,6 +1026,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
@@ -983,11 +1038,11 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     func didStartTyping() {
-        updateTypingStatus(isTyping: true)
+        // 预留：接入对方「正在输入」事件后再展示
     }
 
     func didStopTyping() {
-        updateTypingStatus(isTyping: false)
+        // 预留：接入对方「正在输入」事件后再展示
     }
 
     func didInsertEmoji(_ emoji: String) {
@@ -1089,6 +1144,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         pendingVoiceDurations[messageID] = Int(duration)
         tableView.reloadData()
         scrollToBottom()
@@ -1168,6 +1224,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         pendingMedia[messageID] = compressed
         pendingUploads[messageID] = PendingUpload(
             type: .image, data: jpegData, sourceURL: nil, fileName: "image.jpg",
@@ -1219,6 +1276,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         pendingMedia[messageID] = thumbnail ?? UIImage(systemName: "video")
         pendingUploads[messageID] = PendingUpload(
             type: .video, data: nil, sourceURL: sourceURL, fileName: "video.mp4",
@@ -1390,6 +1448,7 @@ extension ChatViewController: ChatInputBarDelegate {
                     status: 0 // 发送中
                 )
                 self.messages.append(msg)
+                self.pendingAppearIDs.insert(msg.messageID)
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                     self.scrollToBottom()
@@ -1424,6 +1483,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
@@ -1454,6 +1514,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
@@ -1485,6 +1546,7 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
@@ -1576,7 +1638,7 @@ class TextMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         messageLabel.text = message.content
 
         let isFromMe = message.isFromMe
@@ -1603,7 +1665,9 @@ class TextMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: bubbleWidth,
             minHeight: ScreenAdapter.scaleH(38),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }
@@ -1689,7 +1753,7 @@ final class PendingMediaMessageCell: UITableViewCell {
         onRetry?()
     }
 
-    func configure(with message: Message, thumbnail: UIImage?, showTail: Bool = false, onRetry: (() -> Void)?) {
+    func configure(with message: Message, thumbnail: UIImage?, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false, onRetry: (() -> Void)?) {
         let isFromMe = message.isFromMe
         self.onRetry = onRetry
         thumbnailView.image = thumbnail ?? UIImage(systemName: message.type == .video ? "video" : "photo")
@@ -1712,7 +1776,9 @@ final class PendingMediaMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: ScreenAdapter.scaleW(180),
             height: ScreenAdapter.scaleW(180),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }

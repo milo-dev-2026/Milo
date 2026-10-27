@@ -126,7 +126,7 @@ class NoteMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let isFromMe = message.isFromMe
 
         // 解析笔记消息内容
@@ -152,7 +152,9 @@ class NoteMessageCell: UITableViewCell {
             tail: tailView,
             isFromMe: isFromMe,
             width: ScreenAdapter.screenWidth * 0.72,
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
 

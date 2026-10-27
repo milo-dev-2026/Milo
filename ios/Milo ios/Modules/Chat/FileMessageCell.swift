@@ -57,7 +57,7 @@ class FileMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let parts = message.content.split(separator: "|")
         let fileName: String
         let fileSize: String
@@ -114,7 +114,9 @@ class FileMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: ScreenAdapter.scaleW(240),
             height: ScreenAdapter.scaleH(56),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }

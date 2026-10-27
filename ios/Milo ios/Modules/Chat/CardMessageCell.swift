@@ -146,7 +146,7 @@ class CardMessageCell: UITableViewCell {
         }
     }
     
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let isFromMe = message.isFromMe
 
         // 解析名片信息
@@ -180,7 +180,9 @@ class CardMessageCell: UITableViewCell {
             tail: tailView,
             isFromMe: isFromMe,
             width: ScreenAdapter.screenWidth * 0.72,
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
         

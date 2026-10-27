@@ -73,7 +73,7 @@ class LocationMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let content = message.content
         if content.hasPrefix("[位置] ") {
             let parts = content.replacingOccurrences(of: "[位置] ", with: "").components(separatedBy: ",")
@@ -97,7 +97,9 @@ class LocationMessageCell: UITableViewCell {
             tail: tailView,
             isFromMe: isFromMe,
             width: ScreenAdapter.scaleW(200),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }

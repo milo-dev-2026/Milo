@@ -48,7 +48,7 @@ class VideoMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let parts = message.content.split(separator: "|")
         let thumbPath: String
         let videoPath: String
@@ -89,7 +89,9 @@ class VideoMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: ScreenAdapter.scaleW(180),
             height: ScreenAdapter.scaleW(220),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }

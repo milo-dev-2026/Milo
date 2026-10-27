@@ -35,7 +35,7 @@ class ImageMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let content = message.content
         let imgURL: URL?
         if content.hasPrefix("http") {
@@ -61,7 +61,9 @@ class ImageMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: ScreenAdapter.scaleW(180),
             height: ScreenAdapter.scaleW(180),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }

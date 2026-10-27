@@ -48,7 +48,7 @@ class VoiceMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message, showTail: Bool = false) {
+    func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let parts = message.content.split(separator: "|")
         let duration: String
         let path: String
@@ -86,7 +86,9 @@ class VoiceMessageCell: UITableViewCell {
             isFromMe: isFromMe,
             width: bubbleWidth,
             height: ScreenAdapter.scaleH(38),
-            showTail: showTail,
+            timeHeader: timeHeader,
+            groupedAbove: groupedAbove,
+            groupedBelow: groupedBelow,
             fillColor: fillColor
         )
     }
