@@ -286,16 +286,54 @@ class ConversationListViewController: UIViewController {
         navigationController?.pushViewController(AddFriendViewController(), animated: true)
     }
 
+    // MARK: - 会话置顶（本地持久化，对齐安卓右滑置顶）
+    private static let pinnedKey = "pinned_channels"
+
+    private var pinnedIDs: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: ConversationListViewController.pinnedKey) ?? [])
+    }
+
+    private func isPinned(_ conversation: Conversation) -> Bool {
+        pinnedIDs.contains(conversation.channelID)
+    }
+
+    private func togglePin(_ conversation: Conversation) {
+        var ids = UserDefaults.standard.stringArray(forKey: ConversationListViewController.pinnedKey) ?? []
+        if let idx = ids.firstIndex(of: conversation.channelID) {
+            ids.remove(at: idx)
+        } else {
+            ids.append(conversation.channelID)
+        }
+        UserDefaults.standard.set(ids, forKey: ConversationListViewController.pinnedKey)
+    }
+
+    /// 置顶会话排最前，其余按 lastMsgSeq/时间倒序（与安卓一致）
+    private func sortedConversations(_ list: [Conversation]) -> [Conversation] {
+        let pins = pinnedIDs
+        return list.sorted { a, b in
+            let ap = pins.contains(a.channelID)
+            let bp = pins.contains(b.channelID)
+            if ap != bp { return ap }
+            if a.lastMsgSeq != b.lastMsgSeq { return a.lastMsgSeq > b.lastMsgSeq }
+            return (a.lastMessageTimestamp ?? 0) > (b.lastMessageTimestamp ?? 0)
+        }
+    }
+
     private func loadData() {
+        // 先渲染本地缓存会话（对齐安卓：不等 milo 连接状态，立即显示聊天记录）
+        let local = IMManager.shared.getLocalConversationModels()
+        if !local.isEmpty {
+            conversations = sortedConversations(local)
+            tableView.reloadData()
+        }
+
+        // 再异步拉取服务端会话列表补齐/刷新
         Task {
             do {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConversations = syncResp.conversations ?? []
-                // 按 lastMsgSeq 降序排序（其次按时间戳），与Android会话顺序一致
-                conversations = wkConversations.map { Conversation(from: $0) }.sorted {
-                    if $0.lastMsgSeq != $1.lastMsgSeq { return $0.lastMsgSeq > $1.lastMsgSeq }
-                    return ($0.lastMessageTimestamp ?? 0) > ($1.lastMessageTimestamp ?? 0)
-                }
+                // 置顶优先，其余按 lastMsgSeq 降序（其次按时间戳），与Android会话顺序一致
+                conversations = sortedConversations(wkConversations.map { Conversation(from: $0) })
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
                 }
@@ -348,7 +386,12 @@ extension ConversationListViewController: UITableViewDataSource {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ConversationCell", for: indexPath) as! ConversationCell
-        cell.configure(with: conversations[indexPath.row])
+        let conversation = conversations[indexPath.row]
+        cell.configure(with: conversation)
+        // 置顶会话浅灰底（对齐微信/安卓）
+        let pinned = isPinned(conversation)
+        cell.contentView.backgroundColor = pinned ? UIColor(white: 0.95, alpha: 1.0) : .white
+        cell.backgroundColor = cell.contentView.backgroundColor
         return cell
     }
 }
@@ -364,6 +407,18 @@ extension ConversationListViewController: UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let conversation = conversations[indexPath.row]
+        let pinned = isPinned(conversation)
+
+        let pinAction = UIContextualAction(style: .normal, title: pinned ? "取消置顶" : "置顶") { [weak self] _, _, completion in
+            guard let self = self else { completion(false); return }
+            self.togglePin(conversation)
+            self.conversations = self.sortedConversations(self.conversations)
+            tableView.reloadData()
+            completion(true)
+        }
+        pinAction.backgroundColor = .themePrimary
+
         let deleteAction = UIContextualAction(style: .destructive, title: "删除") { _, _, completion in
             self.conversations.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .automatic)
@@ -374,7 +429,7 @@ extension ConversationListViewController: UITableViewDelegate {
             completion(true)
         }
         muteAction.backgroundColor = .systemOrange
-        return UISwipeActionsConfiguration(actions: [deleteAction, muteAction])
+        return UISwipeActionsConfiguration(actions: [deleteAction, muteAction, pinAction])
     }
 }
 
@@ -637,8 +692,34 @@ class ConversationCell: UITableViewCell {
             || lower.contains("official") || lower.contains("robot")
     }
 
+    /// 系统账号专属头像与默认昵称（对齐安卓：文件传输助手=黄色文件夹，系统通知=主题色铃铛，系统团队=双人图标）
+    private static let systemAccountMap: [String: (icon: String, bgHex: String, name: String)] = [
+        "system_file_helper": ("folder.fill", "F5C242", "文件传输助手"),
+        "filehelper": ("folder.fill", "F5C242", "文件传输助手"),
+        "system_notice": ("bell.fill", "4A8DFF", "系统通知"),
+        "u_10000": ("bell.fill", "4A8DFF", "系统通知"),
+        "system_team": ("person.2.fill", "7F92D6", "系统团队")
+    ]
+
+    private static func makeIconAvatar(icon: String, bgHex: String, size: CGFloat = 96) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { ctx in
+            UIColor.hex(bgHex).setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            let config = UIImage.SymbolConfiguration(pointSize: size * 0.45, weight: .medium)
+            if let symbol = UIImage(systemName: icon, withConfiguration: config) {
+                let rect = CGRect(x: (size - symbol.size.width) / 2, y: (size - symbol.size.height) / 2,
+                                  width: symbol.size.width, height: symbol.size.height)
+                symbol.withTintColor(.white, renderingMode: .alwaysOriginal).draw(in: rect)
+            }
+        }
+    }
+
     func configure(with conversation: Conversation) {
-        nameLabel.text = conversation.name
+        // 系统账号：专属图标头像 + 默认昵称 + 官方徽标
+        let systemConf = ConversationCell.systemAccountMap[conversation.channelID.lowercased()]
+        let displayName = conversation.name.isEmpty ? (systemConf?.name ?? conversation.channelID) : conversation.name
+        nameLabel.text = displayName
         lastMessageLabel.text = conversation.lastMessageDisplay
         timeLabel.text = conversation.timeString
 
@@ -647,13 +728,17 @@ class ConversationCell: UITableViewCell {
         nameLabel.textColor = isOfficial ? .themePrimary : .label
         officialBadge.isHidden = !isOfficial
 
-        // 与Android一致：通过 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar 加载
-        AppUtility.loadChannelAvatar(
-            channelId: conversation.channelID,
-            channelType: conversation.channelType,
-            name: conversation.name,
-            into: avatarView
-        )
+        if let conf = systemConf {
+            avatarView.image = ConversationCell.makeIconAvatar(icon: conf.icon, bgHex: conf.bgHex)
+        } else {
+            // 与Android一致：通过 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar 加载
+            AppUtility.loadChannelAvatar(
+                channelId: conversation.channelID,
+                channelType: conversation.channelType,
+                name: displayName,
+                into: avatarView
+            )
+        }
 
         if conversation.unreadCount > 0 {
             unreadBadge.isHidden = false

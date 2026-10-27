@@ -822,6 +822,37 @@ extension IMManager {
         return WKSDK.shared().conversationManager.getConversationList()
     }
 
+    /// 本地会话 → Conversation 模型（会话列表本地优先渲染，对齐安卓先显示本地记录的行为）
+    func getLocalConversationModels() -> [Conversation] {
+        return getConversationList().map { conv in
+            let chId = conv.channel.channelId ?? ""
+            let chType = Int(conv.channel.channelType)
+            let name = getChannelInfo(channelId: chId, channelType: chType)?.name ?? ""
+            var lastMsg: String?
+            var lastType = 1
+            var timestamp: Int64?
+            var seq = 0
+            if let item = conv.lastMsgItem {
+                let m = convertWKMessageToMessage(item)
+                lastMsg = m.content
+                lastType = m.type.rawValue
+                timestamp = m.timestamp
+                seq = m.messageSeq
+            }
+            return Conversation(
+                channelID: chId,
+                channelType: chType,
+                name: name,
+                avatar: nil,
+                lastMessage: lastMsg,
+                lastMessageTimestamp: timestamp,
+                unreadCount: Int(conv.unreadCount),
+                lastMsgSeq: seq,
+                lastMessageType: lastType
+            )
+        }
+    }
+
     // MARK: 获取指定频道的会话
     func getConversation(channelId: String, channelType: Int = 1) -> WuKongIMSDK.WKConversation? {
         let channel = WKChannel()
