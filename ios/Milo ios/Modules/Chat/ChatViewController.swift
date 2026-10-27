@@ -198,9 +198,42 @@ class ChatViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 聊天页导航栏：透明玻璃，消息可滚到状态栏下方
+        applyGlassNavBar()
         // 从聊天背景设置页返回时刷新背景
         applyChatBackground()
         refreshCachedOnlineStatus()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 离开聊天页时恢复导航栏默认外观，避免影响其它页面
+        restoreNavBarAppearance()
+    }
+
+    /// 玻璃导航栏：透明背景 + 毛玻璃，去掉底部分割线
+    private func applyGlassNavBar() {
+        guard let navBar = navigationController?.navigationBar else { return }
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        appearance.shadowColor = .clear
+        navBar.standardAppearance = appearance
+        navBar.scrollEdgeAppearance = appearance
+        navBar.compactAppearance = appearance
+        navBar.isTranslucent = true
+        edgesForExtendedLayout = .all
+    }
+
+    /// 恢复导航栏默认外观
+    private func restoreNavBarAppearance() {
+        guard let navBar = navigationController?.navigationBar else { return }
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithDefaultBackground()
+        navBar.standardAppearance = appearance
+        navBar.scrollEdgeAppearance = appearance
+        navBar.compactAppearance = appearance
+        navBar.isTranslucent = false
     }
 
     // MARK: - 首屏加载骨架
@@ -667,6 +700,9 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let message = messages[indexPath.row]
+        // 是否为连续同方向消息的末条（用于显示气泡尾巴）
+        let nextIdx = indexPath.row + 1
+        let isLastInRun = nextIdx >= messages.count || messages[nextIdx].isFromMe != message.isFromMe
         // 上传中的图片/视频：先展示本地缩略图占位气泡
         if (message.type == .image || message.type == .video), pendingMedia[message.messageID] != nil {
             let cell = tableView.dequeueReusableCell(withIdentifier: "PendingMediaMessageCell", for: indexPath) as! PendingMediaMessageCell
@@ -711,7 +747,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             cell.onAvatarTap = { [weak self] uid in
                 self?.openContactDetail(uid: uid)
             }
-            cell.configure(with: message)
+            cell.configure(with: message, showTail: isLastInRun)
             return cell
         }
     }
@@ -1528,6 +1564,43 @@ extension ChatViewController: UIDocumentPickerDelegate {
 }
 
 // MARK: - 消息Cell
+/// 气泡小尾巴（iMessage 风格）：连续同方向消息只在末条显示
+final class ChatBubbleTailView: UIView {
+    enum Direction { case incoming, outgoing }
+    var direction: Direction = .outgoing { didSet { setNeedsDisplay() } }
+    var fillColor: UIColor = .white { didSet { setNeedsDisplay() } }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func draw(_ rect: CGRect) {
+        let path = UIBezierPath()
+        let w = rect.width, h = rect.height
+        switch direction {
+        case .outgoing:
+            path.move(to: CGPoint(x: 0, y: 0))
+            path.addCurve(to: CGPoint(x: w, y: h),
+                          controlPoint1: CGPoint(x: w * 0.30, y: h * 0.15),
+                          controlPoint2: CGPoint(x: w * 0.75, y: h * 0.85))
+            path.addLine(to: CGPoint(x: 0, y: h))
+            path.close()
+        case .incoming:
+            path.move(to: CGPoint(x: w, y: 0))
+            path.addCurve(to: CGPoint(x: 0, y: h),
+                          controlPoint1: CGPoint(x: w * 0.70, y: h * 0.15),
+                          controlPoint2: CGPoint(x: w * 0.25, y: h * 0.85))
+            path.addLine(to: CGPoint(x: w, y: h))
+            path.close()
+        }
+        fillColor.setFill()
+        path.fill()
+    }
+}
+
 class TextMessageCell: UITableViewCell {
 
     private let bubbleView = UIView()
@@ -1535,6 +1608,7 @@ class TextMessageCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
+    private let tailView = ChatBubbleTailView()
     private var isFromMe = false
     private var currentMessageID = ""
     private var senderUID = ""
@@ -1578,11 +1652,15 @@ class TextMessageCell: UITableViewCell {
         bubbleView.layer.cornerRadius = ScreenAdapter.scaleW(10)
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
 
+        // 气泡尾巴：默认隐藏，仅在连续同方向消息的末条显示
+        tailView.isHidden = true
+        tailView.translatesAutoresizingMaskIntoConstraints = false
+
         avatarView.layer.cornerRadius = ScreenAdapter.scaleW(4)
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
 
-        contentView.addSubviews(avatarView, senderNameLabel, bubbleView, timeLabel)
+        contentView.addSubviews(avatarView, senderNameLabel, tailView, bubbleView, timeLabel)
         bubbleView.addSubview(messageLabel)
 
         avatarView.snp.makeConstraints { make in
@@ -1599,7 +1677,7 @@ class TextMessageCell: UITableViewCell {
         }
     }
 
-    func configure(with message: Message) {
+    func configure(with message: Message, showTail: Bool = false) {
         isFromMe = message.isFromMe
         currentMessageID = message.messageID
         senderUID = message.fromUID
@@ -1641,6 +1719,9 @@ class TextMessageCell: UITableViewCell {
         )
         let bubbleWidth = min(max(ceil(textRect.width) + innerPad, ScreenAdapter.scaleW(40)), maxWidth)
 
+        // 尾巴：仅连续同方向消息的末条显示
+        tailView.isHidden = !showTail
+
         if isFromMe {
             avatarView.snp.remakeConstraints { make in
                 make.trailing.equalToSuperview().offset(-hPad)
@@ -1654,6 +1735,14 @@ class TextMessageCell: UITableViewCell {
                 make.top.equalTo(avatarView)
                 make.width.equalTo(bubbleWidth)
                 make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
+            }
+            tailView.direction = .outgoing
+            tailView.fillColor = .themePrimary
+            tailView.snp.remakeConstraints { make in
+                make.trailing.equalTo(bubbleView.snp.trailing).offset(ScreenAdapter.scaleW(3))
+                make.bottom.equalTo(bubbleView.snp.bottom).offset(-ScreenAdapter.scaleW(2))
+                make.width.equalTo(ScreenAdapter.scaleW(9))
+                make.height.equalTo(ScreenAdapter.scaleW(13))
             }
             timeLabel.snp.remakeConstraints { make in
                 make.trailing.equalTo(bubbleView.snp.trailing)
@@ -1686,6 +1775,14 @@ class TextMessageCell: UITableViewCell {
                     make.width.equalTo(bubbleWidth)
                     make.height.greaterThanOrEqualTo(ScreenAdapter.scaleH(40))
                 }
+            }
+            tailView.direction = .incoming
+            tailView.fillColor = .themeBubbleIncoming
+            tailView.snp.remakeConstraints { make in
+                make.leading.equalTo(bubbleView.snp.leading).offset(-ScreenAdapter.scaleW(3))
+                make.bottom.equalTo(bubbleView.snp.bottom).offset(-ScreenAdapter.scaleW(2))
+                make.width.equalTo(ScreenAdapter.scaleW(9))
+                make.height.equalTo(ScreenAdapter.scaleW(13))
             }
             timeLabel.snp.remakeConstraints { make in
                 make.leading.equalTo(bubbleView.snp.leading)

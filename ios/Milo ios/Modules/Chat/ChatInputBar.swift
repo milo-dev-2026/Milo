@@ -32,6 +32,8 @@ class ChatInputBar: UIView {
 
     weak var delegate: ChatInputBarDelegate?
 
+    /// 输入行胶囊玻璃容器（包含语音/输入框/发送/+）
+    private let pillContainer = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
     private let inputRow = UIView()
     private let textView = UITextView()
     private let sendButton = UIButton(type: .system)
@@ -111,27 +113,32 @@ class ChatInputBar: UIView {
         backgroundTapGesture.cancelsTouchesInView = false
         backgroundTapGesture.addTarget(self, action: #selector(handleBackgroundTap(_:)))
 
-        let topBorder = UIView()
-        topBorder.backgroundColor = .themeSeparator
-        addSubview(topBorder)
-        topBorder.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(0.5)
-        }
-
         // 输入行容器：面板展开时位于其下方，保证面板在 inputBar bounds 内可点击
         addSubview(inputRow)
         inputRow.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
         }
 
+        // 胶囊玻璃容器：圆角 + 内描边，透出背后聊天内容
+        pillContainer.layer.cornerRadius = ScreenAdapter.scaleW(20)
+        pillContainer.layer.borderWidth = 0.5
+        pillContainer.layer.borderColor = UIColor.themeSeparator.cgColor
+        pillContainer.clipsToBounds = true
+        inputRow.addSubview(pillContainer)
+        pillContainer.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(6))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(6))
+            make.leading.equalToSuperview().offset(hPad)
+            make.trailing.equalToSuperview().offset(-hPad)
+        }
+        let pill = pillContainer.contentView
+
         textView.font = ScreenAdapter.font(15)
         textView.layer.cornerRadius = ScreenAdapter.scaleW(8)
-        textView.layer.borderWidth = 0.5
-        textView.layer.borderColor = UIColor.themeSeparator.cgColor
-        textView.backgroundColor = .systemBackground
+        textView.backgroundColor = .clear
         textView.delegate = self
         textView.isScrollEnabled = false
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
 
         sendButton.setTitle("发送", for: .normal)
         sendButton.setTitleColor(.themePrimary, for: .normal)
@@ -149,19 +156,18 @@ class ChatInputBar: UIView {
         holdToTalkButton.setTitle("按住 说话", for: .normal)
         holdToTalkButton.setTitleColor(.label, for: .normal)
         holdToTalkButton.titleLabel?.font = ScreenAdapter.mediumFont(15)
-        holdToTalkButton.backgroundColor = .systemBackground
+        holdToTalkButton.backgroundColor = .clear
         holdToTalkButton.layer.cornerRadius = ScreenAdapter.scaleW(8)
-        holdToTalkButton.layer.borderWidth = 0.5
-        holdToTalkButton.layer.borderColor = UIColor.themeSeparator.cgColor
         holdToTalkButton.isHidden = true
         let talkGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleTalkPress(_:)))
         talkGesture.minimumPressDuration = 0.15
         holdToTalkButton.addGestureRecognizer(talkGesture)
 
-        inputRow.addSubviews(voiceButton, textView, holdToTalkButton, sendButton, moreButton)
+        // 输入控件全部放进胶囊玻璃容器
+        pill.addSubviews(voiceButton, textView, holdToTalkButton, sendButton, moreButton)
 
         moreButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-hPad)
+            make.trailing.equalTo(pill).offset(-hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
@@ -174,15 +180,15 @@ class ChatInputBar: UIView {
         }
 
         voiceButton.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(hPad)
+            make.leading.equalTo(pill).offset(hPad)
             make.centerY.equalTo(textView)
             make.width.height.equalTo(ScreenAdapter.scaleW(28))
         }
 
         textView.snp.makeConstraints { make in
             make.leading.equalTo(voiceButton.snp.trailing).offset(hPad)
-            make.top.equalToSuperview().offset(vPad)
-            make.bottom.equalToSuperview().offset(-vPad)
+            make.top.equalTo(pill).offset(vPad)
+            make.bottom.equalTo(pill).offset(-vPad)
             self.textViewHeight = make.height.equalTo(minH).constraint
             make.trailing.equalTo(sendButton.snp.leading).offset(-hPad)
         }
