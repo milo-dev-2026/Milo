@@ -234,35 +234,13 @@ class ContactsViewController: UIViewController {
 
     // MARK: - 拼音首字母
     private func pinyinFirstLetter(of name: String) -> String {
-        guard let firstChar = name.first else { return "#" }
-        if firstChar.isASCII && firstChar.isLetter {
-            return String(firstChar).uppercased()
-        }
-        let mutableStr = NSMutableString(string: String(firstChar))
-        CFStringTransform(mutableStr, nil, kCFStringTransformToLatin, false)
-        CFStringTransform(mutableStr, nil, kCFStringTransformStripDiacritics, false)
-        let pinyin = mutableStr as String
-        if let first = pinyin.first, first.isLetter, first.isASCII {
-            return String(first).uppercased()
-        }
-        return "#"
+        PinyinHelper.firstLetter(of: name)
     }
 
     /// 一次性构建分组快照，保证 sections 与 sectionIndexTitles 严格一一对应
     private func rebuildSections() {
-        var buckets: [String: [User]] = [:]
-        for user in displayContacts {
-            let key = pinyinFirstLetter(of: user.name)
-            buckets[key, default: []].append(user)
-        }
-        let titles = buckets.keys.sorted { lhs, rhs -> Bool in
-            if lhs == "#" { return false }
-            if rhs == "#" { return true }
-            return lhs < rhs
-        }
-        groupedContacts = titles.map { title in
-            (title: title, users: buckets[title]?.sorted { $0.name < $1.name } ?? [])
-        }
+        groupedContacts = PinyinHelper.sections(displayContacts, name: { $0.name })
+            .map { (title: $0.letter, users: $0.items) }
         tableView.reloadData()
     }
 

@@ -239,17 +239,22 @@ class AddFriendViewController: UIViewController {
 
         resultName.font = ScreenAdapter.mediumFont(16)
         resultName.textColor = .label
+        resultName.lineBreakMode = .byTruncatingTail
         resultCard.addSubview(resultName)
         resultName.snp.makeConstraints { make in
             make.leading.equalTo(resultAvatar.snp.trailing).offset(12)
             make.top.equalTo(resultAvatar.snp.top).offset(4)
+            // 长昵称不覆盖右侧「添加」按钮
+            make.trailing.lessThanOrEqualTo(resultAddButton.snp.leading).offset(-8)
         }
 
         resultSub.font = ScreenAdapter.font(13)
         resultSub.textColor = UIColor(white: 0.6, alpha: 1)
+        resultSub.lineBreakMode = .byTruncatingTail
         resultCard.addSubview(resultSub)
         resultSub.snp.makeConstraints { make in
             make.leading.equalTo(resultName)
+            make.trailing.lessThanOrEqualTo(resultAddButton.snp.leading).offset(-8)
             make.bottom.equalTo(resultAvatar.snp.bottom).offset(-4)
         }
 

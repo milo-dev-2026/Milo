@@ -235,16 +235,42 @@ class ChooseContactsViewController: UIViewController {
     }
 
     // MARK: - 数据加载与分组
+    private static let cacheKey = "choose_contacts_cache_v1"
+
     private func loadData() {
+        // 先渲染本地缓存，避免每次都等网络（提速）
+        if let data = UserDefaults.standard.data(forKey: ChooseContactsViewController.cacheKey),
+           let cached = try? JSONDecoder().decode([CachedContact].self, from: data),
+           !cached.isEmpty {
+            allContacts = cached.map { ($0.uid, $0.name, $0.avatar) }
+            applyFilter()
+        }
+
         Task {
             do {
                 let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
-                allContacts = friends.map { ($0.uid, $0.displayName, $0.avatar) }
-                DispatchQueue.main.async { self.applyFilter() }
+                let list = friends.map { ($0.uid, $0.displayName, $0.avatar) }
+                // 写入缓存供下次秒开
+                let cached = list.map { CachedContact(uid: $0.0, name: $0.1, avatar: $0.2) }
+                if let data = try? JSONEncoder().encode(cached) {
+                    UserDefaults.standard.set(data, forKey: ChooseContactsViewController.cacheKey)
+                }
+                DispatchQueue.main.async {
+                    self.allContacts = list
+                    self.applyFilter()
+                }
             } catch {
-                DispatchQueue.main.async { AppUtility.showToast("加载联系人失败") }
+                DispatchQueue.main.async {
+                    if self.allContacts.isEmpty { AppUtility.showToast("加载联系人失败") }
+                }
             }
         }
+    }
+
+    private struct CachedContact: Codable {
+        let uid: String
+        let name: String
+        let avatar: String?
     }
 
     @objc private func filterContacts() {
@@ -260,34 +286,14 @@ class ChooseContactsViewController: UIViewController {
 
     /// 按拼音首字母分组排序（对齐安卓 QuickSideBar）
     private func rebuildSections() {
-        var groups: [String: [(uid: String, name: String, avatar: String?)]] = [:]
-        for c in filteredContacts {
-            let letter = ChooseContactsViewController.firstLetter(of: c.name)
-            groups[letter, default: []].append(c)
-        }
-        sections = groups.map { ($0.key, $0.value.sorted { $0.name < $1.name }) }
-            .sorted { a, b in
-                if a.letter == "#" { return false }
-                if b.letter == "#" { return true }
-                return a.letter < b.letter
-            }
+        sections = PinyinHelper.sections(filteredContacts, name: { $0.name })
+            .map { (letter: $0.letter, items: $0.items) }
         indexBar.letters = sections.map { $0.letter }
         tableView.reloadData()
     }
 
     static func firstLetter(of name: String) -> String {
-        guard let first = name.first else { return "#" }
-        if first.isASCII, first.isLetter {
-            return String(first).uppercased()
-        }
-        // 中文转拼音取首字母
-        let mutable = NSMutableString(string: String(first)) as CFMutableString
-        if CFStringTransform(mutable, nil, kCFStringTransformToLatin, false),
-           CFStringTransform(mutable, nil, kCFStringTransformStripDiacritics, false),
-           let ch = (mutable as String).uppercased().first, ch.isASCII, ch.isLetter {
-            return String(ch)
-        }
-        return "#"
+        PinyinHelper.firstLetter(of: name)
     }
 
     // MARK: - 选择逻辑

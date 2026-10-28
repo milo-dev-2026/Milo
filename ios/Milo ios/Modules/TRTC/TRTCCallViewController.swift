@@ -167,28 +167,12 @@ class TRTCCallViewController: UIViewController {
 
         let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
 
-        // 从服务器获取 TRTC 参数（SDKAppID + UserSig）
-        var sdkAppID: UInt32 = 0
-        var userSig = ""
-        do {
-            let response: APIResponse<TRTCParamsResponse> = try await APIClient.shared.request(.getTRTCUserSig)
-            if let data = response.data {
-                sdkAppID = UInt32(data.sdkAppID)
-                userSig = data.userSig
-            }
-        } catch {
-            DispatchQueue.main.async {
-                AppUtility.showToast("获取通话参数失败: \(error.localizedDescription)")
-                self.dismiss(animated: true)
-            }
-            return
-        }
-
+        // 与安卓一致：本地生成 UserSig（SDKAppID + UserSig），不依赖后端接口
+        let sdkAppID = TRTCConfig.sdkAppID
+        let userSig = TRTCConfig.userSig
         guard sdkAppID > 0, !userSig.isEmpty else {
-            DispatchQueue.main.async {
-                AppUtility.showToast("TRTC未配置，请联系管理员")
-                self.dismiss(animated: true)
-            }
+            AppUtility.showToast("TRTC未配置，请联系管理员")
+            dismiss(animated: true)
             return
         }
 

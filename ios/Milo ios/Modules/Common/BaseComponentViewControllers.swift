@@ -178,21 +178,14 @@ class GroupCallViewController: UIViewController {
     }
 
     private func enterTRTCRoom() {
-        Task {
-            do {
-                let resp = try await APIClient.shared.requestRaw(.getTRTCUserSig)
-                if let data = resp["data"] as? [String: Any] {
-                    let sdkAppId = data["sdk_app_id"] as? Int ?? 0
-                    let userId = UserDefaults.standard.string(forKey: "uid") ?? ""
-                    let userSig = data["user_sig"] as? String ?? ""
-                    enterRoom(sdkAppId: UInt32(sdkAppId), userId: userId, userSig: userSig)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    AppUtility.showToast("无法加入通话，请重试")
-                }
-            }
+        // 与安卓一致：本地生成 UserSig，不依赖后端接口
+        let userId = UserDefaults.standard.string(forKey: "uid") ?? ""
+        let userSig = TRTCConfig.userSig
+        guard !userSig.isEmpty else {
+            AppUtility.showToast("TRTC未配置，请联系管理员")
+            return
         }
+        enterRoom(sdkAppId: TRTCConfig.sdkAppID, userId: userId, userSig: userSig)
     }
 
     private func enterRoom(sdkAppId: UInt32, userId: String, userSig: String) {

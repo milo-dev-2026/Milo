@@ -348,7 +348,9 @@ class ConversationListViewController: UIViewController {
     private func fetchChannelInfoForConversations() {
         // 拷贝快照，避免并发修改导致索引错乱
         let snapshot = conversations
-        for conv in snapshot {
+        // 本地已有名称/头像的会话不再请求，减少首屏并发请求（提速）
+        let needFetch = snapshot.filter { $0.name.isEmpty || $0.name == $0.channelID }
+        for conv in needFetch {
             Task {
                 do {
                     let channelInfo: ChannelInfo = try await APIClient.shared.requestFlexible(
@@ -361,7 +363,10 @@ class ConversationListViewController: UIViewController {
                         }) else { return }
                         self.conversations[idx].name = channelInfo.displayName
                         self.conversations[idx].avatar = channelInfo.logo ?? channelInfo.avatar
-                        self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
+                        // 只刷新可见行，避免整表抖动
+                        if self.tableView.indexPathsForVisibleRows?.contains(IndexPath(row: idx, section: 0)) == true {
+                            self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
+                        }
                     }
                 } catch { }
             }
@@ -693,14 +698,28 @@ class ConversationCell: UITableViewCell {
             || lower.contains("official") || lower.contains("robot")
     }
 
-    /// 系统账号专属头像与默认昵称（对齐安卓：文件传输助手=黄色文件夹，系统通知=主题色铃铛，系统团队=双人图标）
+    /// 系统账号专属头像与默认昵称（对齐安卓：文件传输助手=绿色文件夹，系统通知=橙色铃铛，系统团队=双人图标）
     private static let systemAccountMap: [String: (icon: String, bgHex: String, name: String)] = [
-        "system_file_helper": ("folder.fill", "F5C242", "文件传输助手"),
-        "filehelper": ("folder.fill", "F5C242", "文件传输助手"),
-        "system_notice": ("bell.fill", "4A8DFF", "系统通知"),
-        "u_10000": ("bell.fill", "4A8DFF", "系统通知"),
+        "system_file_helper": ("folder.fill", "4CAF50", "文件传输助手"),
+        "filehelper": ("folder.fill", "4CAF50", "文件传输助手"),
+        "system_notice": ("bell.fill", "FFA940", "系统通知"),
+        "u_10000": ("bell.fill", "FFA940", "系统通知"),
         "system_team": ("person.2.fill", "7F92D6", "系统团队")
     ]
+
+    /// 按 channelId 或昵称解析系统账号（防止后端返回的 ID 大小写/命名不同导致显示错误头像）
+    static func systemAccount(for channelId: String, name: String) -> (icon: String, bgHex: String, name: String)? {
+        if let conf = systemAccountMap[channelId.lowercased()] {
+            return conf
+        }
+        if name.contains("文件传输助手") {
+            return ("folder.fill", "4CAF50", "文件传输助手")
+        }
+        if name.contains("系统通知") {
+            return ("bell.fill", "FFA940", "系统通知")
+        }
+        return nil
+    }
 
     private static func makeIconAvatar(icon: String, bgHex: String, size: CGFloat = 96) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
@@ -717,8 +736,8 @@ class ConversationCell: UITableViewCell {
     }
 
     func configure(with conversation: Conversation) {
-        // 系统账号：专属图标头像 + 默认昵称 + 官方徽标
-        let systemConf = ConversationCell.systemAccountMap[conversation.channelID.lowercased()]
+        // 系统账号：专属图标头像 + 默认昵称 + 官方徽标（ID 与昵称双重匹配，避免落到后端默认头像）
+        let systemConf = ConversationCell.systemAccount(for: conversation.channelID, name: conversation.name)
         let displayName = conversation.name.isEmpty ? (systemConf?.name ?? conversation.channelID) : conversation.name
         nameLabel.text = displayName
         lastMessageLabel.text = conversation.lastMessageDisplay
@@ -728,6 +747,27 @@ class ConversationCell: UITableViewCell {
         let isOfficial = ConversationCell.isOfficialConversation(conversation)
         nameLabel.textColor = isOfficial ? .themePrimary : .label
         officialBadge.isHidden = !isOfficial
+
+        // 特殊用户（红色昵称 + 西安/押金商家徽标）与特殊群聊（红棕色昵称），对齐安卓
+        if !isOfficial {
+            if conversation.channelType == 1,
+               SpecialUserUtils.isSpecialUser(uid: conversation.channelID, shortNo: "", name: displayName) {
+                nameLabel.attributedText = SpecialUserUtils.attributedName(displayName,
+                                                                            font: nameLabel.font,
+                                                                            color: SpecialUserUtils.specialUserNameColor)
+            } else if conversation.channelType == 2 && SpecialUserUtils.isSpecialGroup(name: displayName) {
+                nameLabel.attributedText = NSAttributedString(
+                    string: displayName,
+                    attributes: [.font: nameLabel.font, .foregroundColor: SpecialUserUtils.specialGroupNameColor]
+                )
+            } else {
+                nameLabel.attributedText = nil
+                nameLabel.text = displayName
+            }
+        } else {
+            nameLabel.attributedText = nil
+            nameLabel.text = displayName
+        }
 
         if let conf = systemConf {
             avatarView.image = ConversationCell.makeIconAvatar(icon: conf.icon, bgHex: conf.bgHex)

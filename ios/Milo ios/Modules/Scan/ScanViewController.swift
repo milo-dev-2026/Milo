@@ -108,11 +108,12 @@ class ScanViewController: UIViewController {
         stack.axis = .horizontal
         stack.distribution = .equalSpacing
         stack.alignment = .center
-        stack.spacing = ScreenAdapter.scaleW(48)
         view.addSubview(stack)
         stack.snp.makeConstraints { make in
-            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-ScreenAdapter.scaleH(36))
-            make.centerX.equalToSuperview()
+            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-ScreenAdapter.scaleH(40))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(44))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(44))
+            make.height.equalTo(ScreenAdapter.scaleH(76))
         }
 
         stack.addArrangedSubview(makeBottomButton(icon: "bolt.fill", title: "闪光灯", action: #selector(toggleTorch)))

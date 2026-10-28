@@ -190,6 +190,11 @@ class ChatViewController: UIViewController {
 
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+        // 点击消息气泡头像：进入对方个人主页 / 群资料
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(handleAvatarTapped(_:)),
+                                               name: ChatAvatarTapRelay.notification,
+                                               object: nil)
 
         inputBar.delegate = self
 
@@ -516,30 +521,39 @@ class ChatViewController: UIViewController {
         }
     }
 
+    // MARK: - 点击气泡头像
+    @objc private func handleAvatarTapped(_ note: Notification) {
+        guard let info = note.userInfo,
+              let tappedId = info["channelId"] as? String else { return }
+        let tappedType = (info["channelType"] as? Int) ?? 1
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+
+        if tappedType == 2 {
+            // 群头像 → 群资料页
+            openGroupDetail()
+            return
+        }
+        // 自己的头像 → 我的主页
+        if tappedId == myUid {
+            openChatPersonal()
+            return
+        }
+        // 他人头像 → 个人主页（统一走联系人详情页）
+        let vc = ContactDetailViewController(uid: tappedId, source: channelType == 2 ? "来自群聊" : "来自聊天")
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
     // MARK: - 单聊语音通话
     @objc private func startVoiceCall() {
         guard channelType == 1 else { return }
-        Task {
-            do {
-                let response: APIResponse<TRTCParamsResponse> = try await APIClient.shared.request(.getTRTCUserSig)
-                guard let params = response.data, params.sdkAppID > 0, !params.userSig.isEmpty else {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("TRTC未配置，请联系管理员")
-                    }
-                    return
-                }
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    let callVC = TRTCCallViewController(channelId: self.channelId)
-                    callVC.modalPresentationStyle = .fullScreen
-                    self.present(callVC, animated: true)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    AppUtility.showToast("获取通话参数失败: \(error.localizedDescription)")
-                }
-            }
+        // 与安卓一致：本地生成 UserSig，不依赖后端接口
+        guard TRTCConfig.sdkAppID > 0, !TRTCConfig.userSig.isEmpty else {
+            AppUtility.showToast("TRTC未配置，请联系管理员")
+            return
         }
+        let callVC = TRTCCallViewController(channelId: channelId)
+        callVC.modalPresentationStyle = .fullScreen
+        present(callVC, animated: true)
     }
 
     // MARK: - 单聊在线状态（数据缺失时不显示，不伪造）

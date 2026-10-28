@@ -106,6 +106,8 @@ enum ChatBubbleLayout {
         let avatarView = avatarImageView(in: contentView)
         if let avatar = avatar {
             avatarView.isHidden = false
+            // 记录头像对应的频道，供点击进入个人主页/群资料
+            avatarView.accessibilityIdentifier = "\(avatar.channelId)|\(avatar.channelType)|\(avatar.name)"
             AppUtility.loadChannelAvatar(
                 channelId: avatar.channelId,
                 channelType: avatar.channelType,
@@ -230,7 +232,9 @@ enum ChatBubbleLayout {
         imageView.layer.cornerRadius = ScreenAdapter.scaleW(6)
         imageView.clipsToBounds = true
         imageView.contentMode = .scaleAspectFill
-        imageView.isUserInteractionEnabled = false
+        imageView.isUserInteractionEnabled = true
+        let tap = UITapGestureRecognizer(target: ChatAvatarTapRelay.shared, action: #selector(ChatAvatarTapRelay.handle(_:)))
+        imageView.addGestureRecognizer(tap)
         contentView.addSubview(imageView)
         return imageView
     }
@@ -252,5 +256,28 @@ enum ChatBubbleLayout {
             make.trailing.lessThanOrEqualToSuperview().offset(-16)
         }
         return label
+    }
+}
+
+// MARK: - 头像点击中继（气泡布局为静态方法，无法直接持有控制器引用）
+final class ChatAvatarTapRelay: NSObject {
+
+    static let shared = ChatAvatarTapRelay()
+    static let notification = Notification.Name("ChatAvatarTapped")
+
+    @objc func handle(_ gesture: UITapGestureRecognizer) {
+        guard let view = gesture.view,
+              let raw = view.accessibilityIdentifier else { return }
+        let parts = raw.split(separator: "|", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return }
+        let channelId = String(parts[0])
+        let channelType = Int(parts[1]) ?? 1
+        let name = String(parts[2])
+        guard !channelId.isEmpty else { return }
+        NotificationCenter.default.post(
+            name: ChatAvatarTapRelay.notification,
+            object: nil,
+            userInfo: ["channelId": channelId, "channelType": channelType, "name": name]
+        )
     }
 }

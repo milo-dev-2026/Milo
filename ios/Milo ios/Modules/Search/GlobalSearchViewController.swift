@@ -223,7 +223,9 @@ class GlobalSearchViewController: UIViewController {
     }
 
     private func parseSearchResult(_ resp: [String: Any], isLoadMore: Bool) {
-        guard let data = resp["data"] as? [String: Any] else {
+        // 注意：后端 make_success 直接返回数据本体（无 data 包装），这里同时兼容两种结构
+        let data = (resp["data"] as? [String: Any]) ?? resp
+        guard data["friends"] != nil || data["groups"] != nil || data["messages"] != nil else {
             if !isLoadMore {
                 emptyLabel.text = "无搜索结果"
                 emptyLabel.isHidden = false
@@ -290,7 +292,8 @@ class GlobalSearchViewController: UIViewController {
     private func parseChannel(_ dict: [String: Any], type: Int) -> GlobalChannel {
         GlobalChannel(
             channelId: dict["channel_id"] as? String ?? "",
-            name: dict["channel_name"] as? String ?? dict["remark"] as? String ?? "",
+            // 后端好友/群条目字段为 name，群聊/频道为 channel_name，兼容 remark
+            name: dict["name"] as? String ?? dict["channel_name"] as? String ?? dict["remark"] as? String ?? "",
             avatar: dict["avatar"] as? String,
             channelType: dict["channel_type"] as? Int ?? type
         )

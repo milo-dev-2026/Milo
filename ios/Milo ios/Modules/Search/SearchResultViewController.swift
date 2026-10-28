@@ -388,7 +388,9 @@ class SearchResultViewController: UIViewController {
     }
 
     private func parseRemote(_ resp: [String: Any]) {
-        guard let data = resp["data"] as? [String: Any] else {
+        // 后端 make_success 直接返回数据本体（无 data 包装），兼容两种结构
+        let data = (resp["data"] as? [String: Any]) ?? resp
+        guard data["messages"] != nil || data["friends"] != nil || data["groups"] != nil else {
             applySimulatedData()
             return
         }
