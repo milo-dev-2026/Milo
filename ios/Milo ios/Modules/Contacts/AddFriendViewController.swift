@@ -292,7 +292,10 @@ class AddFriendViewController: UIViewController {
     }
 
     @objc private func openScan() {
-        navigationController?.pushViewController(ScanViewController(), animated: true)
+        let scanVC = ScanViewController()
+        // 扫码页全屏：隐藏底部 TabBar（对齐安卓）
+        scanVC.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(scanVC, animated: true)
     }
 
     @objc private func resultTapped() {

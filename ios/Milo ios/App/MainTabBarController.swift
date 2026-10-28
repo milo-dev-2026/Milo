@@ -44,8 +44,8 @@ class MainTabBarController: UITabBarController {
         let chatVC = ConversationListViewController()
         chatVC.tabBarItem = UITabBarItem(
             title: "聊天",
-            image: UIImage(systemName: "message"),
-            selectedImage: UIImage(systemName: "message.fill")
+            image: UIImage(systemName: "bubble.left.and.bubble.right"),
+            selectedImage: UIImage(systemName: "bubble.left.and.bubble.right.fill")
         )
 
         let contactsVC = ContactsViewController()
@@ -58,8 +58,8 @@ class MainTabBarController: UITabBarController {
         let myVC = MySettingViewController()
         myVC.tabBarItem = UITabBarItem(
             title: "我的",
-            image: UIImage(systemName: "person"),
-            selectedImage: UIImage(systemName: "person.fill")
+            image: UIImage(systemName: "person.crop.circle"),
+            selectedImage: UIImage(systemName: "person.crop.circle.fill")
         )
 
         // 使用自定义导航控制器（带毛玻璃效果）

@@ -64,19 +64,19 @@ class ConversationListViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .white
+        view.backgroundColor = .themeBg
 
-        // MARK: - 顶部标题栏
-        titleBarView.backgroundColor = .white
+        // MARK: - 顶部标题栏（小字体，inline 风格，位于安全区内不受灵动岛遮挡）
+        titleBarView.backgroundColor = .themeBg
         view.addSubview(titleBarView)
         titleBarView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             make.leading.trailing.equalToSuperview()
-            make.height.equalTo(48)
+            make.height.equalTo(44)
         }
 
         // 中间标题 "Milo"（含连接状态）
-        titleLabel.font = ScreenAdapter.boldFont(20)
+        titleLabel.font = ScreenAdapter.boldFont(17)
         titleLabel.textColor = .label
         titleBarView.addSubview(titleLabel)
         titleLabel.snp.makeConstraints { make in
@@ -85,45 +85,46 @@ class ConversationListViewController: UIViewController {
         updateTitleStatus()
 
         // 右侧加号按钮
-        let addConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        addButton.setImage(UIImage(systemName: "plus.circle", withConfiguration: addConfig), for: .normal)
+        let addConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+        addButton.setImage(UIImage(systemName: "plus", withConfiguration: addConfig), for: .normal)
         addButton.tintColor = .label
         addButton.addTarget(self, action: #selector(showAddMenu), for: .touchUpInside)
         titleBarView.addSubview(addButton)
         addButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-12)
+            make.trailing.equalToSuperview().offset(-14)
             make.centerY.equalToSuperview()
-            make.width.height.equalTo(40)
+            make.width.height.equalTo(32)
         }
 
         // 右侧搜索按钮已移除（下方搜索栏已覆盖入口）
 
-        // MARK: - 搜索栏
-        searchBarContainer.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
-        searchBarContainer.layer.cornerRadius = 18
+        // MARK: - 搜索栏（胶囊，系统填充色，现代 iOS 观感）
+        searchBarContainer.backgroundColor = .secondarySystemFill
+        searchBarContainer.layer.cornerRadius = 19
         searchBarContainer.clipsToBounds = true
         view.addSubview(searchBarContainer)
         searchBarContainer.snp.makeConstraints { make in
-            make.top.equalTo(titleBarView.snp.bottom).offset(8)
+            make.top.equalTo(titleBarView.snp.bottom).offset(4)
             make.leading.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().offset(-16)
-            make.height.equalTo(36)
+            make.height.equalTo(38)
         }
 
         // 搜索图标
-        searchIconView.image = UIImage(systemName: "magnifyingglass")
+        searchIconView.image = UIImage(systemName: "magnifyingglass",
+                                       withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium))
         searchIconView.tintColor = .secondaryLabel
         searchIconView.contentMode = .scaleAspectFit
         searchBarContainer.addSubview(searchIconView)
         searchIconView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(14)
+            make.leading.equalToSuperview().offset(13)
             make.centerY.equalToSuperview()
             make.width.height.equalTo(16)
         }
 
         // 搜索输入框（只读，点击跳转全局搜索页）
         searchTextField.placeholder = "搜索"
-        searchTextField.font = ScreenAdapter.font(14)
+        searchTextField.font = ScreenAdapter.font(15)
         searchTextField.textColor = .label
         searchTextField.tintColor = .themePrimary
         searchTextField.returnKeyType = .search
@@ -141,12 +142,12 @@ class ConversationListViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ConversationCell.self, forCellReuseIdentifier: "ConversationCell")
-        tableView.rowHeight = 64
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: 72, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.rowHeight = 74
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 80, bottom: 0, right: 0)
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.06)
         tableView.separatorStyle = .singleLine
         tableView.tableFooterView = UIView()
-        tableView.backgroundColor = .white
+        tableView.backgroundColor = .themeBg
         tableView.keyboardDismissMode = .interactive
 
         view.addSubview(tableView)
@@ -568,21 +569,21 @@ class ConversationCell: UITableViewCell {
     }
 
     private func setupUI() {
-        let avatarSize: CGFloat = 48
-        let hPad: CGFloat = 12
+        let avatarSize: CGFloat = 52
+        let hPad: CGFloat = 16
 
-        backgroundColor = .white
-        contentView.backgroundColor = .white
+        backgroundColor = .themeBgWhite
+        contentView.backgroundColor = .themeBgWhite
 
         // 头像
-        avatarView.layer.cornerRadius = 8
+        avatarView.layer.cornerRadius = 14
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
 
         // 名字
-        nameLabel.font = ScreenAdapter.mediumFont(16)
+        nameLabel.font = ScreenAdapter.mediumFont(17)
         nameLabel.textColor = .label
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -605,12 +606,12 @@ class ConversationCell: UITableViewCell {
         nameRow.addArrangedSubview(officialBadge)
 
         // 最后一条消息
-        lastMessageLabel.font = ScreenAdapter.font(13)
+        lastMessageLabel.font = ScreenAdapter.font(14)
         lastMessageLabel.textColor = .secondaryLabel
         lastMessageLabel.numberOfLines = 1
 
         // 时间
-        timeLabel.font = ScreenAdapter.font(11)
+        timeLabel.font = ScreenAdapter.font(12)
         timeLabel.textColor = .tertiaryLabel
         timeLabel.textAlignment = .right
 

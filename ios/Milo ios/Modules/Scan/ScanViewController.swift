@@ -26,6 +26,9 @@ class ScanViewController: UIViewController {
         // 透明导航栏：去掉顶部分隔白线，融入相机画面
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
+        appearance.shadowColor = .clear
+        appearance.shadowImage = UIImage()
+        appearance.backgroundImage = UIImage()
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance

@@ -58,21 +58,21 @@ class ContactsViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .white
+        view.backgroundColor = .themeBg
         navigationController?.setNavigationBarHidden(true, animated: false)
 
-        // MARK: 标题栏
-        titleBarView.backgroundColor = .white
+        // MARK: 标题栏（小字体 inline，位于安全区内不受灵动岛遮挡）
+        titleBarView.backgroundColor = .themeBg
         view.addSubview(titleBarView)
         titleBarView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             make.leading.trailing.equalToSuperview()
-            make.height.equalTo(48)
+            make.height.equalTo(44)
         }
 
         // 标题
         titleLabel.text = "通讯录"
-        titleLabel.font = ScreenAdapter.boldFont(20)
+        titleLabel.font = ScreenAdapter.boldFont(17)
         titleLabel.textColor = .label
         titleLabel.textAlignment = .center
         titleBarView.addSubview(titleLabel)
@@ -80,32 +80,33 @@ class ContactsViewController: UIViewController {
             make.center.equalToSuperview()
         }
 
-        // MARK: 搜索栏
-        searchContainer.backgroundColor = UIColor(white: 0.96, alpha: 1.0)
-        searchContainer.layer.cornerRadius = 18
+        // MARK: 搜索栏（胶囊）
+        searchContainer.backgroundColor = .secondarySystemFill
+        searchContainer.layer.cornerRadius = 19
         searchContainer.clipsToBounds = true
         view.addSubview(searchContainer)
         searchContainer.snp.makeConstraints { make in
-            make.top.equalTo(titleBarView.snp.bottom).offset(8)
+            make.top.equalTo(titleBarView.snp.bottom).offset(4)
             make.leading.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().offset(-16)
-            make.height.equalTo(36)
+            make.height.equalTo(38)
         }
 
         // 搜索图标
-        searchIconImageView.image = UIImage(systemName: "magnifyingglass")
+        searchIconImageView.image = UIImage(systemName: "magnifyingglass",
+                                           withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium))
         searchIconImageView.tintColor = .secondaryLabel
         searchIconImageView.contentMode = .scaleAspectFit
         searchContainer.addSubview(searchIconImageView)
         searchIconImageView.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(14)
+            make.leading.equalToSuperview().offset(13)
             make.centerY.equalToSuperview()
             make.width.height.equalTo(16)
         }
 
         // 搜索输入框
         searchTextField.placeholder = "搜索"
-        searchTextField.font = ScreenAdapter.font(14)
+        searchTextField.font = ScreenAdapter.font(15)
         searchTextField.textColor = .label
         searchTextField.tintColor = .themePrimary
         searchTextField.returnKeyType = .search
@@ -124,9 +125,9 @@ class ContactsViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ContactCell.self, forCellReuseIdentifier: "ContactCell")
-        tableView.rowHeight = 56
-        tableView.backgroundColor = .white
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.08)
+        tableView.rowHeight = 60
+        tableView.backgroundColor = .themeBgWhite
+        tableView.separatorColor = UIColor(white: 0, alpha: 0.06)
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 72, bottom: 0, right: 0)
         tableView.tableFooterView = UIView()
         tableView.sectionIndexColor = .themePrimary
@@ -416,10 +417,10 @@ class ContactsHeaderCell: UIView {
     }
 
     private func setupUI() {
-        backgroundColor = .white
+        backgroundColor = .themeBgWhite
 
         let iconSize: CGFloat = 40
-        let hPad: CGFloat = 12
+        let hPad: CGFloat = 16
 
         // 图标背景：浅色模式淡蓝 #E3F2FD
         let iconBgColor = UIColor { trait in
@@ -429,7 +430,7 @@ class ContactsHeaderCell: UIView {
             return UIColor(red: 227.0 / 255.0, green: 242.0 / 255.0, blue: 253.0 / 255.0, alpha: 1.0)
         }
 
-        iconView.layer.cornerRadius = 10
+        iconView.layer.cornerRadius = 11
         iconView.clipsToBounds = true
         iconView.contentMode = .center
         iconView.backgroundColor = iconBgColor
@@ -513,19 +514,19 @@ class ContactCell: UITableViewCell {
     }
 
     private func setupUI() {
-        let avatarSize: CGFloat = 40
-        let hPad: CGFloat = 12
+        let avatarSize: CGFloat = 44
+        let hPad: CGFloat = 16
 
-        backgroundColor = .white
-        contentView.backgroundColor = .white
+        backgroundColor = .themeBgWhite
+        contentView.backgroundColor = .themeBgWhite
 
-        avatarView.layer.cornerRadius = 6
+        avatarView.layer.cornerRadius = 11
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
 
-        nameLabel.font = ScreenAdapter.font(15)
+        nameLabel.font = ScreenAdapter.font(16)
         nameLabel.textColor = .label
 
         contentView.addSubviews(avatarView, nameLabel)
