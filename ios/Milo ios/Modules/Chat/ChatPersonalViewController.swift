@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import Kingfisher
 
+/// 聊天信息页（现代 iOS 卡片风格）
 class ChatPersonalViewController: UIViewController {
 
     private let channelId: String
@@ -13,11 +14,10 @@ class ChatPersonalViewController: UIViewController {
     private var muteOn = false
     private var topOn = false
 
-    // Section 索引
     private enum Section: Int, CaseIterable {
-        case settings = 0   // 消息免打扰、置顶聊天
-        case actions = 1    // 清空聊天记录
-        case bottom = 2     // 添加群成员
+        case settings = 0
+        case actions = 1
+        case bottom = 2
     }
 
     init(channelId: String, title: String, channelType: Int = 1) {
@@ -38,7 +38,6 @@ class ChatPersonalViewController: UIViewController {
         loadLocalSettings()
     }
 
-    // MARK: - 读取本地保存的免打扰 / 置顶状态
     private func loadLocalSettings() {
         let defaults = UserDefaults.standard
         muteOn = defaults.bool(forKey: "chat_mute_\(channelId)")
@@ -48,14 +47,17 @@ class ChatPersonalViewController: UIViewController {
 
     private func setupUI() {
         title = "聊天信息"
-        view.backgroundColor = .themeBackground
+        view.backgroundColor = .systemGroupedBackground
+        navigationItem.largeTitleDisplayMode = .never
 
+        tableView.backgroundColor = .systemGroupedBackground
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.register(ChatPersonalSwitchCell.self, forCellReuseIdentifier: "SwitchCell")
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "DetailCell")
+        tableView.register(ChatInfoSwitchCell.self, forCellReuseIdentifier: "SwitchCell")
+        tableView.register(ChatInfoCell.self, forCellReuseIdentifier: "InfoCell")
+        tableView.rowHeight = 52
         tableView.tableHeaderView = createHeaderView()
-        tableView.separatorInset = UIEdgeInsets(top: 0, left: ScreenAdapter.scaleW(56), bottom: 0, right: 0)
+        tableView.separatorInset = UIEdgeInsets(top: 0, left: 52, bottom: 0, right: 0)
 
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
@@ -63,85 +65,121 @@ class ChatPersonalViewController: UIViewController {
         }
     }
 
-    // MARK: - Header View（对方头像 + 昵称，点击跳转用户详情）
+    // MARK: - Header（头像 + 昵称 + 语音/视频快捷操作）
+    private let headerAvatar = UIImageView()
+    private let headerName = UILabel()
+    private let headerSub = UILabel()
+
     private func createHeaderView() -> UIView {
-        let header = UIView()
-        header.backgroundColor = .clear
+        let width = ScreenAdapter.screenWidth
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: width, height: 196))
 
-        let cardView = UIView()
-        cardView.backgroundColor = .systemBackground
-        cardView.layer.cornerRadius = 12
-        cardView.layer.masksToBounds = true
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(didTapHeader))
-        cardView.addGestureRecognizer(tap)
-
-        // 对方头像（圆形）
-        let avatarSize: CGFloat = 56
-        let avatarImageView = UIImageView()
-        avatarImageView.layer.cornerRadius = avatarSize / 2
-        avatarImageView.clipsToBounds = true
-        avatarImageView.contentMode = .scaleAspectFill
-        avatarImageView.backgroundColor = .systemGray6
-
-        // 昵称（左对齐）
-        let nameLabel = UILabel()
-        nameLabel.font = ScreenAdapter.boldFont(18)
-        nameLabel.textColor = .label
-        nameLabel.textAlignment = .left
-        nameLabel.numberOfLines = 2
-        nameLabel.text = chatTitle
-
-        let arrow = UIImageView(image: UIImage(systemName: "chevron.right"))
-        arrow.tintColor = UIColor(white: 0.75, alpha: 1.0)
-        arrow.contentMode = .scaleAspectFit
-
-        cardView.addSubviews(avatarImageView, nameLabel, arrow)
-        header.addSubview(cardView)
-
-        cardView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(12)
-            make.leading.equalToSuperview().offset(16)
-            make.trailing.equalToSuperview().offset(-16)
-            make.bottom.equalToSuperview().offset(-8)
-        }
-
-        avatarImageView.snp.makeConstraints { make in
+        let card = UIView()
+        card.backgroundColor = .secondarySystemGroupedBackground
+        card.layer.cornerRadius = 16
+        card.isUserInteractionEnabled = true
+        card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapHeader)))
+        header.addSubview(card)
+        card.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(16)
             make.leading.equalToSuperview().offset(16)
-            make.width.height.equalTo(avatarSize)
-            make.bottom.equalToSuperview().offset(-16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(108)
         }
 
-        nameLabel.snp.makeConstraints { make in
-            make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
-            make.trailing.equalTo(arrow.snp.leading).offset(-8)
-            make.centerY.equalTo(avatarImageView)
+        headerAvatar.layer.cornerRadius = 16
+        headerAvatar.clipsToBounds = true
+        headerAvatar.contentMode = .scaleAspectFill
+        headerAvatar.backgroundColor = .tertiarySystemFill
+        card.addSubview(headerAvatar)
+        headerAvatar.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(60)
         }
 
+        headerName.font = ScreenAdapter.boldFont(19)
+        headerName.textColor = .label
+        headerName.text = chatTitle
+        headerName.lineBreakMode = .byTruncatingTail
+        card.addSubview(headerName)
+        headerName.snp.makeConstraints { make in
+            make.leading.equalTo(headerAvatar.snp.trailing).offset(14)
+            make.top.equalTo(headerAvatar.snp.top).offset(6)
+            make.trailing.lessThanOrEqualToSuperview().offset(-40)
+        }
+
+        headerSub.font = ScreenAdapter.font(13)
+        headerSub.textColor = .secondaryLabel
+        headerSub.text = "Milo号：\(channelId)"
+        headerSub.lineBreakMode = .byTruncatingMiddle
+        card.addSubview(headerSub)
+        headerSub.snp.makeConstraints { make in
+            make.leading.equalTo(headerName)
+            make.top.equalTo(headerName.snp.bottom).offset(6)
+            make.trailing.lessThanOrEqualToSuperview().offset(-40)
+        }
+
+        let arrow = UIImageView(image: UIImage(systemName: "chevron.right",
+                                              withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)))
+        arrow.tintColor = .tertiaryLabel
+        card.addSubview(arrow)
         arrow.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalTo(avatarImageView)
-            make.width.height.equalTo(14)
+            make.centerY.equalToSuperview()
         }
 
-        headerCache = HeaderCache(avatar: avatarImageView, nameLabel: nameLabel)
+        AppUtility.loadChannelAvatar(channelId: channelId, channelType: 1, name: chatTitle, into: headerAvatar)
 
-        AppUtility.loadChannelAvatar(channelId: channelId, channelType: 1, name: chatTitle, into: avatarImageView)
-
-        let headerWidth = view.bounds.width > 0 ? view.bounds.width : ScreenAdapter.screenWidth
-        let headerHeight: CGFloat = 12 + 16 + avatarSize + 16 + 8
-        header.frame = CGRect(x: 0, y: 0, width: headerWidth, height: headerHeight)
+        // 快捷操作：语音通话 / 视频通话
+        let callRow = UIStackView()
+        callRow.axis = .horizontal
+        callRow.distribution = .fillEqually
+        callRow.spacing = 12
+        header.addSubview(callRow)
+        callRow.snp.makeConstraints { make in
+            make.top.equalTo(card.snp.bottom).offset(12)
+            make.leading.equalToSuperview().offset(16)
+            make.trailing.equalToSuperview().offset(-16)
+            make.height.equalTo(52)
+        }
+        callRow.addArrangedSubview(makeActionButton(title: "语音通话", icon: "phone.fill", action: #selector(voiceCallTapped)))
+        callRow.addArrangedSubview(makeActionButton(title: "视频通话", icon: "video.fill", action: #selector(videoCallTapped)))
 
         return header
     }
 
-    private struct HeaderCache {
-        weak var avatar: UIImageView?
-        weak var nameLabel: UILabel?
+    private func makeActionButton(title: String, icon: String, action: Selector) -> UIButton {
+        var config = UIButton.Configuration.filled()
+        config.title = title
+        config.image = UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
+        config.imagePadding = 6
+        config.baseBackgroundColor = .secondarySystemGroupedBackground
+        config.baseForegroundColor = .themePrimary
+        config.cornerStyle = .large
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = ScreenAdapter.mediumFont(15)
+            return outgoing
+        }
+        let button = UIButton(configuration: config)
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
     }
 
-    private var headerCache: HeaderCache?
+    @objc private func voiceCallTapped() {
+        startCall(voice: true)
+    }
+
+    @objc private func videoCallTapped() {
+        startCall(voice: false)
+    }
+
+    private func startCall(voice: Bool) {
+        let vc = TRTCCallViewController(channelId: channelId)
+        vc.modalPresentationStyle = .fullScreen
+        present(vc, animated: true)
+    }
 
     // MARK: - Load Data
     private func loadChannelInfo() {
@@ -153,11 +191,9 @@ class ChatPersonalViewController: UIViewController {
                 DispatchQueue.main.async {
                     if !info.displayName.isEmpty {
                         self.chatTitle = info.displayName
-                        self.headerCache?.nameLabel?.text = info.displayName
+                        self.headerName.text = info.displayName
                     }
-                    if let avatarView = self.headerCache?.avatar {
-                        AppUtility.loadChannelAvatar(channelId: self.channelId, channelType: 1, name: self.chatTitle, into: avatarView)
-                    }
+                    AppUtility.loadChannelAvatar(channelId: self.channelId, channelType: 1, name: self.chatTitle, into: self.headerAvatar)
                 }
             } catch {
                 // 静默失败，保留传入的标题
@@ -165,7 +201,6 @@ class ChatPersonalViewController: UIViewController {
         }
     }
 
-    // MARK: - Header Action（跳转用户详情）
     @objc private func didTapHeader() {
         let vc = ContactDetailViewController(uid: channelId)
         navigationController?.pushViewController(vc, animated: true)
@@ -227,7 +262,7 @@ class ChatPersonalViewController: UIViewController {
         AppUtility.showToast("已清空")
     }
 
-    // MARK: - 添加群成员（单聊转群聊）
+    // MARK: - 添加群成员
     private func addGroupMembers() {
         let vc = ChooseContactsViewController(maxSelection: 99)
         vc.title = "选择联系人"
@@ -239,7 +274,6 @@ class ChatPersonalViewController: UIViewController {
 
     private func createGroup(with uids: [String]) {
         guard !uids.isEmpty else { return }
-        // 把当前单聊对象一起加入群聊
         var memberUids = uids
         if !memberUids.contains(channelId) {
             memberUids.append(channelId)
@@ -280,28 +314,26 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
         }
     }
 
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        guard let sec = Section(rawValue: section) else { return nil }
-        switch sec {
-        case .settings, .actions:
-            // 空字符串显示间距，nil 不显示
-            return ""
-        case .bottom:
-            return nil
-        }
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        return nil
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
-        case .settings: return ScreenAdapter.scaleH(8)
-        case .actions: return ScreenAdapter.scaleH(8)
-        case .bottom: return ScreenAdapter.scaleH(24)
+        case .settings: return 8
+        case .actions: return 8
+        case .bottom: return 24
         }
     }
 
-    func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        return nil
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        return 0.01
+    }
+
+    func tableView(_ tableView: UITableView, shouldHighlightRowAt indexPath: IndexPath) -> Bool {
+        guard let sec = Section(rawValue: indexPath.section) else { return false }
+        return sec != .settings
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -309,42 +341,30 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
 
         switch sec {
         case .settings:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "SwitchCell", for: indexPath) as! ChatPersonalSwitchCell
-            cell.imageView?.tintColor = .themePrimary
-            cell.textLabel?.font = ScreenAdapter.font(16)
-
+            let cell = tableView.dequeueReusableCell(withIdentifier: "SwitchCell", for: indexPath) as! ChatInfoSwitchCell
             switch indexPath.row {
             case 0:
-                cell.configure(title: "消息免打扰", icon: "bell.slash", isOn: muteOn)
+                cell.configure(title: "消息免打扰", icon: "bell.slash.fill", iconColor: .systemOrange, isOn: muteOn)
                 cell.switchControl.addTarget(self, action: #selector(toggleMute(_:)), for: .valueChanged)
             case 1:
-                cell.configure(title: "置顶聊天", icon: "pin.fill", isOn: topOn)
+                cell.configure(title: "置顶聊天", icon: "pin.fill", iconColor: .systemBlue, isOn: topOn)
                 cell.switchControl.addTarget(self, action: #selector(toggleTop(_:)), for: .valueChanged)
             default: break
             }
             return cell
 
         case .actions:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "DetailCell", for: indexPath)
-            cell.accessoryType = .disclosureIndicator
-            cell.imageView?.tintColor = .themePrimary
-            cell.textLabel?.font = ScreenAdapter.font(16)
-            // 复用重置：避免继承「添加群成员」行的红色/居中样式
-            cell.textLabel?.textColor = .label
-            cell.textLabel?.textAlignment = .natural
-
-            cell.textLabel?.text = indexPath.row == 0 ? "聊天背景" : "清空聊天记录"
-            cell.imageView?.image = UIImage(systemName: indexPath.row == 0 ? "photo" : "trash")
+            let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath) as! ChatInfoCell
+            if indexPath.row == 0 {
+                cell.configure(title: "聊天背景", icon: "photo.fill", iconColor: .systemTeal, showsArrow: true)
+            } else {
+                cell.configure(title: "清空聊天记录", icon: "trash.fill", iconColor: .systemRed, showsArrow: false)
+            }
             return cell
 
         case .bottom:
-            let cell = tableView.dequeueReusableCell(withIdentifier: "DetailCell", for: indexPath)
-            cell.accessoryType = .none
-            cell.textLabel?.textAlignment = .center
-            cell.textLabel?.font = ScreenAdapter.font(16)
-            cell.imageView?.image = nil
-            cell.textLabel?.text = "添加群成员"
-            cell.textLabel?.textColor = .systemRed
+            let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath) as! ChatInfoCell
+            cell.configure(title: "添加群成员", icon: "person.badge.plus", iconColor: .systemGreen, showsArrow: false, destructive: true)
             return cell
         }
     }
@@ -355,8 +375,7 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
 
         switch sec {
         case .settings:
-            break // 开关操作已处理
-
+            break
         case .actions:
             if indexPath.row == 0 {
                 let vc = ChatBackgroundViewController(channelId: channelId, channelType: channelType)
@@ -364,17 +383,74 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
             } else {
                 confirmClearHistory()
             }
-
         case .bottom:
             addGroupMembers()
         }
     }
 }
 
+// MARK: - 带彩色圆角图标的通用 Cell
+class ChatInfoCell: UITableViewCell {
+
+    private let iconContainer = UIView()
+    private let iconView = UIImageView()
+    private let titleText = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        backgroundColor = .secondarySystemGroupedBackground
+
+        iconContainer.layer.cornerRadius = 7
+        iconContainer.clipsToBounds = true
+        contentView.addSubview(iconContainer)
+        iconContainer.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(28)
+        }
+
+        iconView.contentMode = .scaleAspectFit
+        iconView.tintColor = .white
+        iconContainer.addSubview(iconView)
+        iconView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(16)
+        }
+
+        titleText.font = ScreenAdapter.font(16)
+        titleText.textColor = .label
+        contentView.addSubview(titleText)
+        titleText.snp.makeConstraints { make in
+            make.leading.equalTo(iconContainer.snp.trailing).offset(12)
+            make.centerY.equalToSuperview()
+        }
+    }
+
+    func configure(title: String, icon: String, iconColor: UIColor, showsArrow: Bool, destructive: Bool = false) {
+        titleText.text = title
+        titleText.textColor = destructive ? .systemRed : .label
+        iconView.image = UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        iconContainer.backgroundColor = iconColor
+        accessoryType = showsArrow ? .disclosureIndicator : .none
+    }
+}
+
 // MARK: - 带开关的 Cell
-class ChatPersonalSwitchCell: UITableViewCell {
+class ChatInfoSwitchCell: UITableViewCell {
 
     let switchControl = UISwitch()
+
+    private let iconContainer = UIView()
+    private let iconView = UIImageView()
+    private let titleText = UILabel()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -387,13 +463,41 @@ class ChatPersonalSwitchCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .secondarySystemGroupedBackground
         switchControl.onTintColor = .themePrimary
+
+        iconContainer.layer.cornerRadius = 7
+        iconContainer.clipsToBounds = true
+        contentView.addSubview(iconContainer)
+        iconContainer.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(28)
+        }
+
+        iconView.contentMode = .scaleAspectFit
+        iconView.tintColor = .white
+        iconContainer.addSubview(iconView)
+        iconView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.height.equalTo(16)
+        }
+
+        titleText.font = ScreenAdapter.font(16)
+        titleText.textColor = .label
+        contentView.addSubview(titleText)
+        titleText.snp.makeConstraints { make in
+            make.leading.equalTo(iconContainer.snp.trailing).offset(12)
+            make.centerY.equalToSuperview()
+        }
+
         accessoryView = switchControl
     }
 
-    func configure(title: String, icon: String, isOn: Bool) {
-        textLabel?.text = title
-        imageView?.image = UIImage(systemName: icon)
+    func configure(title: String, icon: String, iconColor: UIColor, isOn: Bool) {
+        titleText.text = title
+        iconView.image = UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        iconContainer.backgroundColor = iconColor
         switchControl.isOn = isOn
     }
 
