@@ -341,25 +341,40 @@ class IMManager: NSObject {
             return info
         }
 
-        // 动态获取IM服务器IP和端口
+        // 立即使用「缓存地址 / 默认地址」发起连接，不等 HTTP 往返，加快连接速度
+        let cachedHost = UserDefaults.standard.string(forKey: "cached_im_host") ?? APIConfig.imTcpHost
+        let cachedPort: UInt16
+        if let p = UserDefaults.standard.object(forKey: "cached_im_port") as? Int {
+            cachedPort = UInt16(p)
+        } else {
+            cachedPort = APIConfig.imTcpPort
+        }
+        WKSDK.shared().options.host = cachedHost
+        WKSDK.shared().options.port = cachedPort
+        WKSDK.shared().connectionManager.connect()
+        CrashLogger.shared.log("[IM] connect immediately with \(cachedHost):\(cachedPort)")
+
+        // 后台异步刷新 IM 服务器地址并缓存（地址变化时重连到正确节点）
         Task {
             do {
                 let imServer: IMServerResponse = try await APIClient.shared.requestFlexible(.getIMServer(uid: uid))
-                let host = imServer.ip ?? APIConfig.imTcpHost
-                let port = UInt16(imServer.port ?? Int(APIConfig.imTcpPort))
-                print("[IM] 获取到IM服务器: \(host):\(port)")
-                DispatchQueue.main.async {
-                    WKSDK.shared().options.host = host
-                    WKSDK.shared().options.port = port
-                    WKSDK.shared().connectionManager.connect()
+                let newHost = imServer.ip ?? APIConfig.imTcpHost
+                let newPort = UInt16(imServer.port ?? Int(APIConfig.imTcpPort))
+                print("[IM] 获取到IM服务器: \(newHost):\(newPort)")
+                CrashLogger.shared.log("[IM] refreshed im server \(newHost):\(newPort)")
+                UserDefaults.standard.set(newHost, forKey: "cached_im_host")
+                UserDefaults.standard.set(Int(newPort), forKey: "cached_im_port")
+                if newHost != cachedHost || newPort != cachedPort {
+                    DispatchQueue.main.async {
+                        WKSDK.shared().options.host = newHost
+                        WKSDK.shared().options.port = newPort
+                        WKSDK.shared().connectionManager.disconnect(true)
+                        WKSDK.shared().connectionManager.connect()
+                    }
                 }
             } catch {
-                print("[IM] 获取IM服务器地址失败，使用默认值: \(error)")
-                DispatchQueue.main.async {
-                    WKSDK.shared().options.host = APIConfig.imTcpHost
-                    WKSDK.shared().options.port = APIConfig.imTcpPort
-                    WKSDK.shared().connectionManager.connect()
-                }
+                print("[IM] 刷新IM服务器地址失败: \(error)")
+                CrashLogger.shared.log("[IM] refresh im server failed: \(error)")
             }
         }
     }

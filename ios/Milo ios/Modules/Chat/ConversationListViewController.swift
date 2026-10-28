@@ -13,6 +13,8 @@ class ConversationListViewController: UIViewController {
     private var isFetchingServer = false
     /// 服务端会话列表是否已成功展示过
     private var serverLoaded = false
+    /// 防抖保存缓存（避免频道信息批量回填时频繁写盘）
+    private var saveCacheWorkItem: DispatchWorkItem?
 
     // MARK: - 顶部标题栏
     private let titleBarView = UIView()
@@ -323,19 +325,62 @@ class ConversationListViewController: UIViewController {
         return "conversations_cache_v1_\(uid)"
     }
 
+    /// 会话列表落盘缓存文件路径（Documents 目录，比 UserDefaults 更可靠、可排查）
+    private var cacheFileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
+        return docs.appendingPathComponent("conv_cache_\(uid).json")
+    }
+
     /// 会话列表落盘缓存：冷启动时先秒显，避免等 IM 连接/网络
     private func saveCache(_ list: [Conversation]) {
-        guard !list.isEmpty, let data = try? JSONEncoder().encode(list) else { return }
-        UserDefaults.standard.set(data, forKey: cacheKey)
+        guard !list.isEmpty else { return }
+        do {
+            let data = try JSONEncoder().encode(list)
+            try data.write(to: cacheFileURL, options: .atomic)
+            // 同时写一份到 UserDefaults 作为备份
+            UserDefaults.standard.set(data, forKey: cacheKey)
+            CrashLogger.shared.log("[ConvCache] saved \(list.count) conversations -> \(cacheFileURL.lastPathComponent)")
+        } catch {
+            CrashLogger.shared.log("[ConvCache] save failed: \(error)")
+        }
+    }
+
+    /// 防抖保存（1 秒内多次调用只保存最后一次，用于频道信息批量回填场景）
+    private func saveCacheDebounced() {
+        saveCacheWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.saveCache(self.conversations)
+        }
+        saveCacheWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: item)
     }
 
     private func loadCachedConversations() -> [Conversation] {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey),
-              let list = try? JSONDecoder().decode([Conversation].self, from: data) else { return [] }
-        return list
+        // 优先读文件
+        do {
+            let data = try Data(contentsOf: cacheFileURL)
+            if let list = try? JSONDecoder().decode([Conversation].self, from: data) {
+                CrashLogger.shared.log("[ConvCache] loaded \(list.count) from file \(cacheFileURL.lastPathComponent)")
+                return list
+            }
+            CrashLogger.shared.log("[ConvCache] file decode failed (data \(data.count) bytes)")
+        } catch {
+            CrashLogger.shared.log("[ConvCache] file read failed: \(error)")
+        }
+        // 降级读 UserDefaults
+        if let data = UserDefaults.standard.data(forKey: cacheKey),
+           let list = try? JSONDecoder().decode([Conversation].self, from: data) {
+            CrashLogger.shared.log("[ConvCache] loaded \(list.count) from UserDefaults")
+            return list
+        }
+        CrashLogger.shared.log("[ConvCache] no cache available")
+        return []
     }
 
     private func loadData() {
+        CrashLogger.shared.log("[ConvList] loadData start, conversations.count=\(conversations.count)")
         // 1. 立即渲染磁盘缓存（同步、纯内存，冷启动第一帧就能看到会话，不等连接）
         if conversations.isEmpty {
             let cached = loadCachedConversations()
@@ -359,6 +404,7 @@ class ConversationListViewController: UIViewController {
         let existingSnapshot = conversations
         DispatchQueue.global(qos: .userInitiated).async {
             let local = IMManager.shared.getLocalConversationModels()
+            CrashLogger.shared.log("[ConvCache] SDK local conversations = \(local.count)")
             DispatchQueue.main.async {
                 self.isLoadingLocal = false
                 guard !local.isEmpty else { return }
@@ -441,6 +487,8 @@ class ConversationListViewController: UIViewController {
                         if self.tableView.indexPathsForVisibleRows?.contains(IndexPath(row: idx, section: 0)) == true {
                             self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
                         }
+                        // 名称回填后防抖落盘，保证缓存里有正确昵称
+                        self.saveCacheDebounced()
                     }
                 } catch { }
             }
