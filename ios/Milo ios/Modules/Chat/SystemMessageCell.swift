@@ -14,8 +14,8 @@ struct SystemMessageContent {
         // 尝试解析为 JSON
         guard let data = content.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            // 不是 JSON，直接返回原文
-            return content
+            // 不是 JSON（旧缓存的裸模板），清理占位符后返回
+            return stripLeftoverPlaceholders(content)
         }
 
         // 从 JSON 中提取模板和额外参数
@@ -28,21 +28,28 @@ struct SystemMessageContent {
         if let extra = json["extra"] as? [[String: Any]] {
             var result = template
             for (index, item) in extra.enumerated() {
-                let name = item["name"] as? String ?? ""
+                let name = item["name"] as? String ?? item["value"] as? String ?? ""
                 let placeholder = "{\(index)}"
                 result = result.replacingOccurrences(of: placeholder, with: name)
             }
-            return result
+            return stripLeftoverPlaceholders(result)
         }
 
         // extra 不是数组，尝试作为单对象处理
         if let extraObj = json["extra"] as? [String: Any],
            let name = extraObj["name"] as? String {
-            return template.replacingOccurrences(of: "{0}", with: name)
+            return stripLeftoverPlaceholders(template.replacingOccurrences(of: "{0}", with: name))
         }
 
-        // 没有有效 extra，直接返回模板
-        return template
+        // 没有有效 extra，返回清理后的模板
+        return stripLeftoverPlaceholders(template)
+    }
+
+    /// 清除未能替换的 {n} 占位符，避免把模板符号直接展示给用户
+    private static func stripLeftoverPlaceholders(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: "\\{\\d+\\}") else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "").trimmingCharacters(in: .whitespaces)
     }
 }
 

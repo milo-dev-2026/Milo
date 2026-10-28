@@ -181,6 +181,7 @@ class ChatViewController: UIViewController {
         tableView.register(LocationMessageCell.self, forCellReuseIdentifier: "LocationMessageCell")
         tableView.register(CardMessageCell.self, forCellReuseIdentifier: "CardMessageCell")
         tableView.register(NoteMessageCell.self, forCellReuseIdentifier: "NoteMessageCell")
+        tableView.register(SystemMessageCell.self, forCellReuseIdentifier: "SystemMessageCell")
         tableView.register(PendingMediaMessageCell.self, forCellReuseIdentifier: "PendingMediaMessageCell")
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
@@ -364,13 +365,13 @@ class ChatViewController: UIViewController {
             chatBgImageView.isHidden = true
             view.backgroundColor = color
         } else {
-            // 默认品牌渐变背景图：固定在 view 上（不随列表滚动）
+            // 默认聊天背景：安卓同款浅灰暗纹图案（不随列表滚动）
             view.backgroundColor = .themeChatBackground
             if !chatBgImageInstalled {
                 chatBgImageInstalled = true
                 chatBgImageView.contentMode = .scaleAspectFill
                 chatBgImageView.isUserInteractionEnabled = false
-                chatBgImageView.image = ChatViewController.makeDefaultChatBackground()
+                chatBgImageView.image = UIImage(named: "ChatBgPattern") ?? ChatViewController.makeDefaultChatBackground()
                 view.insertSubview(chatBgImageView, at: 0)
                 chatBgImageView.snp.makeConstraints { make in
                     make.edges.equalToSuperview()
@@ -900,6 +901,12 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         case .note:
             let cell = tableView.dequeueReusableCell(withIdentifier: "NoteMessageCell", for: indexPath) as! NoteMessageCell
             cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
+            return cell
+        case .system:
+            // 系统/群事件消息：居中灰色圆角条，无头像，{0}/{1} 占位符在解析时替换为昵称
+            let cell = tableView.dequeueReusableCell(withIdentifier: "SystemMessageCell", for: indexPath) as! SystemMessageCell
+            cell.configure(with: message)
+            cell.configureTimeHeader(text: timeHeader, isNew: pendingAppearIDs.contains(message.messageID))
             return cell
         default:
             let cell = tableView.dequeueReusableCell(withIdentifier: "TextMessageCell", for: indexPath) as! TextMessageCell

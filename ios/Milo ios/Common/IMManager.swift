@@ -300,7 +300,19 @@ class IMManager: NSObject {
                                         content.decode(withJSON: payloadDict)
                                         msg.content = content
                                     } else {
-                                        msg.content = WKTextContent(content: payloadDict["content"] as? String ?? "")
+                                        // 未注册类型（群事件 1001/1002/1003 等）：包装成带 _sys 标记的系统消息 JSON，
+                                        // 保留 extra 数组供 {0}/{1} 占位符替换成昵称
+                                        let sysJson: [String: Any] = [
+                                            "_sys": true,
+                                            "content": payloadDict["content"] as? String ?? "",
+                                            "extra": payloadDict["extra"] ?? []
+                                        ]
+                                        if let d = try? JSONSerialization.data(withJSONObject: sysJson),
+                                           let s = String(data: d, encoding: .utf8) {
+                                            msg.content = WKTextContent(content: s)
+                                        } else {
+                                            msg.content = WKTextContent(content: payloadDict["content"] as? String ?? "")
+                                        }
                                     }
                                 }
                                 wkMessages.append(msg)
@@ -611,6 +623,15 @@ extension IMManager: WKChatManagerDelegate {
             }
             msgType = .card
 
+        case 99: // 系统消息
+            if let textContent = wkMsg.content as? WKTextContent {
+                content = textContent.content ?? ""
+            } else if let data = wkMsg.contentData,
+                      let raw = String(data: data, encoding: .utf8) {
+                content = raw
+            }
+            msgType = .system
+
         case 100: // 笔记
             if let noteContent = wkMsg.content as? WKNoteMessageContent {
                 // 优先使用完整JSON
@@ -633,9 +654,26 @@ extension IMManager: WKChatManagerDelegate {
 
         default:
             if let textContent = wkMsg.content as? WKTextContent {
-                content = textContent.content ?? ""
+                let text = textContent.content ?? ""
+                // 同步路径写入的群事件标记（{"_sys":true,"content":...,"extra":[...]}）
+                if text.hasPrefix("{"),
+                   let d = text.data(using: .utf8),
+                   let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                   j["_sys"] as? Bool == true {
+                    content = text
+                    msgType = .system
+                } else {
+                    content = text
+                }
+            } else if contentType >= 1000,
+                      let data = wkMsg.contentData,
+                      let raw = String(data: data, encoding: .utf8) {
+                // 群事件等未注册类型（SDK 实时收包路径）：保留原始 payload 供系统消息解析
+                content = raw
+                msgType = .system
+            } else {
+                content = ""
             }
-            msgType = .text
         }
 
         let status: Int
