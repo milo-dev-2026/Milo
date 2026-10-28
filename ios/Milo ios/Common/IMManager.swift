@@ -625,9 +625,9 @@ extension IMManager: WKChatManagerDelegate {
 
         case 99: // 系统消息
             if let textContent = wkMsg.content as? WKTextContent {
-                content = textContent.content ?? ""
-            } else if let data = wkMsg.contentData,
-                      let raw = String(data: data, encoding: .utf8) {
+                content = textContent.content
+            } else if !wkMsg.contentData.isEmpty,
+                      let raw = String(data: wkMsg.contentData, encoding: .utf8) {
                 content = raw
             }
             msgType = .system
@@ -654,7 +654,7 @@ extension IMManager: WKChatManagerDelegate {
 
         default:
             if let textContent = wkMsg.content as? WKTextContent {
-                let text = textContent.content ?? ""
+                let text = textContent.content
                 // 同步路径写入的群事件标记（{"_sys":true,"content":...,"extra":[...]}）
                 if text.hasPrefix("{"),
                    let d = text.data(using: .utf8),
@@ -666,8 +666,8 @@ extension IMManager: WKChatManagerDelegate {
                     content = text
                 }
             } else if contentType >= 1000,
-                      let data = wkMsg.contentData,
-                      let raw = String(data: data, encoding: .utf8) {
+                      !wkMsg.contentData.isEmpty,
+                      let raw = String(data: wkMsg.contentData, encoding: .utf8) {
                 // 群事件等未注册类型（SDK 实时收包路径）：保留原始 payload 供系统消息解析
                 content = raw
                 msgType = .system
