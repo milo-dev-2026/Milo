@@ -36,6 +36,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             mainWindow.rootViewController = BaseNavigationController(rootViewController: vc)
         } else {
             CrashLogger.shared.log("Step 3: creating MainTabBarController")
+            // 先同步初始化 IM SDK（仅本地，不发网络请求），让会话/消息数据库立即可读，
+            // 避免等连接成功才显示聊天窗口导致白屏
+            IMManager.shared.setupSDK()
             let vc = MainTabBarController()
             mainWindow.rootViewController = vc
             DispatchQueue.global(qos: .userInitiated).async {

@@ -7,6 +7,12 @@ class ConversationListViewController: UIViewController {
 
     private let tableView = UITableView()
     private var conversations: [Conversation] = []
+    /// 本地库读取中（防重入）
+    private var isLoadingLocal = false
+    /// 服务端列表请求中（防重复请求）
+    private var isFetchingServer = false
+    /// 服务端会话列表是否已成功展示过
+    private var serverLoaded = false
 
     // MARK: - 顶部标题栏
     private let titleBarView = UIView()
@@ -32,22 +38,12 @@ class ConversationListViewController: UIViewController {
             name: NSNotification.Name("ConversationsSynced"), object: nil
         )
         NotificationCenter.default.addObserver(
-            self, selector: #selector(handleNewMessage(_:)),
-            name: IMManager.messageReceivedNotification, object: nil
-        )
-        NotificationCenter.default.addObserver(
             self, selector: #selector(handleConnectionStatusChanged(_:)),
             name: IMManager.connectionStatusChangedNotification, object: nil
         )
     }
 
     @objc private func handleSyncCompleted(_ notification: Notification) {
-        DispatchQueue.main.async {
-            self.loadData()
-        }
-    }
-
-    @objc private func handleNewMessage(_ notification: Notification) {
         DispatchQueue.main.async {
             self.loadData()
         }
@@ -61,6 +57,8 @@ class ConversationListViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
+        // 离开时落盘一次（含刚回填的名称/头像），下次冷启动可直接秒显
+        saveCache(conversations)
     }
 
     private func setupUI() {
@@ -320,28 +318,104 @@ class ConversationListViewController: UIViewController {
         }
     }
 
+    private var cacheKey: String {
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
+        return "conversations_cache_v1_\(uid)"
+    }
+
+    /// 会话列表落盘缓存：冷启动时先秒显，避免等 IM 连接/网络
+    private func saveCache(_ list: [Conversation]) {
+        guard !list.isEmpty, let data = try? JSONEncoder().encode(list) else { return }
+        UserDefaults.standard.set(data, forKey: cacheKey)
+    }
+
+    private func loadCachedConversations() -> [Conversation] {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey),
+              let list = try? JSONDecoder().decode([Conversation].self, from: data) else { return [] }
+        return list
+    }
+
     private func loadData() {
-        // 先渲染本地缓存会话（对齐安卓：不等 milo 连接状态，立即显示聊天记录）
-        let local = IMManager.shared.getLocalConversationModels()
-        if !local.isEmpty {
-            conversations = sortedConversations(local)
-            tableView.reloadData()
+        // 1. 立即渲染磁盘缓存（同步、纯内存，冷启动第一帧就能看到会话，不等连接）
+        if conversations.isEmpty {
+            let cached = loadCachedConversations()
+            if !cached.isEmpty {
+                conversations = sortedConversations(cached)
+                tableView.reloadData()
+            }
         }
 
-        // 再异步拉取服务端会话列表补齐/刷新
+        // 2. 后台读 IM SDK 本地数据库（SQLite 查询不放主线程，避免白屏）
+        refreshFromLocal()
+
+        // 3. 最后异步拉取服务端会话列表补齐/刷新（不阻塞界面）
+        fetchFromServer()
+    }
+
+    /// 后台读取 SDK 本地会话库并刷新列表（不发网络）
+    private func refreshFromLocal() {
+        guard !isLoadingLocal else { return }
+        isLoadingLocal = true
+        let existingSnapshot = conversations
+        DispatchQueue.global(qos: .userInitiated).async {
+            let local = IMManager.shared.getLocalConversationModels()
+            DispatchQueue.main.async {
+                self.isLoadingLocal = false
+                guard !local.isEmpty else { return }
+                let merged = self.mergeNames(local, with: existingSnapshot)
+                // 服务端列表已展示时，不用本地较少的会话覆盖，防止回退闪空
+                if self.serverLoaded && merged.count < self.conversations.count { return }
+                self.conversations = self.sortedConversations(merged)
+                self.tableView.reloadData()
+                self.saveCache(self.conversations)
+            }
+        }
+    }
+
+    /// 异步请求服务端会话列表（补齐本地缺失的会话/名称）
+    private func fetchFromServer() {
+        guard !isFetchingServer else { return }
+        isFetchingServer = true
+        let existingSnapshot = conversations
         Task {
             do {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConversations = syncResp.conversations ?? []
                 // 置顶优先，其余按 lastMsgSeq 降序（其次按时间戳），与Android会话顺序一致
-                conversations = sortedConversations(wkConversations.map { Conversation(from: $0) })
+                let serverList = self.sortedConversations(
+                    self.mergeNames(wkConversations.map { Conversation(from: $0) }, with: existingSnapshot)
+                )
                 DispatchQueue.main.async {
+                    self.isFetchingServer = false
+                    self.serverLoaded = true
+                    self.conversations = serverList
                     self.tableView.reloadData()
+                    self.saveCache(serverList)
                 }
                 self.fetchChannelInfoForConversations()
             } catch {
                 print("[ConvList] 加载失败: \(error)")
+                DispatchQueue.main.async {
+                    self.isFetchingServer = false
+                }
             }
+        }
+    }
+
+    /// 用已有名称/头像补齐缺失字段，避免刷新时名字闪空
+    private func mergeNames(_ incoming: [Conversation], with existing: [Conversation]) -> [Conversation] {
+        guard !existing.isEmpty else { return incoming }
+        var nameMap: [String: (name: String, avatar: String?)] = [:]
+        for c in existing where !c.name.isEmpty {
+            nameMap[c.channelID] = (c.name, c.avatar)
+        }
+        return incoming.map { conv in
+            guard (conv.name.isEmpty || conv.name == conv.channelID),
+                  let cached = nameMap[conv.channelID] else { return conv }
+            var updated = conv
+            updated.name = cached.name
+            if updated.avatar == nil { updated.avatar = cached.avatar }
+            return updated
         }
     }
 
@@ -374,8 +448,11 @@ class ConversationListViewController: UIViewController {
     }
 
     private func setupIMObserver() {
-        IMManager.shared.onMessageReceived = { [weak self] message in
-            self?.loadData()
+        // 新消息：只从本地库刷新，不发网络请求（避免每条消息都触发一次服务端同步）
+        IMManager.shared.onMessageReceived = { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.refreshFromLocal()
+            }
         }
     }
 
