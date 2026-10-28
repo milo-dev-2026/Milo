@@ -194,7 +194,8 @@ class ConversationListViewController: UIViewController {
             }
         }
         menu.onDismiss = { [weak self] in
-            self?.popupMenuView = nil
+            // 点击菜单外区域：动画关闭并移除，避免卡在上面
+            self?.closePopupMenu()
         }
 
         view.addSubview(menu)
@@ -308,15 +309,18 @@ class ConversationListViewController: UIViewController {
         UserDefaults.standard.set(ids, forKey: ConversationListViewController.pinnedKey)
     }
 
-    /// 置顶会话排最前，其余按 lastMsgSeq/时间倒序（与安卓一致）
+    /// 置顶会话排最前，其余按消息时间倒序（最新消息在最上面），与安卓一致
     private func sortedConversations(_ list: [Conversation]) -> [Conversation] {
         let pins = pinnedIDs
         return list.sorted { a, b in
             let ap = pins.contains(a.channelID)
             let bp = pins.contains(b.channelID)
             if ap != bp { return ap }
-            if a.lastMsgSeq != b.lastMsgSeq { return a.lastMsgSeq > b.lastMsgSeq }
-            return (a.lastMessageTimestamp ?? 0) > (b.lastMessageTimestamp ?? 0)
+            // 优先按消息时间戳，新消息在最上面
+            let at = a.lastMessageTimestamp ?? 0
+            let bt = b.lastMessageTimestamp ?? 0
+            if at != bt { return at > bt }
+            return a.lastMsgSeq > b.lastMsgSeq
         }
     }
 
@@ -683,6 +687,7 @@ class ConversationCell: UITableViewCell {
     private let nameRow = UIStackView()
     private let nameLabel = UILabel()
     private let officialBadge = UIImageView()
+    private let robotBadge = UIImageView()
     private let lastMessageLabel = UILabel()
     private let timeLabel = UILabel()
     private let unreadBadge = UIView()
@@ -712,28 +717,31 @@ class ConversationCell: UITableViewCell {
         avatarView.image = UIImage(systemName: "person.circle.fill")
         avatarView.tintColor = .systemGray5
 
-        // 名字
-        nameLabel.font = ScreenAdapter.mediumFont(17)
+        // 名字（缩小两个号，对齐安卓会话列表观感）
+        nameLabel.font = ScreenAdapter.mediumFont(15)
         nameLabel.textColor = .label
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // 名称行：名称 + 官方机器人徽标（仅在特殊会话展示，可复用不重建）
-        officialBadge.image = UIImage(
-            systemName: "checkmark.seal.fill",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
-        officialBadge.tintColor = .themePrimary
+        // 名称行：名称 + 官方/机器人徽标（仅在特殊会话展示，可复用不重建）
+        officialBadge.image = nil
         officialBadge.contentMode = .scaleAspectFit
         officialBadge.setContentHuggingPriority(.required, for: .horizontal)
         officialBadge.setContentCompressionResistancePriority(.required, for: .horizontal)
         officialBadge.isHidden = true
+
+        robotBadge.image = nil
+        robotBadge.contentMode = .scaleAspectFit
+        robotBadge.setContentHuggingPriority(.required, for: .horizontal)
+        robotBadge.setContentCompressionResistancePriority(.required, for: .horizontal)
+        robotBadge.isHidden = true
 
         nameRow.axis = .horizontal
         nameRow.alignment = .center
         nameRow.spacing = 4
         nameRow.addArrangedSubview(nameLabel)
         nameRow.addArrangedSubview(officialBadge)
+        nameRow.addArrangedSubview(robotBadge)
 
         // 最后一条消息
         lastMessageLabel.font = ScreenAdapter.font(14)
@@ -860,6 +868,25 @@ class ConversationCell: UITableViewCell {
         }
     }
 
+    /// 文字徽标图片（官方=红框红字，机器人=蓝框蓝字），对齐安卓样式
+    static func makeTextBadge(_ text: String, colorHex: String, fontSize: CGFloat = 10) -> UIImage {
+        let color = UIColor.hex(colorHex)
+        let font = UIFont.systemFont(ofSize: fontSize, weight: .medium)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let hPad: CGFloat = 4, vPad: CGFloat = 2
+        let size = CGSize(width: ceil(textSize.width) + hPad * 2, height: ceil(textSize.height) + vPad * 2)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let rect = CGRect(origin: .zero, size: size)
+            let path = UIBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 3)
+            color.setStroke()
+            path.lineWidth = 1
+            path.stroke()
+            (text as NSString).draw(at: CGPoint(x: hPad, y: vPad), withAttributes: attrs)
+        }
+    }
+
     func configure(with conversation: Conversation) {
         // 系统账号：专属图标头像 + 默认昵称 + 官方徽标（ID 与昵称双重匹配，避免落到后端默认头像）
         let systemConf = ConversationCell.systemAccount(for: conversation.channelID, name: conversation.name)
@@ -868,13 +895,23 @@ class ConversationCell: UITableViewCell {
         lastMessageLabel.text = conversation.lastMessageDisplay
         timeLabel.text = conversation.timeString
 
-        // 特殊会话使用主题色并展示官方机器人徽标；普通会话恢复默认样式
-        let isOfficial = ConversationCell.isOfficialConversation(conversation)
-        nameLabel.textColor = isOfficial ? .themePrimary : .label
-        officialBadge.isHidden = !isOfficial
+        // 系统账号：名称黑色（不染色），后面带「官方」红框 + 「机器人」蓝框徽标（对齐安卓）
+        let isSystemAccount = (systemConf != nil)
+        nameLabel.textColor = .label
+        nameLabel.attributedText = nil
+        nameLabel.text = displayName
+        if isSystemAccount {
+            officialBadge.image = ConversationCell.makeTextBadge("官方", colorHex: "F53F3F")
+            officialBadge.isHidden = false
+            robotBadge.image = ConversationCell.makeTextBadge("机器人", colorHex: "165DFF")
+            robotBadge.isHidden = false
+        } else {
+            officialBadge.isHidden = true
+            robotBadge.isHidden = true
+        }
 
         // 特殊用户（红色昵称 + 西安/押金商家徽标）与特殊群聊（红棕色昵称），对齐安卓
-        if !isOfficial {
+        if !isSystemAccount {
             if conversation.channelType == 1,
                SpecialUserUtils.isSpecialUser(uid: conversation.channelID, shortNo: "", name: displayName) {
                 nameLabel.attributedText = SpecialUserUtils.attributedName(displayName,
@@ -885,13 +922,7 @@ class ConversationCell: UITableViewCell {
                     string: displayName,
                     attributes: [.font: nameLabel.font, .foregroundColor: SpecialUserUtils.specialGroupNameColor]
                 )
-            } else {
-                nameLabel.attributedText = nil
-                nameLabel.text = displayName
             }
-        } else {
-            nameLabel.attributedText = nil
-            nameLabel.text = displayName
         }
 
         if let conf = systemConf {

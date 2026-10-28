@@ -83,7 +83,7 @@ class SecurityAccountViewController: UIViewController {
             subtitle: "管理已绑定的手机号与电子邮箱",
             showRightText: bindStatusLabel
         ) { [weak self] in
-            self?.navigationController?.pushViewController(AccountBindingViewController(bindType: .phone), animated: true)
+            self?.navigationController?.pushViewController(AccountBindingViewController(), animated: true)
         }
 
         let changePwdRow = SecurityAccountRowView(

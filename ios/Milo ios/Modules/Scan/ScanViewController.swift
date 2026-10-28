@@ -12,6 +12,8 @@ class ScanViewController: UIViewController {
 
     /// 闪光灯状态
     private var isTorchOn = false
+    /// 闪光灯按钮引用（切换时更新颜色反馈）
+    private weak var torchButton: UIButton?
 
     var onScanResult: ((String) -> Void)?
 
@@ -133,9 +135,11 @@ class ScanViewController: UIViewController {
         button.addTarget(self, action: action, for: .touchUpInside)
         container.addSubview(button)
         button.snp.makeConstraints { make in
-            make.top.centerX.equalToSuperview()
+            // 容器宽度跟随按钮，保证按钮完全落在父视图 bounds 内可点击
+            make.top.leading.trailing.equalToSuperview()
             make.width.height.equalTo(ScreenAdapter.scaleW(52))
         }
+        if icon == "bolt.fill" { torchButton = button }
 
         let label = UILabel()
         label.text = title
@@ -157,12 +161,17 @@ class ScanViewController: UIViewController {
     }
 
     private func setTorch(on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else {
+            AppUtility.showToast("设备不支持闪光灯")
+            return
+        }
         do {
             try device.lockForConfiguration()
             device.torchMode = on ? .on : .off
             device.unlockForConfiguration()
             isTorchOn = on
+            // 开启后按钮变黄，给用户明确反馈
+            torchButton?.tintColor = on ? .systemYellow : .white
         } catch {
             print("[Scan] 闪光灯切换失败: \(error)")
         }

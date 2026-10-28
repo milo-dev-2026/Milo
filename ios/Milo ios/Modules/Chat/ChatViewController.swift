@@ -77,7 +77,8 @@ class ChatViewController: UIViewController {
         setupUI()
         setupLoadingView()
         setupNavBar()
-        // 先读本地已缓存消息立即渲染，再异步拉取服务端补齐
+        // 先读磁盘消息缓存秒显，再读 SDK 本地库，最后异步拉服务端补齐
+        loadDiskCachedMessages()
         loadCachedMessages()
         loadMessages()
         setupKeyboardObserver()
@@ -154,6 +155,7 @@ class ChatViewController: UIViewController {
             self.tableView.reloadData()
             self.scrollToBottom()
         }
+        saveMessagesCacheDebounced()
     }
 
     private func setupUI() {
@@ -244,6 +246,17 @@ class ChatViewController: UIViewController {
         super.viewWillDisappear(animated)
         // 离开聊天页时恢复导航栏默认外观，避免影响其它页面
         restoreNavBarAppearance()
+        // 离开时立即落盘消息缓存，下次进入秒显
+        msgCacheWorkItem?.cancel()
+        let snapshot = Array(messages.suffix(50))
+        if !snapshot.isEmpty {
+            let url = msgCacheFileURL
+            DispatchQueue.global(qos: .utility).async {
+                if let data = try? JSONEncoder().encode(snapshot) {
+                    try? data.write(to: url, options: .atomic)
+                }
+            }
+        }
     }
 
     /// 玻璃导航栏：透明背景 + 毛玻璃，去掉底部分割线
@@ -411,45 +424,59 @@ class ChatViewController: UIViewController {
     }
 
     private func setupNavBar() {
-        // 自定义标题视图（名字 + 在线状态，居中显示）
+        // 自定义标题视图（头像 + 名字 + 在线状态，左对齐，对齐安卓标题栏）
+        // 宽度预留左右两侧按钮空间，避免长昵称超出标题栏遮挡按钮
+        let maxTitleWidth = max(ScreenAdapter.scaleW(170), ScreenAdapter.screenWidth - 185)
         let titleView = UIView()
-        titleView.frame = CGRect(x: 0, y: 0, width: 220, height: 44)
+        titleView.frame = CGRect(x: 0, y: 0, width: maxTitleWidth, height: 44)
 
-        // 名字
+        // 对方/群头像（安卓标题栏同款）
+        let navAvatar = UIImageView()
+        navAvatar.layer.cornerRadius = ScreenAdapter.scaleW(15)
+        navAvatar.clipsToBounds = true
+        navAvatar.contentMode = .scaleAspectFill
+        navAvatar.backgroundColor = .secondarySystemFill
+        titleView.addSubview(navAvatar)
+        navAvatar.snp.makeConstraints { make in
+            make.leading.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(ScreenAdapter.scaleW(30))
+        }
+        AppUtility.loadChannelAvatar(channelId: channelId, channelType: channelType, name: titleText, into: navAvatar)
+
+        // 名字（过长截断，不遮挡两侧按钮）
         let navTitleLabel = UILabel()
         navTitleLabel.text = titleText
         navTitleLabel.font = ScreenAdapter.mediumFont(16)
         navTitleLabel.textColor = .label
-        navTitleLabel.textAlignment = .center
         navTitleLabel.lineBreakMode = .byTruncatingTail
+        navTitleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         titleView.addSubview(navTitleLabel)
 
         // 单聊在线状态（在线 / 离线X分钟），无数据时隐藏
         onlineStatusLabel.font = ScreenAdapter.font(11)
         onlineStatusLabel.textColor = .secondaryLabel
-        onlineStatusLabel.textAlignment = .center
         onlineStatusLabel.isHidden = true
+        onlineStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         titleView.addSubview(onlineStatusLabel)
 
         let hasStatus = channelType == 1
         if hasStatus {
             navTitleLabel.snp.makeConstraints { make in
-                make.centerX.equalToSuperview()
-                make.leading.greaterThanOrEqualToSuperview()
+                make.leading.equalTo(navAvatar.snp.trailing).offset(ScreenAdapter.scaleW(8))
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalToSuperview().offset(ScreenAdapter.scaleH(7))
             }
             onlineStatusLabel.snp.makeConstraints { make in
-                make.centerX.equalToSuperview()
-                make.leading.greaterThanOrEqualToSuperview()
+                make.leading.equalTo(navTitleLabel)
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalTo(navTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(1))
             }
         } else {
             navTitleLabel.snp.makeConstraints { make in
-                make.center.equalToSuperview()
-                make.leading.greaterThanOrEqualToSuperview()
+                make.leading.equalTo(navAvatar.snp.trailing).offset(ScreenAdapter.scaleW(8))
                 make.trailing.lessThanOrEqualToSuperview()
+                make.centerY.equalToSuperview()
             }
         }
 
@@ -462,6 +489,8 @@ class ChatViewController: UIViewController {
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     navTitleLabel.text = channelInfo.displayName
+                    // 用真实昵称刷新标题头像占位图
+                    AppUtility.loadChannelAvatar(channelId: self.channelId, channelType: self.channelType, name: channelInfo.displayName, into: navAvatar)
                     self.updateOnlineStatus(
                         online: (channelInfo.online ?? 0) == 1,
                         lastOffline: channelInfo.last_offline
@@ -612,8 +641,11 @@ class ChatViewController: UIViewController {
         let alert = UIAlertController(title: "确认清空聊天记录？", message: nil, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "清空", style: .destructive) { [weak self] _ in
-            self?.messages.removeAll()
-            self?.tableView.reloadData()
+            guard let self = self else { return }
+            self.messages.removeAll()
+            self.tableView.reloadData()
+            // 同步删除磁盘消息缓存，避免下次进入旧消息闪现
+            try? FileManager.default.removeItem(at: self.msgCacheFileURL)
             AppUtility.showToast("已清空")
         })
         present(alert, animated: true)
@@ -667,6 +699,41 @@ class ChatViewController: UIViewController {
         }
     }
 
+    // MARK: - 消息磁盘缓存（进入会话秒显，不等网络/IM 连接）
+    private var msgCacheWorkItem: DispatchWorkItem?
+
+    private var msgCacheFileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let safeId = String(channelId.map { $0.isLetter || $0.isNumber ? $0 : "_" })
+        return docs.appendingPathComponent("msg_cache_\(safeId)_\(channelType).json")
+    }
+
+    /// 读取磁盘缓存消息并立即渲染（存在则骨架屏直接消失）
+    private func loadDiskCachedMessages() {
+        guard let data = try? Data(contentsOf: msgCacheFileURL),
+              let cached = try? JSONDecoder().decode([Message].self, from: data),
+              !cached.isEmpty else { return }
+        applyLoadedMessages(cached, scroll: true, finish: false)
+    }
+
+    /// 防抖 0.5 秒落盘最近 50 条消息
+    private func saveMessagesCacheDebounced() {
+        msgCacheWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            let snapshot = Array(self.messages.suffix(50))
+            guard !snapshot.isEmpty else { return }
+            let url = self.msgCacheFileURL
+            DispatchQueue.global(qos: .utility).async {
+                if let data = try? JSONEncoder().encode(snapshot) {
+                    try? data.write(to: url, options: .atomic)
+                }
+            }
+        }
+        msgCacheWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
     /// 合并服务端消息与本地消息（保留发送中/失败占位），按 seq + 时间排序
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool) {
         var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
@@ -689,6 +756,7 @@ class ChatViewController: UIViewController {
         if scroll {
             scrollToBottom()
         }
+        saveMessagesCacheDebounced()
     }
 
     private func loadMessages() {

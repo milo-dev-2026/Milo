@@ -17,10 +17,8 @@ class ChooseContactsViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let indexBar = ContactIndexBar()
 
-    private let bottomBar = UIView()
-    private let bottomCountLabel = UILabel()
-    private let confirmButton = UIButton(type: .custom)
-    private var bottomBarHeight: NSLayoutConstraint!
+    /// 标题栏右侧「确定」按钮（对齐安卓：确定(N)）
+    private let navConfirmButton = UIButton(type: .custom)
 
     // MARK: - 数据
     private var allContacts: [(uid: String, name: String, avatar: String?)] = []
@@ -38,6 +36,8 @@ class ChooseContactsViewController: UIViewController {
         self.maxSelection = maxSelection
         self.onSelected = onSelected
         super.init(nibName: nil, bundle: nil)
+        // 进入本页隐藏底部 Tab 栏（对齐安卓全屏选择页）
+        hidesBottomBarWhenPushed = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -46,12 +46,11 @@ class ChooseContactsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "选择联系人"
-        view.backgroundColor = UIColor(white: 0.97, alpha: 1)
+        view.backgroundColor = .themeBg
         setupNav()
         setupSearchBar()
         setupSelectedHeader()
         setupTableView()
-        setupBottomBar()
         loadData()
     }
 
@@ -62,6 +61,25 @@ class ChooseContactsViewController: UIViewController {
             target: self,
             action: #selector(backTapped)
         )
+        // 确定按钮放在「选择联系人」标题右侧（对齐安卓标题栏右按钮）
+        navConfirmButton.setTitle("确定", for: .normal)
+        navConfirmButton.setTitleColor(.white, for: .normal)
+        navConfirmButton.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .disabled)
+        navConfirmButton.titleLabel?.font = ScreenAdapter.mediumFont(14)
+        navConfirmButton.backgroundColor = .themeColorPrimary
+        navConfirmButton.layer.cornerRadius = 15
+        navConfirmButton.clipsToBounds = true
+        navConfirmButton.isEnabled = false
+        navConfirmButton.alpha = 0.4
+        navConfirmButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+        navConfirmButton.addTarget(self, action: #selector(done), for: .touchUpInside)
+        let container = UIView()
+        container.addSubview(navConfirmButton)
+        navConfirmButton.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+            make.height.equalTo(30)
+        }
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: container)
     }
 
     @objc private func backTapped() {
@@ -70,7 +88,7 @@ class ChooseContactsViewController: UIViewController {
 
     // MARK: - 搜索栏（对齐安卓：圆角浅灰底 + 放大镜 + 清除按钮）
     private func setupSearchBar() {
-        searchBar.backgroundColor = UIColor(white: 0.93, alpha: 1)
+        searchBar.backgroundColor = .themeBgSearchBar
         searchBar.layer.cornerRadius = 18
         view.addSubview(searchBar)
         searchBar.snp.makeConstraints { make in
@@ -81,7 +99,7 @@ class ChooseContactsViewController: UIViewController {
         }
 
         searchIcon.image = UIImage(systemName: "magnifyingglass")
-        searchIcon.tintColor = UIColor(white: 0.6, alpha: 1)
+        searchIcon.tintColor = .secondaryLabel
         searchIcon.contentMode = .scaleAspectFit
         searchBar.addSubview(searchIcon)
         searchIcon.snp.makeConstraints { make in
@@ -151,14 +169,14 @@ class ChooseContactsViewController: UIViewController {
         tableView.register(ChooseContactCell.self, forCellReuseIdentifier: "ChooseContactCell")
         tableView.rowHeight = 56
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 76, bottom: 0, right: 0)
-        tableView.separatorColor = UIColor(white: 0, alpha: 0.06)
-        tableView.backgroundColor = UIColor(white: 0.97, alpha: 1)
+        tableView.separatorColor = .themeSeparator
+        tableView.backgroundColor = .themeBg
         tableView.tableFooterView = UIView()
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
             make.top.equalTo(selectedHeader.snp.bottom)
             make.leading.trailing.equalToSuperview()
-            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-52)
+            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom)
         }
 
         indexBar.onSelect = { [weak self] letter in
@@ -176,57 +194,13 @@ class ChooseContactsViewController: UIViewController {
         }
     }
 
-    // MARK: - 底部确认栏（对齐安卓：已选N人 + 确定按钮）
-    private func setupBottomBar() {
-        bottomBar.backgroundColor = .white
-        let topLine = UIView()
-        topLine.backgroundColor = UIColor(white: 0, alpha: 0.08)
-        bottomBar.addSubview(topLine)
-        topLine.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(0.5)
-        }
-        view.addSubview(bottomBar)
-        bottomBar.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview()
-            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom)
-        }
-        bottomBarHeight = bottomBar.heightAnchor.constraint(equalToConstant: 0)
-        bottomBarHeight.isActive = true
-
-        bottomCountLabel.font = ScreenAdapter.font(14)
-        bottomCountLabel.textColor = .secondaryLabel
-        bottomBar.addSubview(bottomCountLabel)
-        bottomCountLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(16)
-            make.centerY.equalToSuperview()
-        }
-
-        confirmButton.setTitle("确定", for: .normal)
-        confirmButton.setTitleColor(.white, for: .normal)
-        confirmButton.titleLabel?.font = ScreenAdapter.mediumFont(15)
-        confirmButton.backgroundColor = .themeColorPrimary
-        confirmButton.layer.cornerRadius = 18
-        confirmButton.clipsToBounds = true
-        confirmButton.isEnabled = false
-        confirmButton.alpha = 0.4
-        confirmButton.addTarget(self, action: #selector(done), for: .touchUpInside)
-        bottomBar.addSubview(confirmButton)
-        confirmButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalToSuperview()
-            make.width.equalTo(88)
-            make.height.equalTo(36)
-        }
-    }
-
     private func updateSelectionUI() {
         let has = !selectedOrder.isEmpty
         selectedHeaderHeight.constant = has ? 72 : 0
-        bottomBarHeight.constant = has ? 52 : 0
-        bottomCountLabel.text = "已选 \(selectedOrder.count) 人"
-        confirmButton.isEnabled = has
-        confirmButton.alpha = has ? 1 : 0.4
+        // 标题栏确定按钮：带数量，未选时置灰
+        navConfirmButton.setTitle(has ? "确定(\(selectedOrder.count))" : "确定", for: .normal)
+        navConfirmButton.isEnabled = has
+        navConfirmButton.alpha = has ? 1 : 0.4
         UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
         selectedHeader.reloadData()
         if has {
@@ -339,7 +313,7 @@ extension ChooseContactsViewController: UITableViewDataSource, UITableViewDelega
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         guard !sections.isEmpty else { return nil }
         let v = UIView()
-        v.backgroundColor = UIColor(white: 0.95, alpha: 1)
+        v.backgroundColor = .themeBgGrayF5
         let label = UILabel()
         label.text = sections[section].letter
         label.font = ScreenAdapter.mediumFont(13)
@@ -405,7 +379,7 @@ private class ChooseContactCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
-        backgroundColor = .white
+        backgroundColor = .themeBgWhite
 
         checkCircle.image = UIImage(systemName: "circle")
         checkCircle.tintColor = UIColor(white: 0.75, alpha: 1)
@@ -420,7 +394,7 @@ private class ChooseContactCell: UITableViewCell {
         avatarView.layer.cornerRadius = 6
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.backgroundColor = UIColor(white: 0.9, alpha: 1)
+        avatarView.backgroundColor = .themeBgTertiary
         contentView.addSubview(avatarView)
         avatarView.snp.makeConstraints { make in
             make.leading.equalTo(checkCircle.snp.trailing).offset(12)
@@ -470,7 +444,7 @@ private class SelectedAvatarCell: UICollectionViewCell {
         avatarView.layer.cornerRadius = 6
         avatarView.clipsToBounds = true
         avatarView.contentMode = .scaleAspectFill
-        avatarView.backgroundColor = UIColor(white: 0.9, alpha: 1)
+        avatarView.backgroundColor = .themeBgTertiary
         contentView.addSubview(avatarView)
         avatarView.snp.makeConstraints { make in
             make.top.centerX.equalToSuperview()

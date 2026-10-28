@@ -50,7 +50,18 @@ class ContactDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        prefillFromLocalCache()
         loadUserInfo()
+    }
+
+    /// 先用通讯录本地缓存秒显昵称与头像，再异步拉取频道信息刷新
+    private func prefillFromLocalCache() {
+        // 与 ContactsViewController.contactsCacheKey 一致
+        guard let data = UserDefaults.standard.data(forKey: "contacts_cache_v1"),
+              let cached = try? JSONDecoder().decode([User].self, from: data),
+              let user = cached.first(where: { $0.uid == uid }) else { return }
+        nameLabel.text = user.name
+        AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: user.name, into: avatarImageView)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -479,6 +490,11 @@ class ContactDetailViewController: UIViewController {
             do {
                 _ = try await APIClient.shared.requestRaw(.addBlackList(uid: uid))
                 DispatchQueue.main.async {
+                    var uids = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
+                    if !uids.contains(self.uid) {
+                        uids.append(self.uid)
+                        UserDefaults.standard.set(uids, forKey: "blacklist_uids")
+                    }
                     AppUtility.showToast("已加入黑名单")
                 }
             } catch {

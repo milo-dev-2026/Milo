@@ -36,6 +36,7 @@ class ChatPersonalViewController: UIViewController {
         setupUI()
         loadChannelInfo()
         loadLocalSettings()
+        loadMiloNo()
     }
 
     private func loadLocalSettings() {
@@ -102,21 +103,21 @@ class ChatPersonalViewController: UIViewController {
         headerName.textColor = .label
         headerName.text = chatTitle
         headerName.lineBreakMode = .byTruncatingTail
-        card.addSubview(headerName)
-        headerName.snp.makeConstraints { make in
-            make.leading.equalTo(headerAvatar.snp.trailing).offset(14)
-            make.top.equalTo(headerAvatar.snp.top).offset(6)
-            make.trailing.lessThanOrEqualToSuperview().offset(-40)
-        }
 
         headerSub.font = ScreenAdapter.font(13)
         headerSub.textColor = .secondaryLabel
-        headerSub.text = "Milo号：\(channelId)"
-        headerSub.lineBreakMode = .byTruncatingMiddle
-        card.addSubview(headerSub)
-        headerSub.snp.makeConstraints { make in
-            make.leading.equalTo(headerName)
-            make.top.equalTo(headerName.snp.bottom).offset(6)
+        // Milo号由 loadMiloNo() 异步回填，未拿到前隐藏（不再显示乱码 UID）
+        headerSub.isHidden = true
+        headerSub.lineBreakMode = .byTruncatingTail
+
+        // 昵称 + Milo号 垂直排列并整体居中于头像，Milo号隐藏时昵称自动垂直居中
+        let textStack = UIStackView(arrangedSubviews: [headerName, headerSub])
+        textStack.axis = .vertical
+        textStack.spacing = 4
+        card.addSubview(textStack)
+        textStack.snp.makeConstraints { make in
+            make.leading.equalTo(headerAvatar.snp.trailing).offset(14)
+            make.centerY.equalToSuperview()
             make.trailing.lessThanOrEqualToSuperview().offset(-40)
         }
 
@@ -144,7 +145,8 @@ class ChatPersonalViewController: UIViewController {
             make.height.equalTo(52)
         }
         callRow.addArrangedSubview(makeActionButton(title: "语音通话", icon: "phone.fill", action: #selector(voiceCallTapped)))
-        callRow.addArrangedSubview(makeActionButton(title: "视频通话", icon: "video.fill", action: #selector(videoCallTapped)))
+        // 与安卓一致：第二个快捷操作为「发送消息」（返回聊天窗口）
+        callRow.addArrangedSubview(makeActionButton(title: "发送消息", icon: "paperplane.fill", action: #selector(sendMessageTapped)))
 
         return header
     }
@@ -171,14 +173,51 @@ class ChatPersonalViewController: UIViewController {
         startCall(voice: true)
     }
 
-    @objc private func videoCallTapped() {
-        startCall(voice: false)
+    /// 发送消息：返回聊天窗口（本页固定从聊天页 push 进来）
+    @objc private func sendMessageTapped() {
+        if let nav = navigationController,
+           nav.viewControllers.contains(where: { $0 is ChatViewController }) {
+            nav.popViewController(animated: true)
+        } else {
+            let vc = ChatViewController(channelId: channelId, title: chatTitle, channelType: channelType)
+            navigationController?.pushViewController(vc, animated: true)
+        }
     }
 
     private func startCall(voice: Bool) {
         let vc = TRTCCallViewController(channelId: channelId)
         vc.modalPresentationStyle = .fullScreen
         present(vc, animated: true)
+    }
+
+    /// 从 /v1/user/search 读取 short_no（Milo号），无数据时保持隐藏
+    private func loadMiloNo() {
+        Task {
+            do {
+                let resp = try await APIClient.shared.requestRaw(.searchUser(keyword: channelId, page: 1, pageSize: 1))
+                var payload: [String: Any] = resp
+                if let wrapped = resp["data"] as? [String: Any], wrapped["exist"] != nil {
+                    payload = wrapped
+                }
+                let existValue = payload["exist"]
+                let exist: Int = (existValue as? Int) ?? Int((existValue as? String) ?? "") ?? 0
+                var shortNo = ""
+                if exist == 1, let dict = payload["data"] as? [String: Any] {
+                    if let s = dict["short_no"] as? String {
+                        shortNo = s
+                    } else if let n = dict["short_no"] as? Int {
+                        shortNo = String(n)
+                    }
+                }
+                DispatchQueue.main.async {
+                    guard !shortNo.isEmpty else { return }
+                    self.headerSub.text = "Milo号：\(shortNo)"
+                    self.headerSub.isHidden = false
+                }
+            } catch {
+                // 静默失败，保持隐藏
+            }
+        }
     }
 
     // MARK: - Load Data
@@ -259,39 +298,44 @@ class ChatPersonalViewController: UIViewController {
 
     private func clearChatHistory() {
         IMManager.shared.clearMessages(channelId: channelId, channelType: channelType)
+        // 同步删除磁盘消息缓存，避免下次进入旧消息闪现
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let safeId = String(channelId.map { $0.isLetter || $0.isNumber ? $0 : "_" })
+        try? FileManager.default.removeItem(at: docs.appendingPathComponent("msg_cache_\(safeId)_\(channelType).json"))
         AppUtility.showToast("已清空")
     }
 
-    // MARK: - 添加群成员
-    private func addGroupMembers() {
-        let vc = ChooseContactsViewController(maxSelection: 99)
-        vc.title = "选择联系人"
-        vc.onContactsSelected = { [weak self] uids in
-            self?.createGroup(with: uids)
-        }
-        navigationController?.pushViewController(vc, animated: true)
+    // MARK: - 删除好友
+    private func confirmDeleteFriend() {
+        let alert = UIAlertController(title: "删除好友",
+                                      message: "确定删除好友 \(chatTitle) 吗？删除后聊天记录将一并清空。",
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.deleteFriend()
+        })
+        present(alert, animated: true)
     }
 
-    private func createGroup(with uids: [String]) {
-        guard !uids.isEmpty else { return }
-        var memberUids = uids
-        if !memberUids.contains(channelId) {
-            memberUids.append(channelId)
-        }
-        AppUtility.showToast("正在创建群聊...")
+    private func deleteFriend() {
         Task {
             do {
-                let groupId = "group_\(Int(Date().timeIntervalSince1970))"
-                let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: groupId, uids: memberUids))
-                if response["status"] as? Int == 200 {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("群聊创建成功")
-                        self.navigationController?.popViewController(animated: true)
+                let response = try await APIClient.shared.requestRaw(.deleteFriend(uid: channelId))
+                let status = (response["status"] as? Int) ?? Int((response["status"] as? String) ?? "") ?? 0
+                DispatchQueue.main.async {
+                    if status == 200 {
+                        AppUtility.showToast("已删除好友")
+                        // 清空本地聊天记录并返回会话列表
+                        IMManager.shared.clearMessages(channelId: self.channelId, channelType: self.channelType)
+                        NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
+                        self.navigationController?.popToRootViewController(animated: true)
+                    } else {
+                        AppUtility.showToast(response["msg"] as? String ?? "删除失败")
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
-                    AppUtility.showToast("创建群聊失败")
+                    AppUtility.showToast("删除好友失败")
                 }
             }
         }
@@ -309,7 +353,7 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
         case .settings: return 2
-        case .actions: return 2
+        case .actions: return 1
         case .bottom: return 1
         }
     }
@@ -355,16 +399,13 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
 
         case .actions:
             let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath) as! ChatInfoCell
-            if indexPath.row == 0 {
-                cell.configure(title: "聊天背景", icon: "photo.fill", iconColor: .systemTeal, showsArrow: true)
-            } else {
-                cell.configure(title: "清空聊天记录", icon: "trash.fill", iconColor: .systemRed, showsArrow: false)
-            }
+            cell.configure(title: "清空聊天记录", icon: "trash.fill", iconColor: .systemRed, showsArrow: false)
             return cell
 
         case .bottom:
             let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath) as! ChatInfoCell
-            cell.configure(title: "添加群成员", icon: "person.badge.plus", iconColor: .systemGreen, showsArrow: false, destructive: true)
+            // 删除好友：红色文字居中（对齐安卓）
+            cell.configure(title: "删除好友", icon: "", iconColor: .clear, showsArrow: false, destructive: true, centered: true)
             return cell
         }
     }
@@ -377,14 +418,9 @@ extension ChatPersonalViewController: UITableViewDataSource, UITableViewDelegate
         case .settings:
             break
         case .actions:
-            if indexPath.row == 0 {
-                let vc = ChatBackgroundViewController(channelId: channelId, channelType: channelType)
-                navigationController?.pushViewController(vc, animated: true)
-            } else {
-                confirmClearHistory()
-            }
+            confirmClearHistory()
         case .bottom:
-            addGroupMembers()
+            confirmDeleteFriend()
         }
     }
 }
@@ -395,6 +431,8 @@ class ChatInfoCell: UITableViewCell {
     private let iconContainer = UIView()
     private let iconView = UIImageView()
     private let titleText = UILabel()
+    private var titleLeadingConstraint: Constraint?
+    private var titleCenterConstraint: Constraint?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -429,16 +467,26 @@ class ChatInfoCell: UITableViewCell {
         titleText.textColor = .label
         contentView.addSubview(titleText)
         titleText.snp.makeConstraints { make in
-            make.leading.equalTo(iconContainer.snp.trailing).offset(12)
+            titleLeadingConstraint = make.leading.equalTo(iconContainer.snp.trailing).offset(12).constraint
+            titleCenterConstraint = make.centerX.equalToSuperview().constraint
             make.centerY.equalToSuperview()
         }
+        titleCenterConstraint?.deactivate()
     }
 
-    func configure(title: String, icon: String, iconColor: UIColor, showsArrow: Bool, destructive: Bool = false) {
+    func configure(title: String, icon: String, iconColor: UIColor, showsArrow: Bool, destructive: Bool = false, centered: Bool = false) {
         titleText.text = title
         titleText.textColor = destructive ? .systemRed : .label
         iconView.image = UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
         iconContainer.backgroundColor = iconColor
+        iconContainer.isHidden = centered
+        if centered {
+            titleLeadingConstraint?.deactivate()
+            titleCenterConstraint?.activate()
+        } else {
+            titleCenterConstraint?.deactivate()
+            titleLeadingConstraint?.activate()
+        }
         accessoryType = showsArrow ? .disclosureIndicator : .none
     }
 }

@@ -21,13 +21,13 @@ class ContactsViewController: UIViewController {
     private let searchIconImageView = UIImageView()
     private let searchTextField = UITextField()
 
-    // MARK: - 入口项数据（与 Android 图标对应：新的朋友/保存的群聊/加入的群/文件传输助手/系统通知）
+    // MARK: - 入口项数据（与 Android 通讯录头部一致：新朋友/保存的群聊/我加入的群/文件传输助手/系统通知）
     private let headerEntries: [(icon: String, title: String, action: Selector)] = [
-        ("person.badge.plus", "新的朋友", #selector(showFriendApplyList)),
-        ("square.grid.2x2.fill", "保存的群聊", #selector(showSavedGroups)),
-        ("person.3.fill", "加入的群聊", #selector(showJoinedGroups)),
+        ("person.badge.plus", "新朋友", #selector(showFriendApplyList)),
+        ("seal.fill", "保存的群聊", #selector(showSavedGroups)),
+        ("message.fill", "我加入的群", #selector(showJoinedGroups)),
         ("folder.fill", "文件传输助手", #selector(showFileHelper)),
-        ("bell.badge.fill", "系统通知", #selector(showSystemNotice))
+        ("", "系统通知", #selector(showSystemNotice))
     ]
 
     override func viewDidLoad() {
@@ -383,6 +383,8 @@ class ContactsHeaderCell: UIView {
 
     private let iconView = UIImageView()
     private let titleLabel = UILabel()
+    private let officialBadge = UIImageView()
+    private let robotBadge = UIImageView()
     private let arrowView = UIImageView()
 
     override init(frame: CGRect) {
@@ -400,19 +402,9 @@ class ContactsHeaderCell: UIView {
         let iconSize: CGFloat = 40
         let hPad: CGFloat = 16
 
-        // 图标背景：浅色模式淡蓝 #E3F2FD
-        let iconBgColor = UIColor { trait in
-            if trait.userInterfaceStyle == .dark {
-                return UIColor(red: 0.11, green: 0.16, blue: 0.24, alpha: 1.0)
-            }
-            return UIColor(red: 227.0 / 255.0, green: 242.0 / 255.0, blue: 253.0 / 255.0, alpha: 1.0)
-        }
-
         iconView.layer.cornerRadius = 11
         iconView.clipsToBounds = true
         iconView.contentMode = .center
-        iconView.backgroundColor = iconBgColor
-        iconView.tintColor = .themeColorPrimary
         addSubview(iconView)
         iconView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
@@ -425,6 +417,24 @@ class ContactsHeaderCell: UIView {
         addSubview(titleLabel)
         titleLabel.snp.makeConstraints { make in
             make.leading.equalTo(iconView.snp.trailing).offset(12)
+            make.centerY.equalToSuperview()
+        }
+
+        // 「官方」红框徽章（文件传输助手/系统通知）
+        officialBadge.contentMode = .scaleAspectFit
+        officialBadge.isHidden = true
+        addSubview(officialBadge)
+        officialBadge.snp.makeConstraints { make in
+            make.leading.equalTo(titleLabel.snp.trailing).offset(6)
+            make.centerY.equalToSuperview()
+        }
+
+        // 「机器人」蓝框徽章（仅系统通知）
+        robotBadge.contentMode = .scaleAspectFit
+        robotBadge.isHidden = true
+        addSubview(robotBadge)
+        robotBadge.snp.makeConstraints { make in
+            make.leading.equalTo(officialBadge.snp.trailing).offset(4)
             make.centerY.equalToSuperview()
         }
 
@@ -451,24 +461,38 @@ class ContactsHeaderCell: UIView {
     }
 
     func configure(icon: String, title: String) {
-        let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .regular)
-        iconView.image = UIImage(systemName: icon, withConfiguration: config)
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         titleLabel.text = title
+        iconView.image = icon.isEmpty ? nil : UIImage(systemName: icon, withConfiguration: config)
+        iconView.contentMode = .center
+        officialBadge.isHidden = true
+        robotBadge.isHidden = true
 
-        // 特殊账号图标配色对齐安卓 ContactsHeaderAdapter：系统通知 #FFA940 橙，文件传输助手 #4CAF50 绿
+        // 图标样式对齐安卓通讯录头部
         switch title {
-        case "系统通知":
-            iconView.backgroundColor = UIColor(red: 1.0, green: 169.0/255.0, blue: 64.0/255.0, alpha: 1.0)
+        case "新朋友":
+            iconView.backgroundColor = UIColor(red: 74.0/255.0, green: 144.0/255.0, blue: 217.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        case "保存的群聊":
+            iconView.backgroundColor = UIColor(red: 245.0/255.0, green: 108.0/255.0, blue: 108.0/255.0, alpha: 1.0)
+            iconView.tintColor = .white
+        case "我加入的群":
+            iconView.backgroundColor = UIColor(red: 74.0/255.0, green: 144.0/255.0, blue: 217.0/255.0, alpha: 1.0)
             iconView.tintColor = .white
         case "文件传输助手":
             iconView.backgroundColor = UIColor(red: 76.0/255.0, green: 175.0/255.0, blue: 80.0/255.0, alpha: 1.0)
             iconView.tintColor = .white
-        case "新的朋友":
-            iconView.backgroundColor = UIColor(red: 250.0/255.0, green: 140.0/255.0, blue: 22.0/255.0, alpha: 1.0)
-            iconView.tintColor = .white
-        case "保存的群聊", "加入的群聊":
-            iconView.backgroundColor = UIColor(red: 74.0/255.0, green: 144.0/255.0, blue: 217.0/255.0, alpha: 1.0)
-            iconView.tintColor = .white
+            officialBadge.image = ConversationCell.makeTextBadge("官方", colorHex: "F53F3F")
+            officialBadge.isHidden = false
+        case "系统通知":
+            // 对齐安卓：系统通知使用 Milo Logo 头像
+            iconView.image = UIImage(named: "LoginLogo")
+            iconView.contentMode = .scaleAspectFill
+            iconView.backgroundColor = .clear
+            officialBadge.image = ConversationCell.makeTextBadge("官方", colorHex: "F53F3F")
+            officialBadge.isHidden = false
+            robotBadge.image = ConversationCell.makeTextBadge("机器人", colorHex: "165DFF")
+            robotBadge.isHidden = false
         default:
             iconView.backgroundColor = UIColor(white: 0.92, alpha: 1.0)
             iconView.tintColor = .themeColorPrimary
@@ -481,6 +505,9 @@ class ContactCell: UITableViewCell {
 
     private let avatarView = UIImageView()
     private let nameLabel = UILabel()
+    private let statusLabel = UILabel()
+    /// 当前 cell 绑定的 uid，防止异步回调串数据
+    private var currentUid = ""
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -507,7 +534,11 @@ class ContactCell: UITableViewCell {
         nameLabel.font = ScreenAdapter.font(16)
         nameLabel.textColor = .label
 
-        contentView.addSubviews(avatarView, nameLabel)
+        statusLabel.font = ScreenAdapter.font(12)
+        statusLabel.textColor = .secondaryLabel
+        statusLabel.isHidden = true
+
+        contentView.addSubviews(avatarView, nameLabel, statusLabel)
 
         avatarView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(hPad)
@@ -517,13 +548,78 @@ class ContactCell: UITableViewCell {
 
         nameLabel.snp.makeConstraints { make in
             make.leading.equalTo(avatarView.snp.trailing).offset(hPad)
-            make.centerY.equalToSuperview()
             make.trailing.equalToSuperview().offset(-hPad)
+            make.centerY.equalToSuperview().offset(-9)
+        }
+
+        statusLabel.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel)
+            make.trailing.equalToSuperview().offset(-hPad)
+            make.top.equalTo(nameLabel.snp.bottom).offset(2)
         }
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        currentUid = ""
+        statusLabel.isHidden = true
+        statusLabel.text = nil
+        nameLabel.attributedText = nil
+        nameLabel.text = nil
+        nameLabel.textColor = .label
+    }
+
     func configure(with user: User) {
-        nameLabel.text = user.name
+        currentUid = user.uid
         AppUtility.loadChannelAvatar(channelId: user.uid, channelType: 1, name: user.name, into: avatarView)
+
+        // 特殊好友（西安雷虎虎）：红色昵称 + 西安/押金商家徽章 + 在线状态副标题
+        if SpecialUserUtils.isSpecialUser(uid: user.uid, shortNo: "", name: user.name) {
+            nameLabel.attributedText = SpecialUserUtils.attributedName(
+                user.name, font: nameLabel.font, color: SpecialUserUtils.specialUserNameColor)
+            nameLabel.snp.updateConstraints { make in
+                make.centerY.equalToSuperview().offset(-9)
+            }
+            loadOnlineStatus(uid: user.uid)
+        } else {
+            nameLabel.text = user.name
+            nameLabel.snp.updateConstraints { make in
+                make.centerY.equalToSuperview().offset(0)
+            }
+        }
+    }
+
+    /// 拉取频道信息，展示「在线 / 上次在线时间 xx」（对齐安卓）
+    private func loadOnlineStatus(uid: String) {
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let info: ChannelInfo = try await APIClient.shared.requestFlexible(
+                    .getChannelInfo(channelId: uid, channelType: 1))
+                DispatchQueue.main.async {
+                    guard self.currentUid == uid else { return }
+                    if (info.online ?? 0) == 1 {
+                        self.statusLabel.text = "在线"
+                    } else if let last = info.last_offline, last > 0 {
+                        self.statusLabel.text = "上次在线时间 \(ContactCell.lastOfflineText(seconds: last))"
+                    }
+                    self.statusLabel.isHidden = self.statusLabel.text == nil
+                }
+            } catch { }
+        }
+    }
+
+    private static func lastOfflineText(seconds: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(seconds))
+        let cal = Calendar.current
+        let fmt = DateFormatter()
+        if cal.isDateInToday(date) {
+            fmt.dateFormat = "HH:mm"
+        } else if cal.isDateInYesterday(date) {
+            fmt.dateFormat = "昨天 HH:mm"
+        } else {
+            fmt.dateFormat = "MM-dd HH:mm"
+        }
+        return fmt.string(from: date)
     }
 }

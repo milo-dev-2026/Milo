@@ -15,13 +15,9 @@ class NoteEditViewController: UIViewController {
     private let contentStack = UIStackView()
     private let toolbarView = UIView()
     private var autoSaveTimer: Timer?
-    
-    // 工具栏按钮
-    private let titleBtn = UIButton(type: .system)
-    private let textBtn = UIButton(type: .system)
-    private let imageBtn = UIButton(type: .system)
-    private let videoBtn = UIButton(type: .system)
-    private let locationBtn = UIButton(type: .system)
+
+    /// 本地未上传完成的图片（block.id → 本地图），选中后立即展示，不等上传
+    private var localImages: [String: UIImage] = [:]
     
     private var blocks: [NoteBlock] = []
     
@@ -101,14 +97,14 @@ class NoteEditViewController: UIViewController {
     }
     
     private func setupToolbar() {
-        let items: [(icon: String, title: String, btn: UIButton, action: Selector)] = [
-            ("textformat.size", "标题", titleBtn, #selector(addTitleBlock)),
-            ("text.alignleft", "文字", textBtn, #selector(addTextBlock)),
-            ("photo", "图片", imageBtn, #selector(addImageBlock)),
-            ("video", "视频", videoBtn, #selector(addVideoBlock)),
-            ("location", "位置", locationBtn, #selector(addLocationBlock))
+        let items: [(icon: String, title: String, action: Selector)] = [
+            ("textformat.size", "标题", #selector(addTitleBlock)),
+            ("text.alignleft", "文字", #selector(addTextBlock)),
+            ("photo", "图片", #selector(addImageBlock)),
+            ("video", "视频", #selector(addVideoBlock)),
+            ("location", "位置", #selector(addLocationBlock))
         ]
-        
+
         let stack = UIStackView()
         stack.axis = .horizontal
         stack.distribution = .fillEqually
@@ -117,17 +113,37 @@ class NoteEditViewController: UIViewController {
             make.top.leading.trailing.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom)
         }
-        
+
+        // 图标在上、文字在下，垂直居中排列，保证图标与文字严格对齐
         for item in items {
-            let btn = item.btn
-            btn.setImage(UIImage(systemName: item.icon), for: .normal)
-            btn.tintColor = .themePrimary
-            btn.setTitle(item.title, for: .normal)
-            btn.titleLabel?.font = ScreenAdapter.font(10)
-            btn.titleEdgeInsets = UIEdgeInsets(top: 22, left: -20, bottom: 0, right: 0)
-            btn.imageEdgeInsets = UIEdgeInsets(top: -8, left: 10, bottom: 10, right: -10)
-            btn.addTarget(self, action: item.action, for: .touchUpInside)
-            stack.addArrangedSubview(btn)
+            let container = UIView()
+
+            let iconView = UIImageView()
+            iconView.image = UIImage(systemName: item.icon)
+            iconView.tintColor = .themePrimary
+            iconView.contentMode = .scaleAspectFit
+
+            let label = UILabel()
+            label.text = item.title
+            label.font = ScreenAdapter.font(10)
+            label.textColor = .label
+            label.textAlignment = .center
+
+            let vStack = UIStackView(arrangedSubviews: [iconView, label])
+            vStack.axis = .vertical
+            vStack.alignment = .center
+            vStack.spacing = 3
+            container.addSubview(vStack)
+            iconView.snp.makeConstraints { make in
+                make.width.height.equalTo(ScreenAdapter.scaleW(22))
+            }
+            vStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+
+            let tap = UITapGestureRecognizer(target: self, action: item.action)
+            container.addGestureRecognizer(tap)
+            stack.addArrangedSubview(container)
         }
     }
     
@@ -186,7 +202,10 @@ class NoteEditViewController: UIViewController {
             imgView.addGestureRecognizer(tap)
             imgView.tag = index
             
-            if let urlStr = block.imageURL, !urlStr.isEmpty {
+            if let localImage = localImages[block.id] {
+                // 本地刚选的图片立即展示
+                imgView.image = localImage
+            } else if let urlStr = block.imageURL, !urlStr.isEmpty {
                 let url: URL?
                 if urlStr.hasPrefix("http") {
                     url = URL(string: urlStr)
@@ -483,16 +502,25 @@ extension NoteEditViewController: UIImagePickerControllerDelegate, UINavigationC
         
         if let mediaType = info[.mediaType] as? String {
             if mediaType == UTType.image.identifier {
-                if let image = info[.originalImage] as? UIImage,
-                   let data = image.jpegData(compressionQuality: 0.6) {
-                    Task {
+                if let image = info[.originalImage] as? UIImage {
+                    // 先插入本地图片块立即展示，再后台上传回填 URL
+                    let block = NoteBlock(type: .image)
+                    localImages[block.id] = image
+                    blocks.append(block)
+                    renderBlocks()
+                    scrollToBottom()
+
+                    guard let data = image.jpegData(compressionQuality: 0.6) else { return }
+                    let blockId = block.id
+                    Task { [weak self] in
+                        guard let self = self else { return }
                         do {
                             let fileName = "note_img_\(Int(Date().timeIntervalSince1970)).jpg"
                             let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                            DispatchQueue.main.async { [weak self] in
-                                self?.blocks.append(NoteBlock(type: .image, imageURL: path))
-                                self?.renderBlocks()
-                                self?.scrollToBottom()
+                            DispatchQueue.main.async {
+                                if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
+                                    self.blocks[idx].imageURL = path
+                                }
                             }
                         } catch {
                             DispatchQueue.main.async {
