@@ -31,7 +31,7 @@ class GroupQRCodeViewController: UIViewController {
         nameLabel.textColor = .label
         nameLabel.textAlignment = .center
 
-        tipLabel.text = "扫一扫二维码，加入群聊"
+        tipLabel.text = "该二维码永久有效"
         tipLabel.font = ScreenAdapter.font(14)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -100,33 +100,42 @@ class GroupQRCodeViewController: UIViewController {
                     }
                 }
             } catch {
-                // 服务端获取失败时保持本地生成的二维码
+                // 服务端获取失败时保持本地生成的二维码（本地内容同样走 /v1/qrcode/g 路由，永久有效）
             }
         }
     }
 
+    /// CIQRCodeGenerator 输出的是原始 CIImage，直接用 UIImage(ciImage:) 会模糊且尺寸为 0 时为空。
+    /// 固定输出尺寸 + 位图上下文渲染，保证清晰且必能生成（修复"群二维码显示空白"）
     private func displayQRCode(from string: String) {
-        guard let data = string.data(using: .utf8),
-              let filter = CIFilter(name: "CIQRCodeGenerator") else { return }
-        filter.setValue(data, forKey: "inputMessage")
-        filter.setValue("H", forKey: "inputCorrectionLevel")
-        guard let outputImage = filter.outputImage else { return }
-        let scale = max(qrImageView.bounds.width, 200) / outputImage.extent.width
-        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        qrImageView.image = UIImage(ciImage: scaledImage)
+        qrImageView.image = Self.makeQRCode(from: string, size: 512)
     }
 
     private func generateQRCode() {
-        let qrString = "milo://group?\(groupId)"
-        guard let data = qrString.data(using: .utf8),
-              let filter = CIFilter(name: "CIQRCodeGenerator") else { return }
+        // 与后端 /v1/groups/{id}/qrcode 返回内容一致，扫码端统一走 /v1/qrcode/g{id} 解析入群
+        let qrString = "\(APIConfig.apiBaseURL)/v1/qrcode/g\(groupId)"
+        qrImageView.image = Self.makeQRCode(from: qrString, size: 512)
+    }
+
+    static func makeQRCode(from string: String, size: CGFloat) -> UIImage? {
+        guard let data = string.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
         filter.setValue(data, forKey: "inputMessage")
         filter.setValue("H", forKey: "inputCorrectionLevel")
-        guard let outputImage = filter.outputImage else { return }
-        let scaleX = qrImageView.bounds.width / outputImage.extent.width
-        let scaleY = qrImageView.bounds.height / outputImage.extent.height
-        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: max(scaleX, scaleY), y: max(scaleX, scaleY)))
-        qrImageView.image = UIImage(ciImage: scaledImage)
+        guard let outputImage = filter.outputImage else { return nil }
+        let scale = size / max(outputImage.extent.width, 1)
+        let scaled = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { ctx in
+            // 白底 + 最近邻放大（无插值模糊）
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            let ciCtx = CIContext(cgContext: ctx.cgContext, options: nil)
+            if let cg = ciCtx.createCGImage(scaled, from: scaled.extent) {
+                ctx.cgContext.interpolationQuality = .none
+                ctx.cgContext.draw(cg, in: CGRect(x: 0, y: 0, width: size, height: size))
+            }
+        }
     }
 }
 
@@ -667,11 +676,12 @@ class UpdateGroupNameViewController: UIViewController {
     private func loadCurrentName() {
         Task {
             do {
-                let response: APIResponse<Group> = try await APIClient.shared.request(.getGroupInfo(groupId: groupId))
-                if let data = response.data {
+                let raw = try await APIClient.shared.requestRaw(.getChannelInfo(channelId: groupId, channelType: 2))
+                let payload = (raw["data"] as? [String: Any]) ?? raw
+                if let name = payload["name"] as? String, !name.isEmpty {
                     DispatchQueue.main.async {
-                        self.currentName = data.name
-                        self.textField.text = data.name
+                        self.currentName = name
+                        self.textField.text = name
                     }
                 }
             } catch {}
@@ -696,5 +706,144 @@ class UpdateGroupNameViewController: UIViewController {
                 }
             }
         }
+    }
+}
+
+// MARK: - 群资料页（普通成员只读，仿个人信息页；管理员走 GroupDetailViewController）
+class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+
+    private let groupId: String
+    private var groupName: String = ""
+    private var memberCount: Int = 0
+    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private weak var headerAvatar: UIImageView?
+    private weak var headerNameLabel: UILabel?
+    private weak var headerCountLabel: UILabel?
+
+    private var isSpecialGroup: Bool { SpecialUserUtils.isSpecialGroup(name: groupName) }
+
+    init(groupId: String) {
+        self.groupId = groupId
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "群聊信息"
+        view.backgroundColor = .themeBackground
+
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "InfoCell")
+        tableView.tableHeaderView = createHeader()
+
+        view.addSubview(tableView)
+        tableView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+
+        loadInfo()
+    }
+
+    // MARK: - 头部（头像 + 群名 + 成员数，仿个人信息页左对齐布局）
+    private func createHeader() -> UIView {
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: ScreenAdapter.screenWidth, height: ScreenAdapter.scaleH(110)))
+
+        let card = UIView()
+        card.backgroundColor = .systemBackground
+        card.layer.cornerRadius = 12
+        card.layer.masksToBounds = true
+        header.addSubview(card)
+        card.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(8))
+        }
+
+        let avatar = UIImageView()
+        avatar.layer.cornerRadius = 8
+        avatar.clipsToBounds = true
+        avatar.contentMode = .scaleAspectFill
+        avatar.backgroundColor = .systemGray6
+        avatar.image = UIImage(systemName: "person.3.fill")
+        avatar.tintColor = .systemGray5
+
+        let name = UILabel()
+        name.font = ScreenAdapter.boldFont(18)
+        name.textColor = .label
+        name.numberOfLines = 2
+
+        let count = UILabel()
+        count.font = ScreenAdapter.font(13)
+        count.textColor = .secondaryLabel
+
+        card.addSubviews(avatar, name, count)
+        avatar.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(ScreenAdapter.scaleW(56))
+        }
+        name.snp.makeConstraints { make in
+            make.leading.equalTo(avatar.snp.trailing).offset(ScreenAdapter.scaleW(12))
+            make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.top.equalTo(avatar.snp.top).offset(ScreenAdapter.scaleH(2))
+        }
+        count.snp.makeConstraints { make in
+            make.leading.equalTo(name)
+            make.top.equalTo(name.snp.bottom).offset(ScreenAdapter.scaleH(4))
+        }
+
+        headerAvatar = avatar
+        headerNameLabel = name
+        headerCountLabel = count
+        return header
+    }
+
+    private func loadInfo() {
+        Task {
+            do {
+                let raw = try await APIClient.shared.requestRaw(.getChannelInfo(channelId: groupId, channelType: 2))
+                let payload = (raw["data"] as? [String: Any]) ?? raw
+                let name = (payload["name"] as? String) ?? ""
+                let count = (payload["member_count"] as? Int) ?? 0
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.groupName = name
+                    self.memberCount = count
+                    self.headerNameLabel?.text = name
+                    // 特殊群（西安修车大队/西安交流群等）群名使用红棕色
+                    self.headerNameLabel?.textColor = self.isSpecialGroup ? SpecialUserUtils.specialGroupNameColor : .label
+                    self.headerCountLabel?.text = "共 \(count) 人"
+                    if let avatar = self.headerAvatar {
+                        AppUtility.loadChannelAvatar(channelId: self.groupId, channelType: 2, name: name, into: avatar)
+                    }
+                    self.tableView.reloadData()
+                }
+            } catch {}
+        }
+    }
+
+    // MARK: - UITableViewDataSource
+    func numberOfSections(in tableView: UITableView) -> Int { 1 }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        // 特殊群多显示一个"客服"入口
+        return isSpecialGroup ? 1 : 0
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath)
+        cell.textLabel?.text = "客服"
+        cell.textLabel?.font = ScreenAdapter.font(16)
+        cell.imageView?.image = UIImage(systemName: "headset")
+        cell.imageView?.tintColor = .themePrimary
+        cell.accessoryType = .disclosureIndicator
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        // 客服 → 特殊好友 888 个人信息页
+        navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
     }
 }

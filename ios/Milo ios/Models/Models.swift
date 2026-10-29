@@ -45,6 +45,8 @@ struct ChannelInfo: Codable {
     var last_offline: Int?
     var status: Int?
     var follow: Int?
+    /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），仅群频道返回
+    var role: Int?
     var extra: [String: AnyCodable]?
 
     var displayName: String {
@@ -739,6 +741,84 @@ struct Group: Codable {
         case showGroupNickname = "show_group_nickname"
         case myNickname = "my_nickname"
         case members
+    }
+
+    /// 兼容唐僧叨叨 TangSeng 群详情返回的 int 字段（invite/forbidden/mute/top/save/show_nick/group_no 等）
+    private struct TangSengKeys: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { return nil }
+    }
+
+    init(groupID: String = "", name: String = "", avatar: String? = nil, notice: String? = nil,
+         memberCount: Int? = nil, ownerUid: String? = nil, myRole: Int? = nil,
+         joinApproval: Bool? = nil, muteAll: Bool? = nil, forbidAddFriend: Bool? = nil,
+         forbidTempChat: Bool? = nil, forbidNewViewHistory: Bool? = nil,
+         messageDisturb: Bool? = nil, chatTop: Bool? = nil, savedToContacts: Bool? = nil,
+         showGroupNickname: Bool? = nil, myNickname: String? = nil, members: [GroupMember]? = nil) {
+        self.groupID = groupID
+        self.name = name
+        self.avatar = avatar
+        self.notice = notice
+        self.memberCount = memberCount
+        self.ownerUid = ownerUid
+        self.myRole = myRole
+        self.joinApproval = joinApproval
+        self.muteAll = muteAll
+        self.forbidAddFriend = forbidAddFriend
+        self.forbidTempChat = forbidTempChat
+        self.forbidNewViewHistory = forbidNewViewHistory
+        self.messageDisturb = messageDisturb
+        self.chatTop = chatTop
+        self.savedToContacts = savedToContacts
+        self.showGroupNickname = showGroupNickname
+        self.myNickname = myNickname
+        self.members = members
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let t = try decoder.container(keyedBy: TangSengKeys.self)
+        // 宽松解码 Bool：兼容 true/false 与 0/1
+        func boolValue(_ key: CodingKeys) -> Bool? {
+            if let v = try? c.decodeIfPresent(Bool.self, forKey: key) { return v }
+            if let v = try? c.decodeIfPresent(Int.self, forKey: key) { return v == 1 }
+            return nil
+        }
+        func tangBool(_ key: String) -> Bool? {
+            guard let k = TangSengKeys(stringValue: key) else { return nil }
+            if let v = try? t.decodeIfPresent(Int.self, forKey: k) { return v == 1 }
+            if let v = try? t.decodeIfPresent(Bool.self, forKey: k) { return v }
+            return nil
+        }
+        groupID = (try c.decodeIfPresent(String.self, forKey: .groupID))
+            ?? (try? t.decodeIfPresent(String.self, forKey: TangSengKeys(stringValue: "group_no")!)) ?? nil
+            ?? ""
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        avatar = try c.decodeIfPresent(String.self, forKey: .avatar)
+        notice = try c.decodeIfPresent(String.self, forKey: .notice)
+        memberCount = try c.decodeIfPresent(Int.self, forKey: .memberCount)
+        ownerUid = try c.decodeIfPresent(String.self, forKey: .ownerUid)
+        myRole = try c.decodeIfPresent(Int.self, forKey: .myRole)
+        joinApproval = boolValue(.joinApproval) ?? tangBool("invite")
+        muteAll = boolValue(.muteAll) ?? tangBool("forbidden")
+        forbidAddFriend = boolValue(.forbidAddFriend) ?? tangBool("forbidden_add_friend")
+        forbidTempChat = boolValue(.forbidTempChat) ?? tangBool("forbid_member_send_temp_msg")
+        // TangSeng 字段语义为"允许新成员查看历史"，取反得到"禁止"
+        if let v = boolValue(.forbidNewViewHistory) {
+            forbidNewViewHistory = v
+        } else if let allow = tangBool("allow_view_history_msg") {
+            forbidNewViewHistory = !allow
+        } else {
+            forbidNewViewHistory = nil
+        }
+        messageDisturb = boolValue(.messageDisturb) ?? tangBool("mute")
+        chatTop = boolValue(.chatTop) ?? tangBool("top")
+        savedToContacts = boolValue(.savedToContacts) ?? tangBool("save")
+        showGroupNickname = boolValue(.showGroupNickname) ?? tangBool("show_nick")
+        myNickname = try c.decodeIfPresent(String.self, forKey: .myNickname)
+        members = try c.decodeIfPresent([GroupMember].self, forKey: .members)
     }
 
     var isOwner: Bool {

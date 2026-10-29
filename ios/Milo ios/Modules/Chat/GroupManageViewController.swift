@@ -48,9 +48,15 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
     private func loadGroupInfo() {
         Task {
             do {
-                let response: APIResponse<Group> = try await APIClient.shared.request(.getGroupInfo(groupId: groupId))
-                if let data = response.data {
-                    group = data
+                // GET /v1/groups/{group_no} 走 TangSeng，返回 invite/forbidden/mute 等 int 字段，需手动解析
+                let raw = try await APIClient.shared.requestRaw(.getGroupInfo(groupId: groupId))
+                var payload = raw["data"] as? [String: Any] ?? raw
+                if payload["group_id"] == nil && payload["group_no"] == nil {
+                    payload["group_id"] = groupId
+                }
+                if let jsonData = try? JSONSerialization.data(withJSONObject: payload),
+                   let loaded = try? JSONDecoder().decode(Group.self, from: jsonData) {
+                    group = loaded
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
                     }

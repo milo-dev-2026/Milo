@@ -11,12 +11,15 @@ class GroupDetailViewController: UIViewController {
 
     // Section 索引
     private enum Section: Int, CaseIterable {
-        case info = 0       // 我在群里的昵称、群二维码
-        case settings = 1   // 消息免打扰、置顶、保存通讯录、显示群昵称
-        case manage = 2     // 群管理员、入群审核
+        case info = 0       // 群二维码 +（特殊群：客服）
+        case settings = 1   // 消息免打扰、置顶、显示群昵称（普通成员）/ 群管理、入群审核（管理员）
+        case manage = 2     // 群管理入口（仅管理员/群主可见）
         case actions = 3    // 查找聊天内容、清空聊天记录
         case bottom = 4     // 退出/解散群聊
     }
+
+    /// 特殊群（西安修车大队/西安交流群等）在群信息页多显示一个"客服"入口，点击进特殊好友 888 的个人信息页
+    private var isSpecialGroup: Bool { SpecialUserUtils.isSpecialGroup(name: group?.name ?? "") }
 
     init(groupId: String) {
         self.groupId = groupId
@@ -223,8 +226,9 @@ class GroupDetailViewController: UIViewController {
         // 计算 header 高度
         let headerWidth = view.bounds.width > 0 ? view.bounds.width : ScreenAdapter.screenWidth
         let cardWidth = headerWidth - 32
-        let memberGridHeight = calculateMemberGridHeight(cardWidth: cardWidth)
-        let headerHeight = 12 + 16 + avatarSize + 16 + 36 + 12 + 12 + 12 + memberGridHeight + 16 + 8
+        // 成员网格固定两行高度（对齐微信：头像+昵称两行展示，更多成员点头像区进全部成员页）
+        let twoRowGridHeight = calculateMemberGridHeight(cardWidth: cardWidth) * 2
+        let headerHeight = 12 + 16 + avatarSize + 16 + 36 + 12 + 12 + 12 + twoRowGridHeight + 16 + 8
         header.frame = CGRect(x: 0, y: 0, width: headerWidth, height: headerHeight)
 
         return header
@@ -266,8 +270,10 @@ navigationController?.pushViewController(vc, animated: true)
         let avatarSize = itemWidth
         let labelHeight = ScreenAdapter.scaleH(18)
 
-        let displayMembers = Array(members.prefix(9))
-        let totalItems = displayMembers.count + 1 // +1 for add button
+        let displayMembers = Array(members.prefix(8))
+        // 第二行固定为 +（邀请）和 -（移除，仅管理员可见），对齐微信群信息页
+        let showRemove = group?.isAdmin ?? false
+        let totalItems = displayMembers.count + (showRemove ? 2 : 1)
 
         for i in 0..<min(totalItems, 10) {
             let row = CGFloat(i / Int(columns))
@@ -296,13 +302,25 @@ navigationController?.pushViewController(vc, animated: true)
                 let member = displayMembers[i]
                 nameLabel.text = member.name
                 AppUtility.loadChannelAvatar(channelId: member.uid, channelType: 1, name: member.name, into: avatarView)
-            } else {
-                // 添加按钮
+                // 点击成员头像 → 个人主页（对齐微信）
+                container.tag = i
+                let tap = UITapGestureRecognizer(target: self, action: #selector(didTapMemberAvatar(_:)))
+                container.addGestureRecognizer(tap)
+            } else if i == displayMembers.count {
+                // 邀请按钮
                 avatarView.image = UIImage(systemName: "plus")
                 avatarView.tintColor = .themePrimary
                 avatarView.backgroundColor = UIColor.themePrimary.withAlphaComponent(0.1)
                 nameLabel.text = ""
                 let tap = UITapGestureRecognizer(target: self, action: #selector(didTapAddMember))
+                container.addGestureRecognizer(tap)
+            } else {
+                // 移除按钮（仅管理员）
+                avatarView.image = UIImage(systemName: "minus")
+                avatarView.tintColor = .systemRed
+                avatarView.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+                nameLabel.text = ""
+                let tap = UITapGestureRecognizer(target: self, action: #selector(didTapRemoveMember))
                 container.addGestureRecognizer(tap)
             }
 
@@ -311,6 +329,18 @@ navigationController?.pushViewController(vc, animated: true)
             container.isUserInteractionEnabled = true
             gridView.addSubview(container)
         }
+    }
+
+    @objc private func didTapMemberAvatar(_ gesture: UITapGestureRecognizer) {
+        guard let view = gesture.view, view.tag < members.count else { return }
+        let member = members[view.tag]
+        navigationController?.pushViewController(ContactDetailViewController(uid: member.uid), animated: true)
+    }
+
+    @objc private func didTapRemoveMember() {
+        let vc = RemoveGroupMembersViewController(groupId: groupId)
+        vc.onMembersRemoved = { [weak self] in self?.loadGroupInfo() }
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     // MARK: - Load Data
@@ -322,17 +352,16 @@ navigationController?.pushViewController(vc, animated: true)
                     .getChannelInfo(channelId: groupId, channelType: 2)
                 )
                 let payload = (raw["data"] as? [String: Any]) ?? raw
-                var dict: [String: Any] = ["group_id": groupId]
-                dict["name"] = (payload["name"] as? String) ?? ""
+                // 透传完整 payload（含 mute/top/save/show_nick/invite/forbidden 等 TangSeng int 字段），
+                // 由 Group 自定义解码器统一兼容解析
+                var dict: [String: Any] = payload
+                dict["group_id"] = groupId
+                if dict["name"] == nil { dict["name"] = "" }
                 if let logo = payload["logo"] as? String, !logo.isEmpty { dict["avatar"] = logo }
-                if let notice = payload["notice"] as? String, !notice.isEmpty { dict["notice"] = notice }
-                if let mc = payload["member_count"] as? Int { dict["member_count"] = mc }
                 if let owner = (payload["creator"] as? String) ?? (payload["owner_uid"] as? String) {
                     dict["owner_uid"] = owner
                 }
                 if let role = payload["role"] as? Int { dict["my_role"] = role }
-                if let top = payload["chat_top"] as? Bool { dict["chat_top"] = top }
-                if let disturb = payload["message_disturb"] as? Bool { dict["message_disturb"] = disturb }
                 let jsonData = try JSONSerialization.data(withJSONObject: dict)
                 var loaded = try JSONDecoder().decode(Group.self, from: jsonData)
 
@@ -549,13 +578,21 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         guard let sec = Section(rawValue: section) else { return 0 }
+        let admin = group?.isAdmin ?? false
+        let specialExtra = isSpecialGroup ? 1 : 0
         switch sec {
-        case .info: return 3
-        case .settings: return 4
+        case .info:
+            // 管理员：只保留群二维码（+特殊群客服）；普通成员：我在群里的昵称/群二维码/群备注（+特殊群客服）
+            return (admin ? 1 : 3) + specialExtra
+        case .settings:
+            // 管理员不显示个人开关（免打扰/置顶/保存通讯录/显示群昵称），统一进群管理
+            return admin ? 0 : 4
         case .manage:
-            // 群主/管理员才显示管理功能组
-            return (group?.isAdmin ?? false) ? 2 : 0
-        case .actions: return 2
+            // 群主/管理员显示"群管理"入口
+            return admin ? 1 : 0
+        case .actions:
+            // 管理员不显示查找/清空（群管理内提供）
+            return admin ? 0 : 2
         case .bottom: return 1
         }
     }
@@ -592,22 +629,37 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             cell.textLabel?.font = ScreenAdapter.font(16)
             cell.detailTextLabel?.font = ScreenAdapter.font(14)
             cell.detailTextLabel?.textColor = .secondaryLabel
+            let admin = group?.isAdmin ?? false
 
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = "我在群里的昵称"
-                cell.imageView?.image = UIImage(systemName: "person.text.rectangle")
-                cell.detailTextLabel?.text = group?.myNickname ?? ""
-            case 1:
-                cell.textLabel?.text = "群二维码"
-                cell.imageView?.image = UIImage(systemName: "qrcode")
-            case 2:
-                cell.textLabel?.text = "群备注"
-                cell.imageView?.image = UIImage(systemName: "pencil")
-                cell.detailTextLabel?.text = UserDefaults.standard.string(forKey: "group_remark_\(groupId)") ?? ""
-                cell.detailTextLabel?.font = ScreenAdapter.font(14)
-                cell.detailTextLabel?.textColor = .secondaryLabel
-            default: break
+            if admin {
+                // 管理员版：row0 群二维码，特殊群 row1 客服
+                switch indexPath.row {
+                case 0:
+                    cell.textLabel?.text = "群二维码"
+                    cell.imageView?.image = UIImage(systemName: "qrcode")
+                case 1:
+                    cell.textLabel?.text = "客服"
+                    cell.imageView?.image = UIImage(systemName: "headset")
+                default: break
+                }
+            } else {
+                switch indexPath.row {
+                case 0:
+                    cell.textLabel?.text = "我在群里的昵称"
+                    cell.imageView?.image = UIImage(systemName: "person.text.rectangle")
+                    cell.detailTextLabel?.text = group?.myNickname ?? ""
+                case 1:
+                    cell.textLabel?.text = "群二维码"
+                    cell.imageView?.image = UIImage(systemName: "qrcode")
+                case 2:
+                    cell.textLabel?.text = "群备注"
+                    cell.imageView?.image = UIImage(systemName: "pencil")
+                    cell.detailTextLabel?.text = UserDefaults.standard.string(forKey: "group_remark_\(groupId)") ?? ""
+                case 3:
+                    cell.textLabel?.text = "客服"
+                    cell.imageView?.image = UIImage(systemName: "headset")
+                default: break
+                }
             }
             return cell
 
@@ -638,19 +690,9 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             cell.accessoryType = .disclosureIndicator
             cell.imageView?.tintColor = .themePrimary
             cell.textLabel?.font = ScreenAdapter.font(16)
-
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = "群管理员"
-                cell.imageView?.image = UIImage(systemName: "person.badge.shield.checkmark")
-            case 1:
-                cell.textLabel?.text = "入群审核"
-                cell.imageView?.image = UIImage(systemName: "checkmark.shield")
-                cell.detailTextLabel?.text = (group?.joinApproval ?? false) ? "已开启" : "已关闭"
-                cell.detailTextLabel?.font = ScreenAdapter.font(14)
-                cell.detailTextLabel?.textColor = .secondaryLabel
-            default: break
-            }
+            // 单行"群管理"入口，内含角色/权限/禁言/黑名单/转让等全部管理功能
+            cell.textLabel?.text = "群管理"
+            cell.imageView?.image = UIImage(systemName: "gearshape")
             return cell
 
         case .actions:
@@ -694,41 +736,50 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
 
         switch sec {
         case .info:
-            switch indexPath.row {
-            case 0:
-                // 我在群里的昵称
-                let vc = EditMyNicknameViewController(groupId: groupId, currentNickname: group?.myNickname ?? "")
-                vc.onNicknameUpdated = { [weak self] nickname in
-                    self?.group?.myNickname = nickname
-                    self?.tableView.reloadData()
+            let admin = group?.isAdmin ?? false
+            if admin {
+                switch indexPath.row {
+                case 0:
+                    // 群二维码
+                    let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
+                    navigationController?.pushViewController(vc, animated: true)
+                case 1:
+                    // 特殊群：客服 → 特殊好友 888 个人信息页
+                    navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
+                default: break
                 }
-navigationController?.pushViewController(vc, animated: true)
-            case 1:
-                // 群二维码
-                let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
-navigationController?.pushViewController(vc, animated: true)
-            case 2:
-                // 群备注
-                let vc = SetGroupRemarkViewController(groupId: groupId)
-navigationController?.pushViewController(vc, animated: true)
-            default: break
+            } else {
+                switch indexPath.row {
+                case 0:
+                    // 我在群里的昵称
+                    let vc = EditMyNicknameViewController(groupId: groupId, currentNickname: group?.myNickname ?? "")
+                    vc.onNicknameUpdated = { [weak self] nickname in
+                        self?.group?.myNickname = nickname
+                        self?.tableView.reloadData()
+                    }
+                    navigationController?.pushViewController(vc, animated: true)
+                case 1:
+                    // 群二维码
+                    let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
+                    navigationController?.pushViewController(vc, animated: true)
+                case 2:
+                    // 群备注
+                    let vc = SetGroupRemarkViewController(groupId: groupId)
+                    navigationController?.pushViewController(vc, animated: true)
+                case 3:
+                    // 特殊群：客服 → 特殊好友 888 个人信息页
+                    navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
+                default: break
+                }
             }
 
         case .settings:
             break // 开关操作已处理
 
         case .manage:
-            switch indexPath.row {
-            case 0:
-                // 群管理员
-                let vc = GroupAdminsViewController(groupId: groupId)
-navigationController?.pushViewController(vc, animated: true)
-            case 1:
-                // 入群审核 - 跳转到群管理页面对应位置
-                let vc = GroupManageViewController(groupId: groupId)
-navigationController?.pushViewController(vc, animated: true)
-            default: break
-            }
+            // 群管理（角色/权限/禁言/黑名单/转让）
+            let vc = GroupManageViewController(groupId: groupId)
+            navigationController?.pushViewController(vc, animated: true)
 
         case .actions:
             switch indexPath.row {

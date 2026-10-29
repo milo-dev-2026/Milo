@@ -49,6 +49,9 @@ class ChatViewController: UIViewController {
     private let scrollDownButton = UIButton(type: .system)
     /// 最近一次在线状态文案，供「正在输入」切换后还原
     private var lastOnlineStatusText: String?
+    /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），控制群管理入口可见性（对齐安卓 hideOrShowRightView）
+    private var myGroupRole: Int = 0
+    private var isGroupAdmin: Bool { myGroupRole == 1 || myGroupRole == 2 }
 
     /// 聊天文件上传专用会话（默认 30/60 秒对原图/视频不够）
     private let uploadSession: URLSession = {
@@ -574,6 +577,11 @@ class ChatViewController: UIViewController {
                         online: (channelInfo.online ?? 0) == 1,
                         lastOffline: channelInfo.last_offline
                     )
+                    // 群聊：根据角色控制右上角"三横"管理入口（仅群主/管理员可见）
+                    if self.channelType == 2 {
+                        self.myGroupRole = channelInfo.role ?? 0
+                        self.updateGroupRightBarButton()
+                    }
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
@@ -602,7 +610,11 @@ class ChatViewController: UIViewController {
             callBtn.tintColor = .themePrimary
             navigationItem.rightBarButtonItems = [moreBtn, callBtn]
         } else {
-            navigationItem.rightBarButtonItem = moreBtn
+            // 群聊：三横管理入口仅群主/管理员可见（角色异步返回后由 updateGroupRightBarButton 设置），
+            // 普通成员通过点标题进入群资料页
+            navigationItem.rightBarButtonItems = []
+            titleView.isUserInteractionEnabled = true
+            titleView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapTitleView)))
         }
 
         // 返回按钮
@@ -629,6 +641,33 @@ class ChatViewController: UIViewController {
         }
     }
 
+    /// 群聊：仅群主/管理员显示右上角"三横"管理入口（对齐安卓 ChatActivity.hideOrShowRightView）
+    private func updateGroupRightBarButton() {
+        guard channelType == 2 else { return }
+        if isGroupAdmin {
+            let moreBtn = UIBarButtonItem(
+                image: UIImage(systemName: "line.3.horizontal"),
+                style: .plain,
+                target: self,
+                action: #selector(showMoreOptions)
+            )
+            moreBtn.tintColor = .label
+            navigationItem.rightBarButtonItems = [moreBtn]
+        } else {
+            navigationItem.rightBarButtonItems = []
+        }
+    }
+
+    /// 点击群聊标题：管理员进群详情（可管理），普通成员进群资料页（只读）
+    @objc private func didTapTitleView() {
+        guard channelType == 2 else { return }
+        if isGroupAdmin {
+            openGroupDetail()
+        } else {
+            navigationController?.pushViewController(GroupInfoViewController(groupId: channelId), animated: true)
+        }
+    }
+
     // MARK: - 点击气泡头像
     @objc private func handleAvatarTapped(_ note: Notification) {
         guard let info = note.userInfo,
@@ -637,8 +676,12 @@ class ChatViewController: UIViewController {
         let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
 
         if tappedType == 2 {
-            // 群头像 → 群资料页
-            openGroupDetail()
+            // 群头像 → 管理员进群详情（可管理），普通成员进群资料页（只读）
+            if isGroupAdmin {
+                openGroupDetail()
+            } else {
+                navigationController?.pushViewController(GroupInfoViewController(groupId: channelId), animated: true)
+            }
             return
         }
         // 自己的头像 → 我的主页

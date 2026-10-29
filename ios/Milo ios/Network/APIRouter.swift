@@ -229,8 +229,8 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         case let .updateUserInfoFields(fields):
             request.httpBody = try JSONSerialization.data(withJSONObject: fields)
-        case let .getGroupInfo(groupId):
-            request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
+        case .getGroupInfo:
+            break // GET /v1/groups/{group_no}，无 query
         case let .syncMessageExtra(channelId, channelType, version):
             request.httpBody = try JSONSerialization.data(withJSONObject: [
                 "channel_id": channelId,
@@ -337,30 +337,31 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
         case let .removeFromBlackList(groupId, uid):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uid": uid])
-        case let .setJoinApproval(groupId, enabled):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "enabled": enabled])
-        case let .setGroupMuteAll(groupId, muted):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "muted": muted])
-        case let .setForbidAddFriend(groupId, forbidden):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
-        case let .setForbidTempChat(groupId, forbidden):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
-        case let .setForbidNewMemberViewHistory(groupId, forbidden):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "forbidden": forbidden])
+        case let .setJoinApproval(_, enabled):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["invite": enabled ? 1 : 0])
+        case let .setGroupMuteAll(_, muted):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["forbidden": muted ? 1 : 0])
+        case let .setForbidAddFriend(_, forbidden):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["forbidden_add_friend": forbidden ? 1 : 0])
+        case let .setForbidTempChat(_, forbidden):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["forbid_member_send_temp_msg": forbidden ? 1 : 0])
+        case let .setForbidNewMemberViewHistory(_, forbidden):
+            // 后端字段语义为"允许新成员查看历史消息"，取反
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["allow_view_history_msg": forbidden ? 0 : 1])
         case let .leaveGroup(groupId):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
         case let .dismissGroup(groupId):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
         case let .updateMyNicknameInGroup(groupId, nickname):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "nickname": nickname])
-        case let .setMessageDisturb(groupId, disturbed):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "disturbed": disturbed])
-        case let .setChatTop(groupId, topped):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "topped": topped])
-        case let .saveToContacts(groupId, saved):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "saved": saved])
-        case let .setShowGroupNickname(groupId, show):
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "show": show])
+        case let .setMessageDisturb(_, disturbed):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["mute": disturbed ? 1 : 0])
+        case let .setChatTop(_, topped):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["top": topped ? 1 : 0])
+        case let .saveToContacts(_, saved):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["save": saved ? 1 : 0])
+        case let .setShowGroupNickname(_, show):
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["show_nick": show ? 1 : 0])
         case let .clearChatHistory(groupId):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId])
         case let .getLeftGroupMembers(groupId):
@@ -456,7 +457,7 @@ enum APIRouter: URLRequestConvertible {
         case .syncFriends: return "/v1/friend/sync"
         case let .getChannelInfo(channelId, channelType): return "/v1/channels/\(channelId)/\(channelType)"
         case .updateUserInfo, .updateUserInfoFields: return "/v1/user/current"
-        case .getGroupInfo: return "/v1/groups/info"
+        case let .getGroupInfo(groupId): return "/v1/groups/\(groupId)"
         case .uploadFile: return "/v1/files/upload"
         case .getFriendsApply: return "/v1/friend/apply"
         case .applyFriend: return "/v1/friend/apply"
@@ -486,18 +487,20 @@ enum APIRouter: URLRequestConvertible {
         case .getGroupBlackList: return "/v1/groups/blacklist"
         case .addToBlackList: return "/v1/groups/blacklist/add"
         case .removeFromBlackList: return "/v1/groups/blacklist/remove"
-        case .setJoinApproval: return "/v1/groups/settings/join_approval"
-        case .setGroupMuteAll: return "/v1/groups/settings/mute_all"
-        case .setForbidAddFriend: return "/v1/groups/settings/forbid_add_friend"
-        case .setForbidTempChat: return "/v1/groups/settings/forbid_temp_chat"
-        case .setForbidNewMemberViewHistory: return "/v1/groups/settings/forbid_new_view_history"
+        // 管理员群设置统一走 PUT /v1/groups/{group_no}/setting（对齐安卓与后端 app.py）
+        case let .setJoinApproval(groupId, _): return "/v1/groups/\(groupId)/setting"
+        case let .setGroupMuteAll(groupId, _): return "/v1/groups/\(groupId)/setting"
+        case let .setForbidAddFriend(groupId, _): return "/v1/groups/\(groupId)/setting"
+        case let .setForbidTempChat(groupId, _): return "/v1/groups/\(groupId)/setting"
+        case let .setForbidNewMemberViewHistory(groupId, _): return "/v1/groups/\(groupId)/setting"
         case .leaveGroup: return "/v1/groups/leave"
         case .dismissGroup: return "/v1/groups/dismiss"
         case .updateMyNicknameInGroup: return "/v1/groups/my_nickname"
-        case .setMessageDisturb: return "/v1/groups/settings/message_disturb"
-        case .setChatTop: return "/v1/groups/settings/chat_top"
-        case .saveToContacts: return "/v1/groups/settings/save_contacts"
-        case .setShowGroupNickname: return "/v1/groups/settings/show_nickname"
+        // 个人群设置统一走 PUT /v1/groups/{group_no}/mysetting（对齐安卓与后端 app.py）
+        case let .setMessageDisturb(groupId, _): return "/v1/groups/\(groupId)/mysetting"
+        case let .setChatTop(groupId, _): return "/v1/groups/\(groupId)/mysetting"
+        case let .saveToContacts(groupId, _): return "/v1/groups/\(groupId)/mysetting"
+        case let .setShowGroupNickname(groupId, _): return "/v1/groups/\(groupId)/mysetting"
         case .clearChatHistory: return "/v1/groups/clear_history"
         case .getLeftGroupMembers: return "/v1/groups/left_members"
         case .verifyLoginPwd: return "/v1/user/verify_login_pwd"
