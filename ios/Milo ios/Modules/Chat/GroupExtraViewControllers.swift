@@ -277,8 +277,8 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
                 // 优先用 SDK 已同步的频道名，避免把群号 hex 当昵称显示成“乱码”
                 var name = ""
                 if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2),
-                   let n = info.name, !n.isEmpty {
-                    name = n
+                   !info.name.isEmpty {
+                    name = info.name
                 }
                 if name.isEmpty { name = "群聊" }
                 list.append((groupId: gid, name: name, memberCount: 0))
@@ -293,7 +293,8 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
         // 异步补拉频道信息（群名/头像），回来刷新列表
         for g in list {
             IMManager.shared.fetchChannelInfo(channelId: g.groupId, channelType: 2) { [weak self] info in
-                guard let self = self, let info = info, let newName = info.name, !newName.isEmpty else { return }
+                guard let self = self, let info = info, !info.name.isEmpty else { return }
+                let newName = info.name
                 DispatchQueue.main.async {
                     if let idx = self.groups.firstIndex(where: { $0.groupId == g.groupId }), self.groups[idx].name != newName {
                         self.groups[idx].name = newName
