@@ -150,6 +150,17 @@ final class RTCCallManager {
             guard let self = self else { return }
             self.waitingVC = nil
             self.sendSignal(.refuse, to: callerId)
+            // 对齐安卓 refuseCall：发送"已拒绝"通话结果消息（双方会话可见）
+            IMManager.shared.sendRTCResultMessage(channelId: callerId, channelType: 1,
+                                                  callType: self.callType, resultType: 3, second: 0)
+            self.reset()
+        }, onTimeout: { [weak self] in
+            guard let self = self else { return }
+            self.waitingVC = nil
+            self.sendSignal(.refuse, to: callerId)
+            // 对齐安卓 WaitingAnswerActivity 超时：发送"未接听"通话结果消息
+            IMManager.shared.sendRTCResultMessage(channelId: callerId, channelType: 1,
+                                                  callType: self.callType, resultType: 2, second: 0)
             self.reset()
         })
         waitingVC = waiting

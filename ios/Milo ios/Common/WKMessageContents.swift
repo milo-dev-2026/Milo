@@ -229,49 +229,115 @@ import WuKongIMSDK
 }
 
 // MARK: - 笔记消息内容 (type: 100)
+/// 线缆格式与安卓 WKNoteContent 完全一致：noteId/noteTitle/noteContent/noteGroup/noteTime/blockListJson/coverUrl/resource/summary/containVideo/containLocation
+/// 保证 iOS↔安卓↔utalk 双端互通，无需安卓改动
 @objc public class WKNoteMessageContent: WKMessageContent {
     @objc public var noteId: String = ""
-    @objc public var title: String = ""
+    @objc public var noteTitle: String = ""
     @objc public var noteContent: String = ""
+    @objc public var noteGroup: String = ""
+    @objc public var noteTime: String = ""
+    @objc public var blockListJson: String = ""
+    @objc public var coverUrl: String = ""
+    @objc public var summary: String = ""
+    @objc public var containVideo: Int = 0
+    @objc public var containLocation: Int = 0
+
+    // 旧字段兼容（本端解析用）
+    @objc public var title: String = ""
     @objc public var noteJSON: String = ""
-    
+
     public override func encodeWithJSON() -> [AnyHashable : Any] {
         var dict = [AnyHashable: Any]()
-        dict["note_id"] = noteId
-        dict["title"] = title
-        dict["content"] = noteContent
-        dict["note_json"] = noteJSON
+        dict["noteId"] = noteId
+        dict["noteTitle"] = noteTitle
+        dict["noteContent"] = noteContent
+        dict["noteGroup"] = noteGroup
+        dict["noteTime"] = noteTime
+        dict["blockListJson"] = blockListJson
+        // 与安卓一致：coverUrl 和 resource 都写封面图，兼容 utalk
+        dict["coverUrl"] = coverUrl
+        dict["resource"] = coverUrl
+        dict["resourceType"] = ""
+        dict["summary"] = summary
+        dict["containVideo"] = containVideo
+        dict["containLocation"] = containLocation
         return dict
     }
-    
+
     public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
         guard let contentDic = contentDic else { return }
-        if let noteId = contentDic["note_id"] as? String {
-            self.noteId = noteId
+        func str(_ key: String) -> String {
+            if let s = contentDic[key] as? String { return s }
+            if let n = contentDic[key] as? NSNumber { return n.stringValue }
+            return ""
         }
-        if let title = contentDic["title"] as? String {
-            self.title = title
+        // 安卓/utalk 原生字段
+        noteId = str("noteId")
+        noteTitle = str("noteTitle")
+        noteContent = str("noteContent")
+        noteGroup = str("noteGroup")
+        noteTime = str("noteTime")
+        blockListJson = str("blockListJson")
+        coverUrl = str("coverUrl").isEmpty ? str("resource") : str("coverUrl")
+        summary = str("summary")
+        if let v = contentDic["containVideo"] as? NSNumber { containVideo = v.intValue }
+        if let v = contentDic["containLocation"] as? NSNumber { containLocation = v.intValue }
+        // 兼容旧 iOS 格式 note_id/title/content/note_json
+        if noteId.isEmpty { noteId = str("note_id") }
+        if noteTitle.isEmpty { noteTitle = str("title") }
+        if noteContent.isEmpty { noteContent = str("content") }
+        noteJSON = str("note_json")
+        // 保留完整 JSON 供详情页解析
+        if let data = try? JSONSerialization.data(withJSONObject: contentDic),
+           let s = String(data: data, encoding: .utf8) {
+            noteJSON = s
         }
-        if let noteContent = contentDic["content"] as? String {
-            self.noteContent = noteContent
-        }
-        if let noteJSON = contentDic["note_json"] as? String {
-            self.noteJSON = noteJSON
-        }
-        // 兼容安卓 WKNoteContent 驼峰字段：保留完整 JSON 供详情页解析（noteId/noteTitle/blockListJson 等）
-        if contentDic["noteTitle"] != nil || contentDic["blockListJson"] != nil || contentDic["noteId"] != nil {
-            if let nid = contentDic["noteId"] as? String { self.noteId = nid }
-            if let t = contentDic["noteTitle"] as? String { self.title = t }
-            if let nc = contentDic["noteContent"] as? String { self.noteContent = nc }
-            if let data = try? JSONSerialization.data(withJSONObject: contentDic),
-               let str = String(data: data, encoding: .utf8) {
-                self.noteJSON = str
-            }
-        }
+        title = noteTitle
     }
-    
+
     public override class func contentType() -> NSNumber {
         return NSNumber(value: 100)
+    }
+}
+
+// MARK: - RTC 通话结果消息内容 (type: 9989，与安卓 WKRTCType.WK_P2P_CALL / RTCMsgContent 一致)
+/// 通话结束时由结束方发送的真实聊天消息，双方会话中展示通话气泡（对齐微信/安卓）
+/// callType: 0=语音 1=视频；resultType: 0=取消 1=正常结束 2=未接听 3=拒绝 4=忙线；second: 通话时长(秒)
+@objc public class WKRTCMsgContent: WKMessageContent {
+    @objc public var callType: Int = 0
+    @objc public var resultType: Int = 0
+    @objc public var second: Int = 0
+
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
+        var dict = [AnyHashable : Any]()
+        dict["call_type"] = callType
+        dict["second"] = second
+        dict["result_type"] = resultType
+        dict["type"] = 9989
+        return dict
+    }
+
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+        if let v = contentDic["call_type"] as? Int {
+            self.callType = v
+        } else if let v = contentDic["call_type"] as? NSNumber {
+            self.callType = v.intValue
+        }
+        if let v = contentDic["result_type"] as? Int {
+            self.resultType = v
+        } else if let v = contentDic["result_type"] as? NSNumber {
+            self.resultType = v.intValue
+        }
+        if let v = contentDic["second"] as? Int {
+            self.second = v
+        } else if let v = contentDic["second"] as? NSNumber {
+            self.second = v.intValue
+        }
+    }
+
+    public override class func contentType() -> NSNumber {
+        return NSNumber(value: 9989)
     }
 }
 
@@ -327,6 +393,7 @@ import WuKongIMSDK
 class WKMessageContentRegistrar {
     static func registerAll() {
         WKSDK.shared().registerMessageContent(WKRTCSignalMessageContent.self)
+        WKSDK.shared().registerMessageContent(WKRTCMsgContent.self)
         WKSDK.shared().registerMessageContent(WKImageMessageContent.self)
         WKSDK.shared().registerMessageContent(WKVoiceMessageContent.self)
         WKSDK.shared().registerMessageContent(WKVideoMessageContent.self)

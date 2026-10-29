@@ -9,7 +9,8 @@ enum FavoriteType: Int, Codable {
     case file = 5
     case location = 6
     case link = 7
-    
+    case note = 100
+
     var title: String {
         switch self {
         case .text: return "文字"
@@ -19,9 +20,10 @@ enum FavoriteType: Int, Codable {
         case .file: return "文件"
         case .location: return "位置"
         case .link: return "链接"
+        case .note: return "笔记"
         }
     }
-    
+
     var iconName: String {
         switch self {
         case .text: return "text.bubble"
@@ -31,6 +33,7 @@ enum FavoriteType: Int, Codable {
         case .file: return "doc.fill"
         case .location: return "mappin.circle"
         case .link: return "link"
+        case .note: return "note.text"
         }
     }
 }
@@ -128,6 +131,14 @@ struct FavoriteItem: Codable {
             return location?.address ?? "[位置]"
         case .link:
             return content
+        case .note:
+            // content 为笔记 JSON，提取标题做预览
+            if let data = content.data(using: .utf8),
+               let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                let t = (dict["noteTitle"] as? String) ?? (dict["title"] as? String) ?? ""
+                return "[笔记] \(t.isEmpty ? "无标题" : t)"
+            }
+            return "[笔记]"
         }
     }
     

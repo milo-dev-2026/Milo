@@ -7,7 +7,7 @@ import MapKit
 
 // MARK: - 收藏列表页
 class FavoriteViewController: UIViewController {
-    
+
     private let searchContainer = UIView()
     private let searchIconImageView = UIImageView()
     private let searchTextField = UITextField()
@@ -16,6 +16,20 @@ class FavoriteViewController: UIViewController {
     private var isSearching = false
     private var isMultiSelectMode = false
     private var selectedIds: Set<String> = []
+
+    /// 从聊天工具栏进入时携带的会话上下文（对齐安卓 FavoriteActivity channelId/channelType）
+    private let contextChannelId: String?
+    private let contextChannelType: Int
+
+    init(channelId: String? = nil, channelType: Int = 1) {
+        self.contextChannelId = channelId
+        self.contextChannelType = channelType
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -82,6 +96,7 @@ class FavoriteViewController: UIViewController {
         tableView.register(FavoriteFileCell.self, forCellReuseIdentifier: "FavoriteFileCell")
         tableView.register(FavoriteLocationCell.self, forCellReuseIdentifier: "FavoriteLocationCell")
         tableView.register(FavoriteLinkCell.self, forCellReuseIdentifier: "FavoriteLinkCell")
+        tableView.register(FavoriteNoteCell.self, forCellReuseIdentifier: "FavoriteNoteCell")
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
             make.top.equalTo(searchContainer.snp.bottom).offset(8)
@@ -205,30 +220,14 @@ class FavoriteViewController: UIViewController {
     
     @objc private func batchForward() {
         guard !selectedIds.isEmpty else { return }
-        let alert = UIAlertController(title: "转发到", message: "请选择转发目标", preferredStyle: .alert)
-        alert.addTextField { tf in
-            tf.placeholder = "输入对方ID"
+        let items = selectedIds.compactMap { FavoriteStorageManager.shared.getFavorite(by: $0) }
+        guard !items.isEmpty else { return }
+        FavoriteForwarder.present(from: self, items: items,
+                                  channelId: contextChannelId, channelType: contextChannelType) { [weak self] in
+            guard let self = self else { return }
+            self.selectedIds.removeAll()
+            if self.isMultiSelectMode { self.toggleMultiSelect() }
         }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "发送", style: .default) { [weak self] _ in
-            guard let targetId = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !targetId.isEmpty else { return }
-            Task {
-                for id in self?.selectedIds ?? [] {
-                    if let item = FavoriteStorageManager.shared.getFavorite(by: id) {
-                        do {
-                            _ = try await APIClient.shared.requestRaw(
-                                .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue, channelType: 1)
-                            )
-                        } catch {}
-                    }
-                }
-                DispatchQueue.main.async {
-                    AppUtility.showToast("已转发")
-                }
-            }
-        })
-        present(alert, animated: true)
     }
     
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -257,30 +256,8 @@ class FavoriteViewController: UIViewController {
     }
     
     private func forwardItem(_ item: FavoriteItem) {
-        let alert = UIAlertController(title: "转发到", message: "请选择转发目标", preferredStyle: .alert)
-        alert.addTextField { tf in
-            tf.placeholder = "输入对方ID"
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "发送", style: .default) { [weak self] _ in
-            guard let targetId = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !targetId.isEmpty else { return }
-            Task {
-                do {
-                    _ = try await APIClient.shared.requestRaw(
-                        .sendMessage(channelId: targetId, content: item.content, type: item.type.rawValue, channelType: 1)
-                    )
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("已转发")
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("转发失败")
-                    }
-                }
-            }
-        })
-        present(alert, animated: true)
+        FavoriteForwarder.present(from: self, items: [item],
+                                  channelId: contextChannelId, channelType: contextChannelType)
     }
 }
 
@@ -335,6 +312,8 @@ extension FavoriteViewController: UITableViewDataSource, UITableViewDelegate {
             cell = tableView.dequeueReusableCell(withIdentifier: "FavoriteLocationCell", for: indexPath) as! FavoriteLocationCell
         case .link:
             cell = tableView.dequeueReusableCell(withIdentifier: "FavoriteLinkCell", for: indexPath) as! FavoriteLinkCell
+        case .note:
+            cell = tableView.dequeueReusableCell(withIdentifier: "FavoriteNoteCell", for: indexPath) as! FavoriteNoteCell
         }
         
         cell.configure(with: item)
@@ -368,12 +347,23 @@ extension FavoriteViewController: UITableViewDataSource, UITableViewDelegate {
             return
         }
         
+        // 笔记直接打开笔记详情页（对齐聊天页笔记查看体验）
+        if item.type == .note {
+            if let note = FavoriteForwarder.parseNote(item.content) {
+                let noteVC = NoteDetailViewController(note: note)
+                navigationController?.pushViewController(noteVC, animated: true)
+            } else {
+                AppUtility.showToast("笔记内容无法解析")
+            }
+            return
+        }
+
         // 进入详情页
-        let detail = FavoriteDetailViewController(item: item)
+        let detail = FavoriteDetailViewController(item: item, channelId: contextChannelId, channelType: contextChannelType)
         detail.onDelete = { [weak self] _ in
             self?.loadData()
         }
-navigationController?.pushViewController(detail, animated: true)
+        navigationController?.pushViewController(detail, animated: true)
     }
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
@@ -939,5 +929,569 @@ class FavoriteLinkCell: FavoriteBaseCell {
     override func configure(with item: FavoriteItem) {
         super.configure(with: item)
         linkLabel.text = item.content
+    }
+}
+
+// MARK: - 笔记收藏Cell
+class FavoriteNoteCell: FavoriteBaseCell {
+
+    private let noteContainer = UIView()
+    private let noteIcon = UIImageView()
+    private let noteTitleLabel = UILabel()
+    private let notePreviewLabel = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setupUI() {
+        noteContainer.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.08)
+        noteContainer.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        cardView.addSubview(noteContainer)
+
+        noteIcon.image = UIImage(systemName: "note.text")
+        noteIcon.tintColor = .systemOrange
+        noteIcon.contentMode = .scaleAspectFit
+        noteContainer.addSubview(noteIcon)
+
+        noteTitleLabel.font = ScreenAdapter.mediumFont(14)
+        noteTitleLabel.textColor = .label
+        noteTitleLabel.numberOfLines = 1
+        noteContainer.addSubview(noteTitleLabel)
+
+        notePreviewLabel.font = ScreenAdapter.font(12)
+        notePreviewLabel.textColor = .secondaryLabel
+        notePreviewLabel.numberOfLines = 2
+        noteContainer.addSubview(notePreviewLabel)
+
+        noteContainer.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(14))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(14))
+            make.top.equalTo(typeIconView.snp.bottom).offset(ScreenAdapter.scaleH(10))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(14))
+        }
+
+        noteIcon.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(12))
+            make.width.height.equalTo(ScreenAdapter.scaleW(22))
+        }
+
+        noteTitleLabel.snp.makeConstraints { make in
+            make.leading.equalTo(noteIcon.snp.trailing).offset(ScreenAdapter.scaleW(8))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+            make.centerY.equalTo(noteIcon)
+        }
+
+        notePreviewLabel.snp.makeConstraints { make in
+            make.leading.equalTo(noteIcon.snp.trailing).offset(ScreenAdapter.scaleW(8))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+            make.top.equalTo(noteTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(12))
+        }
+    }
+
+    override func configure(with item: FavoriteItem) {
+        super.configure(with: item)
+        let note = FavoriteForwarder.parseNote(item.content)
+        noteTitleLabel.text = (note?.title.isEmpty == false) ? note!.title : "无标题笔记"
+        notePreviewLabel.text = note?.previewText ?? ""
+    }
+}
+
+// MARK: - 收藏转发器（对齐安卓 FavoriteActivity.showForwardDialog）
+enum FavoriteForwarder {
+
+    /// 解析笔记 JSON（本端 NoteEntity 格式 / 安卓 WKNoteContent 格式均兼容）
+    static func parseNote(_ content: String) -> NoteEntity? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return nil }
+        if let note = try? JSONDecoder().decode(NoteEntity.self, from: data), !note.blocks.isEmpty || !note.title.isEmpty {
+            return note
+        }
+        guard let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        // 安卓 WKNoteContent 原生格式
+        if dict["noteTitle"] != nil || dict["blockListJson"] != nil || dict["noteId"] != nil {
+            var note = NoteEntity()
+            if let nid = dict["noteId"] as? String, !nid.isEmpty { note.id = nid }
+            note.title = dict["noteTitle"] as? String ?? ""
+            note.group = dict["noteGroup"] as? String ?? "普通笔记"
+            var blocks: [NoteBlock] = []
+            if let blJson = dict["blockListJson"] as? String, !blJson.isEmpty,
+               let bd = blJson.data(using: .utf8),
+               let arr = try? JSONSerialization.jsonObject(with: bd) as? [[String: Any]] {
+                for b in arr {
+                    let t = (b["type"] as? NSNumber)?.intValue ?? 2
+                    let c = b["content"] as? String ?? ""
+                    switch t {
+                    case 1: blocks.append(NoteBlock(type: .title, content: c))
+                    case 3:
+                        let img = b["imagePath"] as? String ?? ""
+                        blocks.append(NoteBlock(type: .image, imageURL: img.isEmpty ? nil : img))
+                    case 4:
+                        let v = b["videoPath"] as? String ?? ""
+                        blocks.append(NoteBlock(type: .video, videoURL: v.isEmpty ? nil : v))
+                    case 5:
+                        let lat = (b["latitude"] as? NSNumber)?.doubleValue ?? 0
+                        let lng = (b["longitude"] as? NSNumber)?.doubleValue ?? 0
+                        let ln = b["locationName"] as? String ?? ""
+                        let la = b["locationAddress"] as? String ?? ""
+                        blocks.append(NoteBlock(type: .location, content: ln,
+                                                location: NoteLocation(latitude: lat, longitude: lng, address: la.isEmpty ? ln : la)))
+                    default: blocks.append(NoteBlock(type: .text, content: c))
+                    }
+                }
+            }
+            if blocks.isEmpty, let nc = dict["noteContent"] as? String, !nc.isEmpty {
+                blocks = [NoteBlock(type: .text, content: nc)]
+            }
+            note.blocks = blocks
+            return note
+        }
+        if let note = try? JSONDecoder().decode(NoteEntity.self, from: data) { return note }
+        return nil
+    }
+
+    /// 相对路径/绝对地址统一转 URL（聊天媒体走 /v1/static/chat/ 前缀规则）
+    static func mediaURL(_ urlStr: String) -> URL? {
+        guard !urlStr.isEmpty else { return nil }
+        if urlStr.hasPrefix("http") { return URL(string: urlStr) }
+        if urlStr.hasPrefix("/") { return URL(string: APIConfig.apiBaseURL + urlStr) }
+        return URL(string: APIConfig.apiBaseURL + "/" + urlStr)
+    }
+
+    /// 转发入口：有会话上下文（聊天工具栏进入）→ 弹"发送给当前好友 确定/取消"；
+    /// 无上下文（我的页面进入）→ 上下滑动选择好友 → 再弹确认
+    static func present(from vc: UIViewController, items: [FavoriteItem],
+                        channelId: String?, channelType: Int, onSent: (() -> Void)? = nil) {
+        if let cid = channelId, !cid.isEmpty {
+            let name = IMManager.shared.getChannelInfo(channelId: cid, channelType: channelType)?.displayName ?? "当前好友"
+            let sheet = FavoriteForwardSheet(items: items, targetId: cid, targetType: channelType, targetName: name)
+            sheet.onSent = onSent
+            vc.present(sheet, animated: true)
+        } else {
+            let picker = FriendPickerSheet()
+            picker.onPicked = { [weak vc] friend in
+                guard let vc = vc, let friend = friend else { return }
+                let sheet = FavoriteForwardSheet(items: items, targetId: friend.uid, targetType: 1, targetName: friend.displayName)
+                sheet.onSent = onSent
+                vc.present(sheet, animated: true)
+            }
+            vc.present(picker, animated: true)
+        }
+    }
+
+    /// 逐条发送收藏内容（全部走 IM SDK 类型消息，保证与安卓双端互通）
+    static func send(_ item: FavoriteItem, to channelId: String, channelType: Int) {
+        let im = IMManager.shared
+        switch item.type {
+        case .text, .link:
+            im.sendTextMessage(channelId: channelId, content: item.content, channelType: channelType)
+        case .image:
+            let url = item.imageURL ?? item.content
+            guard !url.isEmpty, !url.hasPrefix("local:") else {
+                im.sendTextMessage(channelId: channelId, content: "[图片]", channelType: channelType)
+                return
+            }
+            im.sendImageMessage(channelId: channelId, imageURL: url, width: 0, height: 0, channelType: channelType)
+        case .voice:
+            guard let url = item.voiceURL, !url.isEmpty else {
+                im.sendTextMessage(channelId: channelId, content: "[语音]", channelType: channelType)
+                return
+            }
+            im.sendVoiceMessage(channelId: channelId, voiceURL: url,
+                                duration: max(1, Int(item.voiceDuration ?? 1)), channelType: channelType)
+        case .video:
+            let video = item.videoURL ?? ""
+            guard !video.isEmpty else {
+                im.sendTextMessage(channelId: channelId, content: "[视频]", channelType: channelType)
+                return
+            }
+            im.sendVideoMessage(channelId: channelId, thumbURL: item.imageURL ?? "", videoURL: video,
+                                duration: 0, channelType: channelType)
+        case .file:
+            guard let url = item.fileURL, !url.isEmpty else {
+                im.sendTextMessage(channelId: channelId, content: item.fileName ?? "[文件]", channelType: channelType)
+                return
+            }
+            im.sendFileMessage(channelId: channelId, fileName: item.fileName ?? "文件",
+                               fileSize: item.fileSize ?? 0, fileURL: url, channelType: channelType)
+        case .location:
+            guard let loc = item.location else {
+                im.sendTextMessage(channelId: channelId, content: "[位置]", channelType: channelType)
+                return
+            }
+            // 收藏存的 address 可能为 "名称\n地址"，拆分回 name/address
+            let parts = loc.address.components(separatedBy: "\n")
+            let name = parts.first ?? loc.address
+            let addr = parts.count > 1 ? parts.dropFirst().joined(separator: "\n") : ""
+            im.sendLocationMessage(channelId: channelId, name: name, address: addr,
+                                   latitude: loc.latitude, longitude: loc.longitude, channelType: channelType)
+        case .note:
+            guard let note = parseNote(item.content),
+                  let data = try? JSONEncoder().encode(note),
+                  let json = String(data: data, encoding: .utf8) else {
+                im.sendTextMessage(channelId: channelId, content: "[笔记]", channelType: channelType)
+                return
+            }
+            im.sendNoteMessage(channelId: channelId, noteJSON: json, channelType: channelType)
+        }
+    }
+}
+
+// MARK: - 底部转发确认弹层（对齐安卓 chat_favorite_forward_dialog）
+class FavoriteForwardSheet: UIViewController {
+
+    var onSent: (() -> Void)?
+
+    private let items: [FavoriteItem]
+    private let targetId: String
+    private let targetType: Int
+    private let targetName: String
+
+    private let dimView = UIView()
+    private let cardView = UIView()
+
+    init(items: [FavoriteItem], targetId: String, targetType: Int, targetName: String) {
+        self.items = items
+        self.targetId = targetId
+        self.targetType = targetType
+        self.targetName = targetName
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+    }
+
+    private func setupUI() {
+        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        view.addSubview(dimView)
+        dimView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+        let tap = UITapGestureRecognizer(target: self, action: #selector(cancelTapped))
+        dimView.addGestureRecognizer(tap)
+
+        cardView.backgroundColor = .systemBackground
+        cardView.layer.cornerRadius = ScreenAdapter.scaleW(14)
+        cardView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        cardView.clipsToBounds = true
+        view.addSubview(cardView)
+        cardView.snp.makeConstraints { make in
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+
+        let titleLabel = UILabel()
+        titleLabel.text = "发送给"
+        titleLabel.font = ScreenAdapter.mediumFont(16)
+        titleLabel.textColor = .label
+        cardView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.centerX.equalToSuperview()
+        }
+
+        // 好友头像 + 昵称
+        let avatarView = UIImageView()
+        avatarView.layer.cornerRadius = ScreenAdapter.scaleW(20)
+        avatarView.clipsToBounds = true
+        avatarView.contentMode = .scaleAspectFill
+        AppUtility.loadChannelAvatar(channelId: targetId, channelType: targetType, name: targetName, into: avatarView)
+        cardView.addSubview(avatarView)
+        avatarView.snp.makeConstraints { make in
+            make.top.equalTo(titleLabel.snp.bottom).offset(ScreenAdapter.scaleH(14))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.width.height.equalTo(ScreenAdapter.scaleW(40))
+        }
+
+        let nameLabel = UILabel()
+        nameLabel.text = targetName
+        nameLabel.font = ScreenAdapter.mediumFont(15)
+        nameLabel.textColor = .label
+        nameLabel.numberOfLines = 1
+        cardView.addSubview(nameLabel)
+        nameLabel.snp.makeConstraints { make in
+            make.leading.equalTo(avatarView.snp.trailing).offset(ScreenAdapter.scaleW(10))
+            make.centerY.equalTo(avatarView)
+            make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        // 内容预览区
+        let previewContainer = UIView()
+        previewContainer.backgroundColor = .systemGray6
+        previewContainer.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        cardView.addSubview(previewContainer)
+        previewContainer.snp.makeConstraints { make in
+            make.top.equalTo(avatarView.snp.bottom).offset(ScreenAdapter.scaleH(14))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+        }
+
+        if items.count > 1 {
+            let label = UILabel()
+            label.text = "【逐条转发】共\(items.count)条消息"
+            label.font = ScreenAdapter.font(14)
+            label.textColor = .label
+            previewContainer.addSubview(label)
+            label.snp.makeConstraints { make in
+                make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
+                make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+                make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+                make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(14))
+            }
+        } else if let item = items.first {
+            switch item.type {
+            case .image, .video:
+                let imgView = UIImageView()
+                imgView.contentMode = .scaleAspectFill
+                imgView.clipsToBounds = true
+                imgView.backgroundColor = .systemGray5
+                imgView.layer.cornerRadius = ScreenAdapter.scaleW(6)
+                let urlStr = item.imageURL ?? item.content
+                if let url = FavoriteForwarder.mediaURL(urlStr) {
+                    imgView.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))
+                }
+                previewContainer.addSubview(imgView)
+                imgView.snp.makeConstraints { make in
+                    make.top.equalToSuperview().offset(ScreenAdapter.scaleH(10))
+                    make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+                    make.width.equalTo(ScreenAdapter.scaleW(80))
+                    make.height.equalTo(ScreenAdapter.scaleH(80))
+                    make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(10))
+                }
+                if item.type == .video {
+                    let playIcon = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+                    playIcon.tintColor = .white
+                    imgView.addSubview(playIcon)
+                    playIcon.snp.makeConstraints { make in
+                        make.center.equalToSuperview()
+                        make.width.height.equalTo(ScreenAdapter.scaleW(28))
+                    }
+                }
+            default:
+                let label = UILabel()
+                label.text = item.previewText
+                label.font = ScreenAdapter.font(14)
+                label.textColor = .label
+                label.numberOfLines = 3
+                previewContainer.addSubview(label)
+                label.snp.makeConstraints { make in
+                    make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
+                    make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+                    make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+                    make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(14))
+                }
+            }
+        }
+
+        // 取消 / 确定 按钮
+        let btnStack = UIStackView()
+        btnStack.axis = .horizontal
+        btnStack.spacing = ScreenAdapter.scaleW(12)
+        btnStack.distribution = .fillEqually
+        cardView.addSubview(btnStack)
+        btnStack.snp.makeConstraints { make in
+            make.top.equalTo(previewContainer.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(ScreenAdapter.scaleH(44))
+            make.bottom.equalToSuperview().offset(-(ScreenAdapter.scaleH(16) + view.safeAreaInsets.bottom))
+        }
+
+        let cancelBtn = UIButton(type: .system)
+        cancelBtn.setTitle("取消", for: .normal)
+        cancelBtn.setTitleColor(.label, for: .normal)
+        cancelBtn.backgroundColor = .systemGray5
+        cancelBtn.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        cancelBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        cancelBtn.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        btnStack.addArrangedSubview(cancelBtn)
+
+        let confirmBtn = UIButton(type: .system)
+        confirmBtn.setTitle("确定", for: .normal)
+        confirmBtn.setTitleColor(.white, for: .normal)
+        confirmBtn.backgroundColor = .themePrimary
+        confirmBtn.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        confirmBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        confirmBtn.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+        btnStack.addArrangedSubview(confirmBtn)
+    }
+
+    @objc private func cancelTapped() {
+        dismiss(animated: true)
+    }
+
+    @objc private func confirmTapped() {
+        for item in items {
+            FavoriteForwarder.send(item, to: targetId, channelType: targetType)
+        }
+        dismiss(animated: true) { [weak self] in
+            AppUtility.showToast("已发送给\(self?.targetName ?? "")")
+            self?.onSent?()
+        }
+    }
+}
+
+// MARK: - 好友滑动选择弹层（我的页面转发收藏：上下滑动选择好友）
+class FriendPickerSheet: UIViewController, UIPickerViewDataSource, UIPickerViewDelegate {
+
+    var onPicked: ((FriendSyncInfo?) -> Void)?
+
+    private var friends: [FriendSyncInfo] = []
+    private let dimView = UIView()
+    private let cardView = UIView()
+    private let pickerView = UIPickerView()
+    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
+
+    init() {
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        loadFriends()
+    }
+
+    private func setupUI() {
+        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        view.addSubview(dimView)
+        dimView.snp.makeConstraints { make in make.edges.equalToSuperview() }
+        let tap = UITapGestureRecognizer(target: self, action: #selector(cancelTapped))
+        dimView.addGestureRecognizer(tap)
+
+        cardView.backgroundColor = .systemBackground
+        cardView.layer.cornerRadius = ScreenAdapter.scaleW(14)
+        cardView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        cardView.clipsToBounds = true
+        view.addSubview(cardView)
+        cardView.snp.makeConstraints { make in
+            make.leading.trailing.bottom.equalToSuperview()
+        }
+
+        let titleLabel = UILabel()
+        titleLabel.text = "选择好友"
+        titleLabel.font = ScreenAdapter.mediumFont(16)
+        titleLabel.textColor = .label
+        cardView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.centerX.equalToSuperview()
+        }
+
+        pickerView.dataSource = self
+        pickerView.delegate = self
+        cardView.addSubview(pickerView)
+        pickerView.snp.makeConstraints { make in
+            make.top.equalTo(titleLabel.snp.bottom).offset(ScreenAdapter.scaleH(8))
+            make.leading.trailing.equalToSuperview()
+            make.height.equalTo(ScreenAdapter.scaleH(180))
+        }
+
+        loadingIndicator.hidesWhenStopped = true
+        cardView.addSubview(loadingIndicator)
+        loadingIndicator.snp.makeConstraints { make in
+            make.center.equalTo(pickerView)
+        }
+
+        let btnStack = UIStackView()
+        btnStack.axis = .horizontal
+        btnStack.spacing = ScreenAdapter.scaleW(12)
+        btnStack.distribution = .fillEqually
+        cardView.addSubview(btnStack)
+        btnStack.snp.makeConstraints { make in
+            make.top.equalTo(pickerView.snp.bottom).offset(ScreenAdapter.scaleH(12))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(20))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(20))
+            make.height.equalTo(ScreenAdapter.scaleH(44))
+            make.bottom.equalToSuperview().offset(-(ScreenAdapter.scaleH(16) + view.safeAreaInsets.bottom))
+        }
+
+        let cancelBtn = UIButton(type: .system)
+        cancelBtn.setTitle("取消", for: .normal)
+        cancelBtn.setTitleColor(.label, for: .normal)
+        cancelBtn.backgroundColor = .systemGray5
+        cancelBtn.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        cancelBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        cancelBtn.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        btnStack.addArrangedSubview(cancelBtn)
+
+        let confirmBtn = UIButton(type: .system)
+        confirmBtn.setTitle("确定", for: .normal)
+        confirmBtn.setTitleColor(.white, for: .normal)
+        confirmBtn.backgroundColor = .themePrimary
+        confirmBtn.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        confirmBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        confirmBtn.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+        btnStack.addArrangedSubview(confirmBtn)
+    }
+
+    private func loadFriends() {
+        loadingIndicator.startAnimating()
+        Task {
+            do {
+                let list: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.loadingIndicator.stopAnimating()
+                    self.friends = list
+                    self.pickerView.reloadAllComponents()
+                    if list.isEmpty {
+                        AppUtility.showToast("暂无好友")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.loadingIndicator.stopAnimating()
+                    AppUtility.showToast("好友列表加载失败")
+                }
+            }
+        }
+    }
+
+    @objc private func cancelTapped() {
+        dismiss(animated: true)
+    }
+
+    @objc private func confirmTapped() {
+        guard !friends.isEmpty else {
+            AppUtility.showToast("暂无可转发的好友")
+            return
+        }
+        let row = pickerView.selectedRow(inComponent: 0)
+        guard row >= 0, row < friends.count else { return }
+        let friend = friends[row]
+        dismiss(animated: true) { [weak self] in
+            self?.onPicked?(friend)
+        }
+    }
+
+    // MARK: UIPickerView
+    func numberOfComponents(in pickerView: UIPickerView) -> Int { return 1 }
+
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        return friends.count
+    }
+
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        guard row < friends.count else { return nil }
+        return friends[row].displayName
     }
 }

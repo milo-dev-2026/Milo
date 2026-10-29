@@ -8,6 +8,8 @@ class WaitingAnswerViewController: UIViewController {
     private let callerName: String
     private var onAccept: (() -> Void)?
     private var onReject: (() -> Void)?
+    /// 超时未接听回调（对齐安卓 WaitingAnswerActivity 45s 超时：发送"未接听"结果消息）
+    private var onTimeout: (() -> Void)?
 
     private let avatarView = UIImageView()
     private let nameLabel = UILabel()
@@ -17,11 +19,12 @@ class WaitingAnswerViewController: UIViewController {
     private var ringTimer: Timer?
     private var timeoutWorkItem: DispatchWorkItem?
 
-    init(channelId: String, callerName: String, onAccept: @escaping () -> Void, onReject: @escaping () -> Void) {
+    init(channelId: String, callerName: String, onAccept: @escaping () -> Void, onReject: @escaping () -> Void, onTimeout: (() -> Void)? = nil) {
         self.channelId = channelId
         self.callerName = callerName
         self.onAccept = onAccept
         self.onReject = onReject
+        self.onTimeout = onTimeout
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -139,9 +142,14 @@ class WaitingAnswerViewController: UIViewController {
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
             AudioServicesPlaySystemSound(1005)
         }
-        // 45 秒无人接听自动拒绝（对齐安卓 WaitingAnswerActivity）
+        // 45 秒无人接听自动结束（对齐安卓 WaitingAnswerActivity：超时走 onTimeout 发送"未接听"）
         let work = DispatchWorkItem { [weak self] in
-            self?.reject()
+            guard let self = self else { return }
+            self.timeoutWorkItem?.cancel()
+            self.ringTimer?.invalidate()
+            self.dismiss(animated: true) {
+                self.onTimeout?()
+            }
         }
         timeoutWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 45, execute: work)

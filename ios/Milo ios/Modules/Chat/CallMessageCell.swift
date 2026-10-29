@@ -2,76 +2,81 @@
 import SnapKit
 
 // MARK: - 通话消息内容解析
+/// 线缆格式对齐安卓 RTCMsgContent：{"call_type":0/1,"result_type":0~4,"second":秒}
+/// callType: 0=语音 1=视频；resultType: 0=取消 1=正常结束 2=未接听 3=拒绝 4=忙线
 struct CallMessageContent {
-    enum CallType: String {
-        case voice = "voice"
-        case video = "video"
-        case unknown
+    enum CallType {
+        case voice
+        case video
 
         var displayText: String {
             switch self {
             case .voice: return "语音通话"
             case .video: return "视频通话"
-            case .unknown: return "通话"
             }
-        }
-    }
-
-    enum CallStatus: String {
-        case connected = "connected"
-        case missed = "missed"
-        case cancelled = "cancelled"
-        case unknown
-
-        var displayText: String {
-            switch self {
-            case .connected: return ""
-            case .missed: return "未接通"
-            case .cancelled: return "已取消"
-            case .unknown: return ""
-            }
-        }
-
-        var isMissed: Bool {
-            return self == .missed || self == .cancelled
         }
     }
 
     let type: CallType
-    let status: CallStatus
+    let resultType: Int
     let duration: Int // 秒
 
-    /// 解析通话消息内容
-    static func parse(_ content: String) -> CallMessageContent {
-        guard !content.isEmpty else {
-            return CallMessageContent(type: .unknown, status: .unknown, duration: 0)
-        }
-
-        // 尝试解析为 JSON
-        guard let data = content.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            // 不是 JSON，尝试简单格式
-            return CallMessageContent(type: .unknown, status: .unknown, duration: 0)
-        }
-
-        let typeStr = json["type"] as? String ?? ""
-        let duration = json["duration"] as? Int ?? 0
-        let statusStr = json["status"] as? String ?? ""
-
-        let callType = CallType(rawValue: typeStr) ?? .unknown
-        let callStatus = CallStatus(rawValue: statusStr) ?? .unknown
-
-        return CallMessageContent(type: callType, status: callStatus, duration: duration)
+    /// 是否为未成功接通的结果（取消/未接听/拒绝/忙线）
+    var isMissed: Bool {
+        return resultType != 1
     }
 
-    /// 格式化时长为 mm:ss
-    var durationText: String {
-        if status.isMissed {
-            return status.displayText
+    /// 解析通话消息内容（兼容旧 iOS JSON 格式 type/status/duration）
+    static func parse(_ content: String) -> CallMessageContent {
+        guard let data = content.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return CallMessageContent(type: .voice, resultType: 1, duration: 0)
         }
-        let minutes = duration / 60
-        let seconds = duration % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+
+        func intVal(_ key: String) -> Int? {
+            if let v = json[key] as? Int { return v }
+            if let v = json[key] as? NSNumber { return v.intValue }
+            if let v = json[key] as? String { return Int(v) }
+            return nil
+        }
+
+        // 安卓格式：call_type/result_type/second
+        if let resultType = intVal("result_type") {
+            let callType: CallType = (intVal("call_type") ?? 0) == 1 ? .video : .voice
+            return CallMessageContent(type: callType, resultType: resultType, duration: intVal("second") ?? 0)
+        }
+
+        // 旧 iOS 格式：type("voice"/"video")/status("connected"/"missed"/"cancelled")/duration
+        let callType: CallType = (json["type"] as? String) == "video" ? .video : .voice
+        let statusStr = json["status"] as? String ?? ""
+        let legacyResult: Int
+        switch statusStr {
+        case "connected": legacyResult = 1
+        case "missed": legacyResult = 2
+        case "cancelled": legacyResult = 0
+        default: legacyResult = 1
+        }
+        return CallMessageContent(type: callType, resultType: legacyResult, duration: intVal("duration") ?? 0)
+    }
+
+    /// 结果文案（对齐安卓 WKCallProvider：发送方/接收方文案不同）
+    func resultText(isFromMe: Bool) -> String {
+        switch resultType {
+        case 1: // 正常结束
+            let minutes = duration / 60
+            let seconds = duration % 60
+            return String(format: "通话时长 %02d:%02d", minutes, seconds)
+        case 0: // 取消
+            return isFromMe ? "已取消" : "对方已取消"
+        case 2: // 未接听
+            return isFromMe ? "未接通" : "对方无应答"
+        case 3: // 拒绝
+            return isFromMe ? "已拒绝" : "对方已拒绝"
+        case 4: // 忙线
+            return isFromMe ? "未接通" : "对方忙线中"
+        default:
+            return ""
+        }
     }
 }
 
@@ -206,8 +211,8 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
         // 设置通话类型文字
         callTypeLabel.text = content.type.displayText
 
-        // 设置时长/状态文字
-        durationLabel.text = content.durationText
+        // 设置结果/时长文字（对齐安卓：发送方与接收方文案不同）
+        durationLabel.text = content.resultText(isFromMe: message.isFromMe)
 
         // 设置图标和颜色
         configureCallIcon(content: content)
@@ -220,7 +225,7 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
     }
 
     private func configureCallIcon(content: CallMessageContent) {
-        let isMissed = content.status.isMissed
+        let isMissed = content.isMissed
 
         // 图标
         switch content.type {
@@ -232,8 +237,6 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
             } else {
                 callIcon.image = UIImage(systemName: "phone.arrow.down.left.fill")
             }
-        case .unknown:
-            callIcon.image = UIImage(systemName: "phone.fill")
         }
 
         // 颜色

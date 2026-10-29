@@ -98,10 +98,10 @@ class FavoriteStorageManager {
             )
             
         case .voice:
-            // 语音消息内容格式: url|duration
+            // 语音消息内容格式: duration|url（与 Models.decodedPayload 约定一致）
             let parts = message.content.components(separatedBy: "|")
-            let url = parts.first ?? ""
-            let duration = TimeInterval(parts.last ?? "0") ?? 0
+            let duration = TimeInterval(parts.first ?? "0") ?? 0
+            let url = parts.count > 1 ? parts[1] : ""
             return FavoriteItem(
                 type: .voice,
                 content: message.content,
@@ -109,7 +109,7 @@ class FavoriteStorageManager {
                 voiceDuration: duration,
                 fromUser: from
             )
-            
+
         case .video:
             // 视频消息内容格式: thumb|url
             let parts = message.content.components(separatedBy: "|")
@@ -121,15 +121,17 @@ class FavoriteStorageManager {
                 videoURL: url,
                 fromUser: from
             )
-            
+
         case .file:
-            // 文件消息内容格式: fileName|fileSize
+            // 文件消息内容格式: fileName|fileSize|url
             let parts = message.content.components(separatedBy: "|")
             let fileName = parts.first ?? ""
-            let fileSize = Int64(parts.last ?? "0") ?? 0
+            let fileSize = parts.count > 1 ? (Int64(parts[1]) ?? 0) : 0
+            let fileURL = parts.count > 2 ? parts[2] : nil
             return FavoriteItem(
                 type: .file,
                 content: message.content,
+                fileURL: fileURL,
                 fileName: fileName,
                 fileSize: fileSize,
                 fromUser: from
@@ -150,6 +152,14 @@ class FavoriteStorageManager {
                 fromUser: from
             )
             
+        case .note:
+            // 笔记消息：content 为笔记 JSON（本端 NoteEntity 或安卓 WKNoteContent 格式），原样保存供详情页解析
+            return FavoriteItem(
+                type: .note,
+                content: message.content,
+                fromUser: from
+            )
+
         default:
             return FavoriteItem(
                 type: .text,

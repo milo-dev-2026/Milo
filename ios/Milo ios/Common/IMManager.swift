@@ -490,18 +490,77 @@ class IMManager: NSObject {
     }
 
     // MARK: - 发送笔记消息
+    /// 线缆格式与安卓 WKNoteContent 完全一致，保证双端互通（noteId/noteTitle/noteContent/noteGroup/noteTime/blockListJson/coverUrl/summary/containVideo/containLocation）
     func sendNoteMessage(channelId: String, noteJSON: String, channelType: Int = 1) {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         let noteContent = WKNoteMessageContent()
-        noteContent.noteJSON = noteJSON
-        // 尝试解析标题和内容
+        // noteJSON 为本端 NoteEntity JSON：{id,title,blocks:[{type,content,imageURL,videoURL,location}],group,updateTime...}
         if let data = noteJSON.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            noteContent.title = json["title"] as? String ?? ""
-            noteContent.noteContent = json["content"] as? String ?? ""
             noteContent.noteId = json["id"] as? String ?? ""
+            noteContent.noteTitle = json["title"] as? String ?? ""
+            noteContent.noteGroup = json["group"] as? String ?? "普通笔记"
+            let updateTime = (json["updateTime"] as? NSNumber)?.int64Value ?? (json["update_time"] as? NSNumber)?.int64Value ?? 0
+            if updateTime > 0 {
+                let df = DateFormatter()
+                df.dateFormat = "yyyy-MM-dd HH:mm"
+                noteContent.noteTime = df.string(from: Date(timeIntervalSince1970: TimeInterval(updateTime / 1000)))
+            }
+            // blocks → 安卓 blockListJson：type 1标题/2文字/3图片/4视频/5位置，字段 content/imagePath/videoPath/videoCover/locationName/locationAddress/latitude/longitude
+            var androidBlocks: [[String: Any]] = []
+            var summaryText = ""
+            var cover = ""
+            var hasVideo = false
+            var hasLocation = false
+            if let blocks = json["blocks"] as? [[String: Any]] {
+                for b in blocks {
+                    let typeStr = b["type"] as? String ?? "text"
+                    let content = b["content"] as? String ?? ""
+                    switch typeStr {
+                    case "title":
+                        androidBlocks.append(["type": 1, "content": content])
+                        if summaryText.isEmpty { summaryText = content }
+                    case "image":
+                        let img = b["imageURL"] as? String ?? b["image_url"] as? String ?? ""
+                        androidBlocks.append(["type": 3, "content": "", "imagePath": img])
+                        if cover.isEmpty { cover = img }
+                    case "video":
+                        let video = b["videoURL"] as? String ?? b["video_url"] as? String ?? ""
+                        androidBlocks.append(["type": 4, "content": "", "videoPath": video, "videoCover": ""])
+                        hasVideo = true
+                    case "location":
+                        var lat = 0.0, lng = 0.0, addr = ""
+                        if let loc = b["location"] as? [String: Any] {
+                            lat = (loc["latitude"] as? NSNumber)?.doubleValue ?? 0
+                            lng = (loc["longitude"] as? NSNumber)?.doubleValue ?? 0
+                            addr = loc["address"] as? String ?? ""
+                        }
+                        androidBlocks.append(["type": 5, "content": "", "locationName": content,
+                                              "locationAddress": addr, "latitude": lat, "longitude": lng])
+                        hasLocation = true
+                    default:
+                        androidBlocks.append(["type": 2, "content": content])
+                        if summaryText.isEmpty { summaryText = content }
+                    }
+                }
+            }
+            if let bd = try? JSONSerialization.data(withJSONObject: androidBlocks),
+               let s = String(data: bd, encoding: .utf8) {
+                noteContent.blockListJson = s
+            }
+            // 扁平 content 兜底（安卓扁平笔记）
+            if androidBlocks.isEmpty, let flat = json["content"] as? String, !flat.isEmpty {
+                noteContent.noteContent = flat
+                if summaryText.isEmpty { summaryText = flat }
+            } else {
+                noteContent.noteContent = summaryText
+            }
+            noteContent.summary = summaryText
+            noteContent.coverUrl = cover
+            noteContent.containVideo = hasVideo ? 1 : 0
+            noteContent.containLocation = hasLocation ? 1 : 0
         }
         _ = WKSDK.shared().chatManager.sendMessage(noteContent, channel: channel)
     }
@@ -520,6 +579,19 @@ class IMManager: NSObject {
         signal.callerName = callerName
         _ = WKSDK.shared().chatManager.sendMessage(signal, channel: channel)
     }
+
+    /// 发送通话结果消息（type=9989，对齐安卓 RTCMsgContent：由结束方发送，双方会话可见）
+    /// resultType: 0=取消 1=正常结束 2=未接听 3=拒绝 4=忙线
+    func sendRTCResultMessage(channelId: String, channelType: Int = 1, callType: Int = 0, resultType: Int, second: Int) {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        let content = WKRTCMsgContent()
+        content.callType = callType
+        content.resultType = resultType
+        content.second = second
+        _ = WKSDK.shared().chatManager.sendMessage(content, channel: channel)
+    }
 }
 
 // MARK: - WKChatManagerDelegate
@@ -527,6 +599,16 @@ extension IMManager: WKChatManagerDelegate {
 
     func onRecvMessages(_ message: WKMessage!, left: Int) {
         guard let wkMsg = message else { return }
+
+        // 黑名单过滤（微信逻辑：拉黑后不再接收对方消息）
+        let fromUidRaw = wkMsg.fromUid ?? ""
+        if !fromUidRaw.isEmpty, Int(wkMsg.channelType) == 1 {
+            let myUid0 = UserDefaults.standard.string(forKey: "uid") ?? ""
+            if fromUidRaw != myUid0,
+               (UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []).contains(fromUidRaw) {
+                return
+            }
+        }
 
         // RTC 通话信令（type=9996）：不进聊天列表，交由通话管理器处理
         if Int(wkMsg.content.realContentType) == 9996 {
@@ -724,6 +806,20 @@ extension IMManager: WKChatManagerDelegate {
                 }
             }
             msgType = .note
+
+        case 9989: // 通话结果（对齐安卓 RTCMsgContent，供 CallMessageCell 解析）
+            if let rtcContent = wkMsg.content as? WKRTCMsgContent {
+                let dict: [String: Any] = [
+                    "call_type": rtcContent.callType,
+                    "result_type": rtcContent.resultType,
+                    "second": rtcContent.second
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: dict),
+                   let str = String(data: data, encoding: .utf8) {
+                    content = str
+                }
+            }
+            msgType = .call
 
         default:
             if let textContent = wkMsg.content as? WKTextContent {

@@ -486,19 +486,32 @@ class ContactDetailViewController: UIViewController {
 
     // MARK: - 加入黑名单
     private func addToBlacklist() {
+        let targetUid = uid
+        // 先本地写入，保证黑名单列表立即可见；接口失败则回滚
+        var uids = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
+        if !uids.contains(targetUid) {
+            uids.append(targetUid)
+            UserDefaults.standard.set(uids, forKey: "blacklist_uids")
+        }
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.addBlackList(uid: uid))
+                let resp = try await APIClient.shared.requestRaw(.addBlackList(uid: targetUid))
+                let status = resp["status"] as? Int ?? 200
                 DispatchQueue.main.async {
-                    var uids = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
-                    if !uids.contains(self.uid) {
-                        uids.append(self.uid)
-                        UserDefaults.standard.set(uids, forKey: "blacklist_uids")
+                    if status == 200 {
+                        AppUtility.showToast("已加入黑名单")
+                    } else {
+                        var cur = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
+                        cur.removeAll { $0 == targetUid }
+                        UserDefaults.standard.set(cur, forKey: "blacklist_uids")
+                        AppUtility.showToast(resp["msg"] as? String ?? "操作失败")
                     }
-                    AppUtility.showToast("已加入黑名单")
                 }
             } catch {
                 DispatchQueue.main.async {
+                    var cur = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
+                    cur.removeAll { $0 == targetUid }
+                    UserDefaults.standard.set(cur, forKey: "blacklist_uids")
                     AppUtility.showToast("操作失败")
                 }
             }

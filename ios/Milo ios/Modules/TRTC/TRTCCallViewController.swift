@@ -42,6 +42,10 @@ class TRTCCallViewController: UIViewController {
     private var callDurationTimer: Timer?
     private var callDuration: Int = 0
     private var ringbackTimer: Timer?
+    /// 通话结果消息是否已发送（防重复）
+    private var resultMessageSent = false
+    /// 是否已执行结束流程（防重复挂断/信令）
+    private var didEnd = false
 
     init(channelId: String, peerName: String = "语音通话", peerAvatar: String = "", roomId: Int = 0, isCaller: Bool = true) {
         self.channelId = channelId
@@ -141,7 +145,27 @@ class TRTCCallViewController: UIViewController {
         }
     }
 
-    private func endCall(notifyPeer: Bool) {
+    /// 发送通话结果消息（对齐安卓 finishWithResult：由结束方发送，双方会话可见）
+    /// 已接通 → 正常结束(1)+时长；未接通（主叫取消/进房失败等）→ 取消(0)
+    /// 对方结束（拒绝/挂断/忙线信令）时本端不发送，对方已发
+    private func sendResultMessageIfNeeded() {
+        guard !resultMessageSent else { return }
+        resultMessageSent = true
+        if isConnected {
+            IMManager.shared.sendRTCResultMessage(channelId: channelId, channelType: 1,
+                                                  callType: 0, resultType: 1, second: callDuration)
+        } else {
+            IMManager.shared.sendRTCResultMessage(channelId: channelId, channelType: 1,
+                                                  callType: 0, resultType: 0, second: 0)
+        }
+    }
+
+    private func endCall(notifyPeer: Bool, sendResult: Bool = true) {
+        if didEnd { return }
+        didEnd = true
+        if sendResult {
+            sendResultMessageIfNeeded()
+        }
         if notifyPeer {
             RTCCallManager.shared.sendSignal(isConnected ? .hangup : .cancel, to: channelId)
         }
@@ -375,7 +399,13 @@ extension TRTCCallViewController: TRTCCloudDelegate {
     func onError(_ errCode: Int, errMsg: String?, extInfo: [AnyHashable : Any]!) {
         print("[TRTC] onError code=\(errCode) msg=\(errMsg ?? "")")
         DispatchQueue.main.async {
-            self.statusLabel.text = "通话错误(\(errCode))"
+            let text = errMsg?.isEmpty == false ? errMsg! : "错误码 \(errCode)"
+            self.statusLabel.text = "通话错误: \(text)"
+            AppUtility.showToast("通话错误: \(text)")
+            // 对齐安卓 onError：1.5秒后结束通话并发送结果消息
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.endCall(notifyPeer: false, sendResult: true)
+            }
         }
     }
 
@@ -404,14 +434,13 @@ extension TRTCCallViewController: TRTCCloudDelegate {
         startCallDurationTimer()
     }
 
-    /// 对方拒绝/挂断/忙线时的提示（对齐安卓）
+    /// 对方拒绝/挂断/忙线时的提示（对齐安卓：任何状态下都结束通话；结果消息由对方发送）
     private func showPeerEndTip(_ text: String) {
         statusLabel.text = text
         statusLabel.textColor = .systemRed
-        // 3秒后自动消失
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self, !self.isConnected else { return }
-            self.endCall(notifyPeer: false)
+        // 1.5秒后自动消失
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.endCall(notifyPeer: false, sendResult: false)
         }
     }
 
@@ -436,7 +465,7 @@ extension TRTCCallViewController: TRTCCloudDelegate {
                 self.stopCallDurationTimer()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.endCall(notifyPeer: false)
+                self.endCall(notifyPeer: false, sendResult: false)
             }
         }
     }

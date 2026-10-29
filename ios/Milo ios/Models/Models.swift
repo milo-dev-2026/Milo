@@ -390,6 +390,12 @@ struct WKMessageData: Codable {
                 return (type, s)
             }
             return (type, "")
+        case 9989: // 通话结果：保留完整 JSON 供 CallMessageCell 解析（call_type/result_type/second）
+            if let data = try? JSONSerialization.data(withJSONObject: dict),
+               let s = String(data: data, encoding: .utf8) {
+                return (type, s)
+            }
+            return (type, "")
         default:
             // 兼容安卓端未带 type 或字段不同的笔记消息
             if dict["note_json"] != nil || (dict["title"] != nil && dict["content"] != nil && str("blocks").isEmpty) {
@@ -470,7 +476,7 @@ enum MessageType: Int, Codable {
     case card = 7
     case note = 100
     case system = 99
-    case call = 8
+    case call = 9989 // 通话结果消息（对齐安卓 WKRTCType.WK_P2P_CALL）
     case multiForward = 9
 }
 
@@ -601,6 +607,14 @@ struct Conversation: Codable {
         case MessageType.location.rawValue: return "[位置]"
         case MessageType.card.rawValue: return "[名片]"
         case MessageType.note.rawValue: return "[笔记]"
+        case MessageType.call.rawValue:
+            // 对齐安卓 RTCMsgContent.getDisplayContent：按 call_type 区分语音/视频
+            if let data = msg.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let ct = (json["call_type"] as? Int) ?? (json["call_type"] as? NSNumber)?.intValue ?? 0
+                return ct == 1 ? "[视频通话]" : "[语音通话]"
+            }
+            return "[语音通话]"
         case MessageType.system.rawValue: return parseSystemPreview(msg)
         default:
             // WuKongIM 系统/群事件消息 contentType 1000~2000（邀请入群、退群等）

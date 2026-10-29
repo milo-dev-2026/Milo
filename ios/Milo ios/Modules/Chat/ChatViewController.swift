@@ -21,8 +21,8 @@ class ChatViewController: UIViewController {
     private let tableView = UITableView()
     private let inputBar = ChatInputBar()
     private var messages: [Message] = []
-    /// 特殊群聊（西安修车大队）：该群系统消息只显示"对方撤回了一条消息"等纯文案，不显示操作详情
-    private var isSpecialGroup: Bool { titleText.contains("西安修车大队") }
+    /// 特殊群聊（西安修车大队/西安交流群等）：该群系统消息只显示"对方撤回了一条消息"等纯文案，不显示操作详情
+    private var isSpecialGroup: Bool { SpecialUserUtils.isSpecialGroup(name: titleText) }
     /// 历史消息分页状态（滑到顶部继续加载更早的记录）
     private var isLoadingOlder = false
     private var hasMoreHistory = true
@@ -200,6 +200,7 @@ class ChatViewController: UIViewController {
         tableView.register(CardMessageCell.self, forCellReuseIdentifier: "CardMessageCell")
         tableView.register(NoteMessageCell.self, forCellReuseIdentifier: "NoteMessageCell")
         tableView.register(SystemMessageCell.self, forCellReuseIdentifier: "SystemMessageCell")
+        tableView.register(CallMessageCell.self, forCellReuseIdentifier: "CallMessageCell")
         tableView.register(PendingMediaMessageCell.self, forCellReuseIdentifier: "PendingMediaMessageCell")
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
@@ -780,8 +781,15 @@ class ChatViewController: UIViewController {
     /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
         var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
+        // 黑名单过滤（微信逻辑：拉黑后对方消息不展示）
+        if channelType == 1 {
+            let blackUids = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
+            if !blackUids.isEmpty {
+                result = result.filter { $0.isFromMe || !blackUids.contains($0.fromUID) }
+            }
+        }
         // 特殊群聊：过滤掉管理后台已删除的消息（is_deleted=1）以及全部系统/群事件消息
-        if titleText.contains("西安修车大队") {
+        if isSpecialGroup {
             result = result.filter { msg in
                 // 系统消息（谁邀请谁、改群名、退群等）不显示
                 if msg.type == .system { return false }
@@ -968,6 +976,16 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         case .note:
             let cell = tableView.dequeueReusableCell(withIdentifier: "NoteMessageCell", for: indexPath) as! NoteMessageCell
             cell.configure(with: message, timeHeader: timeHeader, groupedAbove: groupedAbove, groupedBelow: groupedBelow)
+            return cell
+        case .call:
+            // 通话结果气泡（对齐安卓 WKCallProvider）
+            let cell = tableView.dequeueReusableCell(withIdentifier: "CallMessageCell", for: indexPath) as! CallMessageCell
+            cell.configure(with: message)
+            cell.configureTimeHeader(text: timeHeader, isNew: pendingAppearIDs.contains(message.messageID))
+            cell.onBubbleTapped = { [weak self] in
+                // 点击通话气泡重新发起语音通话（对齐安卓点击重拨）
+                self?.startVoiceCall()
+            }
             return cell
         case .system:
             // 系统/群事件消息：居中灰色圆角条，无头像，{0}/{1} 占位符在解析时替换为昵称
@@ -1546,7 +1564,10 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     func didTapFavorite() {
-        navigationController?.pushViewController(FavoriteViewController(), animated: true)
+        navigationController?.pushViewController(
+            FavoriteViewController(channelId: channelId, channelType: channelType),
+            animated: true
+        )
     }
 
     func didTapMentionButton() {
@@ -1582,7 +1603,8 @@ extension ChatViewController: ChatInputBarDelegate {
                 let path = try await uploadChatFile(data: data, fileName: "voice_\(messageID).m4a")
                 DispatchQueue.main.async {
                     if let index = self.messages.firstIndex(where: { $0.messageID == messageID }) {
-                        self.messages[index].content = path
+                        // 与接收端格式统一为 duration|url，保证气泡宽度/秒数/收藏解析一致
+                        self.messages[index].content = "\(max(1, Int(duration)))|\(path)"
                         self.messages[index].status = 1
                         self.confirmedLocalIDs.insert(messageID)
                         self.tableView.reloadData()

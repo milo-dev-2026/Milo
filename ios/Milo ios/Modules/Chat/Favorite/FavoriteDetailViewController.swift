@@ -10,20 +10,24 @@ import CoreLocation
 class FavoriteDetailViewController: UIViewController {
     
     private let item: FavoriteItem
+    private let contextChannelId: String?
+    private let contextChannelType: Int
     var onDelete: ((String) -> Void)?
-    
+
     private let scrollView = UIScrollView()
     private let contentContainer = UIView()
     private let senderInfoView = UIView()
     private let avatarView = UIImageView()
     private let senderNameLabel = UILabel()
     private let timeLabel = UILabel()
-    
+
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
-    
-    init(item: FavoriteItem) {
+
+    init(item: FavoriteItem, channelId: String? = nil, channelType: Int = 1) {
         self.item = item
+        self.contextChannelId = channelId
+        self.contextChannelType = channelType
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -159,6 +163,8 @@ class FavoriteDetailViewController: UIViewController {
             setupLocationContent()
         case .link:
             setupLinkContent()
+        case .note:
+            setupNoteContent()
         }
     }
     
@@ -447,6 +453,93 @@ class FavoriteDetailViewController: UIViewController {
         }
     }
     
+    // MARK: - 笔记内容
+    private func setupNoteContent() {
+        let container = UIView()
+        container.backgroundColor = .systemBackground
+        container.isUserInteractionEnabled = true
+        let tap = UITapGestureRecognizer(target: self, action: #selector(openNote))
+        container.addGestureRecognizer(tap)
+        contentContainer.addSubview(container)
+        container.snp.makeConstraints { make in
+            make.top.equalTo(senderInfoView.snp.bottom).offset(ScreenAdapter.scaleH(8))
+            make.leading.trailing.equalToSuperview()
+            make.bottom.equalToSuperview()
+        }
+
+        let noteCard = UIView()
+        noteCard.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.08)
+        noteCard.layer.cornerRadius = ScreenAdapter.scaleW(12)
+        container.addSubview(noteCard)
+        noteCard.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(16))
+        }
+
+        let noteIcon = UIImageView()
+        noteIcon.image = UIImage(systemName: "note.text")
+        noteIcon.tintColor = .systemOrange
+        noteIcon.contentMode = .scaleAspectFit
+        noteCard.addSubview(noteIcon)
+        noteIcon.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(14))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
+            make.width.height.equalTo(ScreenAdapter.scaleW(28))
+        }
+
+        let note = FavoriteForwarder.parseNote(item.content)
+        let titleLabel = UILabel()
+        titleLabel.text = note?.title.isEmpty == false ? note!.title : "无标题笔记"
+        titleLabel.font = ScreenAdapter.mediumFont(16)
+        titleLabel.textColor = .label
+        titleLabel.numberOfLines = 2
+        noteCard.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.leading.equalTo(noteIcon.snp.trailing).offset(ScreenAdapter.scaleW(10))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(14))
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
+        }
+
+        let previewLabel = UILabel()
+        previewLabel.text = note?.previewText ?? "笔记内容无法解析"
+        previewLabel.font = ScreenAdapter.font(14)
+        previewLabel.textColor = .secondaryLabel
+        previewLabel.numberOfLines = 3
+        noteCard.addSubview(previewLabel)
+        previewLabel.snp.makeConstraints { make in
+            make.leading.equalTo(noteIcon.snp.trailing).offset(ScreenAdapter.scaleW(10))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(14))
+            make.top.equalTo(titleLabel.snp.bottom).offset(ScreenAdapter.scaleH(6))
+            make.bottom.equalToSuperview().offset(-ScreenAdapter.scaleH(14))
+        }
+
+        let openBtn = UIButton(type: .system)
+        openBtn.setTitle("查看笔记", for: .normal)
+        openBtn.backgroundColor = .themePrimary
+        openBtn.setTitleColor(.white, for: .normal)
+        openBtn.titleLabel?.font = ScreenAdapter.mediumFont(15)
+        openBtn.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        openBtn.addTarget(self, action: #selector(openNote), for: .touchUpInside)
+        container.addSubview(openBtn)
+        openBtn.snp.makeConstraints { make in
+            make.top.equalTo(noteCard.snp.bottom).offset(ScreenAdapter.scaleH(16))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(24))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(24))
+            make.height.equalTo(ScreenAdapter.scaleH(44))
+        }
+    }
+
+    @objc private func openNote() {
+        guard let note = FavoriteForwarder.parseNote(item.content) else {
+            AppUtility.showToast("笔记内容无法解析")
+            return
+        }
+        let noteVC = NoteDetailViewController(note: note)
+        navigationController?.pushViewController(noteVC, animated: true)
+    }
+
     // MARK: - 链接内容
     private func setupLinkContent() {
         let container = UIView()
@@ -511,30 +604,8 @@ class FavoriteDetailViewController: UIViewController {
     }
     
     @objc private func forwardItem() {
-        let alert = UIAlertController(title: "转发到", message: "请选择转发目标", preferredStyle: .alert)
-        alert.addTextField { tf in
-            tf.placeholder = "输入对方ID"
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "发送", style: .default) { [weak self] _ in
-            guard let targetId = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !targetId.isEmpty else { return }
-            Task {
-                do {
-                    _ = try await APIClient.shared.requestRaw(
-                        .sendMessage(channelId: targetId, content: self?.item.content ?? "", type: self?.item.type.rawValue ?? 1, channelType: 1)
-                    )
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("已转发")
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("转发失败")
-                    }
-                }
-            }
-        })
-        present(alert, animated: true)
+        FavoriteForwarder.present(from: self, items: [item],
+                                  channelId: contextChannelId, channelType: contextChannelType)
     }
     
     @objc private func deleteItem() {

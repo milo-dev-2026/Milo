@@ -10,8 +10,8 @@ enum SpecialUserUtils {
     /// 特殊用户昵称
     static let specialName = "西安雷虎虎"
 
-    /// 特殊群聊名称（安卓：西安修车车友交流2群 / 西安修车大队），额外补充「骗人出门让车撞」
-    static let specialGroupNames = ["西安修车车友交流2群", "西安修车大队", "骗人出门让车撞"]
+    /// 特殊群聊名称（安卓：西安修车车友交流2群 / 西安修车大队），额外补充「骗人出门让车撞」「西安交流群」
+    static let specialGroupNames = ["西安修车车友交流2群", "西安修车大队", "骗人出门让车撞", "西安交流群"]
 
     /// 特殊用户昵称颜色：红色
     static let specialUserNameColor = UIColor.red
