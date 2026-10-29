@@ -318,6 +318,39 @@ class ConversationListViewController: UIViewController {
         return ConversationListViewController.pinnedKey(for: uid)
     }
 
+    /// 已删除会话（按账号隔离）：删除后本地库/服务端刷新都不再显示该会话
+    private var deletedStorageKey: String {
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
+        return "deleted_channels_v1_\(uid)"
+    }
+
+    private var deletedIDs: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: deletedStorageKey) ?? [])
+    }
+
+    private func markDeleted(_ conversation: Conversation) {
+        var ids = UserDefaults.standard.stringArray(forKey: deletedStorageKey) ?? []
+        if !ids.contains(conversation.channelID) { ids.append(conversation.channelID) }
+        UserDefaults.standard.set(ids, forKey: deletedStorageKey)
+        UserDefaults.standard.synchronize()
+    }
+
+    /// 收到该会话新消息时自动移出删除名单（对齐微信行为：有新消息会话重新出现）
+    private func unmarkDeleted(channelId: String) {
+        var ids = UserDefaults.standard.stringArray(forKey: deletedStorageKey) ?? []
+        if let idx = ids.firstIndex(of: channelId) {
+            ids.remove(at: idx)
+            UserDefaults.standard.set(ids, forKey: deletedStorageKey)
+            UserDefaults.standard.synchronize()
+        }
+    }
+
+    private func filterDeleted(_ list: [Conversation]) -> [Conversation] {
+        let deleted = deletedIDs
+        guard !deleted.isEmpty else { return list }
+        return list.filter { !deleted.contains($0.channelID) }
+    }
+
     private var pinnedIDs: Set<String> {
         migrateLegacyPinsIfNeeded()
         return Set(UserDefaults.standard.stringArray(forKey: pinnedStorageKey) ?? [])
@@ -485,7 +518,7 @@ class ConversationListViewController: UIViewController {
             DispatchQueue.main.async {
                 self.isLoadingLocal = false
                 guard !local.isEmpty else { return }
-                let merged = self.mergeNames(local, with: existingSnapshot)
+                let merged = self.filterDeleted(self.mergeNames(local, with: existingSnapshot))
                 // 服务端列表已展示时，不用本地较少的会话覆盖，防止回退闪空
                 if self.serverLoaded && merged.count < self.conversations.count { return }
                 self.conversations = self.sortedConversations(merged)
@@ -506,7 +539,7 @@ class ConversationListViewController: UIViewController {
                 let wkConversations = syncResp.conversations ?? []
                 // 置顶优先，其余按 lastMsgSeq 降序（其次按时间戳），与Android会话顺序一致
                 let serverList = self.sortedConversations(
-                    self.mergeNames(wkConversations.map { Conversation(from: $0) }, with: existingSnapshot)
+                    self.filterDeleted(self.mergeNames(wkConversations.map { Conversation(from: $0) }, with: existingSnapshot))
                 )
                 DispatchQueue.main.async {
                     self.isFetchingServer = false
@@ -593,9 +626,14 @@ class ConversationListViewController: UIViewController {
 
     private func setupIMObserver() {
         // 新消息：只从本地库刷新，不发网络请求（避免每条消息都触发一次服务端同步）
-        IMManager.shared.onMessageReceived = { [weak self] _ in
+        IMManager.shared.onMessageReceived = { [weak self] message in
+            guard let self = self else { return }
+            // 收到该会话的新消息时移出删除名单（对齐微信：有新消息会话重新出现）
+            if !message.isFromMe {
+                self.unmarkDeleted(channelId: message.channelID)
+            }
             DispatchQueue.main.async {
-                self?.refreshFromLocal()
+                self.refreshFromLocal()
             }
         }
     }
@@ -647,8 +685,11 @@ extension ConversationListViewController: UITableViewDelegate {
         pinAction.backgroundColor = .themePrimary
 
         let deleteAction = UIContextualAction(style: .destructive, title: "删除") { _, _, completion in
+            self.markDeleted(conversation)
             self.conversations.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .automatic)
+            // 同步刷新缓存，避免冷启动又出现
+            self.saveCache(self.conversations)
             completion(true)
         }
         let muteAction = UIContextualAction(style: .normal, title: "免打扰") { _, _, completion in

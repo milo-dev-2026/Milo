@@ -136,6 +136,15 @@ class NoteMessageCell: UITableViewCell {
            let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
             noteTitleLabel.text = note.title.isEmpty ? "无标题笔记" : note.title
             notePreviewLabel.text = note.previewText
+        } else if let data = message.content.data(using: .utf8),
+                  let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  dict["noteTitle"] != nil || dict["noteId"] != nil {
+            // 安卓 WKNoteContent 原生格式：noteTitle/summary/noteContent
+            let title = dict["noteTitle"] as? String ?? ""
+            noteTitleLabel.text = title.isEmpty ? "无标题笔记" : title
+            let summary = dict["summary"] as? String ?? ""
+            let noteContent = dict["noteContent"] as? String ?? ""
+            notePreviewLabel.text = !summary.isEmpty ? summary : (noteContent.isEmpty ? "" : noteContent)
         } else {
             noteTitleLabel.text = "笔记"
             notePreviewLabel.text = message.content

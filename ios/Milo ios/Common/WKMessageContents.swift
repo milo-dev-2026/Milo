@@ -147,29 +147,42 @@ import WuKongIMSDK
 // MARK: - 位置消息内容 (type: 6)
 @objc public class WKLocationMessageContent: WKMessageContent {
     @objc public var name: String = ""
+    @objc public var address: String = ""
     @objc public var latitude: Double = 0
     @objc public var longitude: Double = 0
     
     public override func encodeWithJSON() -> [AnyHashable : Any] {
+        // 对齐安卓 WKLocationContent：title/address/lat/lng，同时保留 name/latitude/longitude 兼容旧数据
         var dict = [AnyHashable: Any]()
+        dict["title"] = name
         dict["name"] = name
+        dict["address"] = address
+        dict["lat"] = latitude
+        dict["lng"] = longitude
         dict["latitude"] = latitude
         dict["longitude"] = longitude
         return dict
     }
     
     public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
-        if let name = contentDic["name"] as? String {
+        if let title = contentDic["title"] as? String, !title.isEmpty {
+            self.name = title
+        } else if let name = contentDic["name"] as? String {
             self.name = name
         }
-        if let latitude = contentDic["latitude"] as? Double {
+        if let address = contentDic["address"] as? String {
+            self.address = address
+        }
+        let latVal = contentDic["lat"] ?? contentDic["latitude"]
+        if let latitude = latVal as? Double {
             self.latitude = latitude
-        } else if let latitude = contentDic["latitude"] as? NSNumber {
+        } else if let latitude = latVal as? NSNumber {
             self.latitude = latitude.doubleValue
         }
-        if let longitude = contentDic["longitude"] as? Double {
+        let lngVal = contentDic["lng"] ?? contentDic["longitude"]
+        if let longitude = lngVal as? Double {
             self.longitude = longitude
-        } else if let longitude = contentDic["longitude"] as? NSNumber {
+        } else if let longitude = lngVal as? NSNumber {
             self.longitude = longitude.doubleValue
         }
     }
@@ -232,6 +245,7 @@ import WuKongIMSDK
     }
     
     public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+        guard let contentDic = contentDic else { return }
         if let noteId = contentDic["note_id"] as? String {
             self.noteId = noteId
         }
@@ -243,6 +257,16 @@ import WuKongIMSDK
         }
         if let noteJSON = contentDic["note_json"] as? String {
             self.noteJSON = noteJSON
+        }
+        // 兼容安卓 WKNoteContent 驼峰字段：保留完整 JSON 供详情页解析（noteId/noteTitle/blockListJson 等）
+        if contentDic["noteTitle"] != nil || contentDic["blockListJson"] != nil || contentDic["noteId"] != nil {
+            if let nid = contentDic["noteId"] as? String { self.noteId = nid }
+            if let t = contentDic["noteTitle"] as? String { self.title = t }
+            if let nc = contentDic["noteContent"] as? String { self.noteContent = nc }
+            if let data = try? JSONSerialization.data(withJSONObject: contentDic),
+               let str = String(data: data, encoding: .utf8) {
+                self.noteJSON = str
+            }
         }
     }
     

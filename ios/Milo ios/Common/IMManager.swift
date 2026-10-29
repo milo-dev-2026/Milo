@@ -1,4 +1,6 @@
 import Foundation
+import UIKit
+import UserNotifications
 import WuKongIMSDK
 import AudioToolbox
 
@@ -460,12 +462,13 @@ class IMManager: NSObject {
     }
 
     // MARK: - 发送位置消息
-    func sendLocationMessage(channelId: String, name: String, latitude: Double, longitude: Double, channelType: Int = 1) {
+    func sendLocationMessage(channelId: String, name: String, address: String = "", latitude: Double, longitude: Double, channelType: Int = 1) {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         let locationContent = WKLocationMessageContent()
         locationContent.name = name
+        locationContent.address = address
         locationContent.latitude = latitude
         locationContent.longitude = longitude
         _ = WKSDK.shared().chatManager.sendMessage(locationContent, channel: channel)
@@ -549,12 +552,17 @@ extension IMManager: WKChatManagerDelegate {
         }
     }
 
+    /// 当前正在聊天的频道ID（对齐安卓 chattingChannelID：在该聊天页内不播放新消息提示音）
+    var currentChattingChannelId: String?
+
     /// 应用内新消息提醒：遵循「设置-消息通知」开关（总开关/声音/震动/免打扰时段），对齐安卓行为
     private func playInAppMessageAlertIfNeeded(_ msg: Message) {
         // 自己发送的消息不提醒
         let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
         if !myUid.isEmpty, msg.fromUID == myUid { return }
         guard LocalStore.shared.isMessageNotificationEnabled else { return }
+        // 正在该聊天页面内不提示（对齐安卓 chattingChannelID 判断）
+        if currentChattingChannelId == msg.channelID { return }
 
         // 免打扰时段（支持跨天，如 22:00-08:00）
         let defaults = UserDefaults.standard
@@ -568,11 +576,48 @@ extension IMManager: WKChatManagerDelegate {
             if inDnd { return }
         }
 
-        if LocalStore.shared.isSoundEnabled {
-            AudioServicesPlaySystemSound(1007) // 系统短信提示音
+        if UIApplication.shared.applicationState == .active {
+            // 前台：播放系统提示音 + 震动
+            if LocalStore.shared.isSoundEnabled {
+                AudioServicesPlaySystemSound(1007) // 系统短信提示音
+            }
+            if LocalStore.shared.isVibrationEnabled {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            }
+        } else {
+            // 后台/锁屏：发本地通知（带声音），对齐安卓系统通知行为
+            postLocalMessageNotification(msg)
         }
-        if LocalStore.shared.isVibrationEnabled {
-            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+    }
+
+    /// 后台新消息本地通知（对齐安卓 showNotification）
+    private func postLocalMessageNotification(_ msg: Message) {
+        let channelName = getChannelInfo(channelId: msg.channelID, channelType: msg.channelType)?.displayName ?? "新消息"
+        let content = UNMutableNotificationContent()
+        content.title = channelName
+        content.body = notificationPreviewText(for: msg)
+        if LocalStore.shared.isSoundEnabled {
+            content.sound = .default
+        }
+        content.userInfo = ["channel_id": msg.channelID, "channel_name": channelName]
+        let request = UNNotificationRequest(identifier: "msg_\(msg.messageID)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// 通知正文：按消息类型显示前缀（与会话列表一致）
+    private func notificationPreviewText(for msg: Message) -> String {
+        switch msg.type {
+        case .image: return "[图片]"
+        case .voice: return "[语音]"
+        case .video: return "[视频]"
+        case .file: return "[文件]"
+        case .location: return "[位置]"
+        case .card: return "[名片]"
+        case .note: return "[笔记]"
+        case .call: return "[语音通话]"
+        case .multiForward: return "[合并转发]"
+        case .system: return ""
+        default: return msg.content
         }
     }
 
@@ -639,8 +684,9 @@ extension IMManager: WKChatManagerDelegate {
 
         case 6: // 位置
             if let locationContent = wkMsg.content as? WKLocationMessageContent {
-                // 兼容旧格式: "name|lat,lng"
-                content = "\(locationContent.name)|\(locationContent.latitude),\(locationContent.longitude)"
+                // 兼容旧格式: "name|lat,lng"；有地址时 name\naddress|lat,lng（cell 可拆分）
+                let locName = locationContent.address.isEmpty ? locationContent.name : "\(locationContent.name)\n\(locationContent.address)"
+                content = "\(locName)|\(locationContent.latitude),\(locationContent.longitude)"
             }
             msgType = .location
 

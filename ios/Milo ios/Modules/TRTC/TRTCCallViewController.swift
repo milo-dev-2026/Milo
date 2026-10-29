@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import Kingfisher
 import AVFoundation
+import AudioToolbox
 import TXLiteAVSDK_TRTC
 
 // MARK: - TRTC语音通话页
@@ -57,7 +58,34 @@ class TRTCCallViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        Task { await setupTRTC() }
+        // 对齐安卓 checkPermissionsAndStart：先确保麦克风权限再进房
+        requestMicPermissionThenStart()
+    }
+
+    private func requestMicPermissionThenStart() {
+        let start = { [weak self] in
+            Task { await self?.setupTRTC() }
+        }
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            start()
+        case .denied:
+            AppUtility.showToast("请在系统设置中允许使用麦克风")
+            dismiss(animated: true)
+        case .undetermined:
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        start()
+                    } else {
+                        AppUtility.showToast("需要麦克风权限才能通话")
+                        self.dismiss(animated: true)
+                    }
+                }
+            }
+        @unknown default:
+            start()
+        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -75,6 +103,25 @@ class TRTCCallViewController: UIViewController {
         TRTCCloud.destroySharedInstance()
     }
 
+    /// 加载对方头像
+    private func loadPeerAvatar() {
+        guard !peerAvatar.isEmpty else { return }
+        updatePeerAvatar(peerAvatar)
+    }
+
+    /// 更新对方头像（供 RTCCallManager 在获取到头像后调用）
+    func updatePeerAvatar(_ avatarUrl: String) {
+        guard !avatarUrl.isEmpty else { return }
+        var urlString = avatarUrl
+        if !urlString.hasPrefix("http") {
+            urlString = APIConfig.chatMediaURL(avatarUrl)?.absoluteString ?? ""
+        }
+        if let url = URL(string: urlString), !urlString.isEmpty {
+            avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "phone.fill"))
+            avatarView.tintColor = nil
+        }
+    }
+
     /// 处理对方信令（由 RTCCallManager 调用）
     func handleRemoteSignal(_ type: Int) {
         DispatchQueue.main.async {
@@ -82,17 +129,11 @@ class TRTCCallViewController: UIViewController {
             case RTCCallManager.Signal.accept.rawValue:
                 self.statusLabel.text = self.isConnected ? "通话中" : "对方已接听，连接中..."
             case RTCCallManager.Signal.refuse.rawValue:
-                self.statusLabel.text = "对方已拒绝"
-                self.stopCallDurationTimer()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.endCall(notifyPeer: false) }
+                self.showPeerEndTip("对方已拒绝")
             case RTCCallManager.Signal.hangup.rawValue:
-                self.statusLabel.text = "对方已挂断"
-                self.stopCallDurationTimer()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.endCall(notifyPeer: false) }
+                self.showPeerEndTip("对方已挂断")
             case RTCCallManager.Signal.busy.rawValue:
-                self.statusLabel.text = "对方忙线中"
-                self.stopCallDurationTimer()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.endCall(notifyPeer: false) }
+                self.showPeerEndTip("对方忙线中")
             default:
                 break
             }
@@ -104,8 +145,11 @@ class TRTCCallViewController: UIViewController {
             RTCCallManager.shared.sendSignal(isConnected ? .hangup : .cancel, to: channelId)
         }
         stopCallDurationTimer()
+        stopRingbackTone()
         trtcCloud?.stopLocalAudio()
         trtcCloud?.exitRoom()
+        // 恢复音频会话，避免 playAndRecord 会话残留影响后续消息提示音
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         dismiss(animated: true) { [weak self] in
             self?.onFinish?()
         }
@@ -141,16 +185,7 @@ class TRTCCallViewController: UIViewController {
         avatarView.tintColor = .white
         avatarView.backgroundColor = UIColor.themePrimary.withAlphaComponent(0.8)
         // 显示对方头像（对齐安卓通话页）
-        if !peerAvatar.isEmpty {
-            var urlString = peerAvatar
-            if !urlString.hasPrefix("http") {
-                urlString = APIConfig.chatMediaURL(peerAvatar)?.absoluteString ?? ""
-            }
-            if let url = URL(string: urlString), !urlString.isEmpty {
-                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "phone.fill"))
-                avatarView.tintColor = nil
-            }
-        }
+        loadPeerAvatar()
         avatarView.layer.borderWidth = 3
         avatarView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
 
@@ -160,8 +195,8 @@ class TRTCCallViewController: UIViewController {
         nameLabel.textColor = .white
         nameLabel.textAlignment = .center
 
-        // 状态标签
-        statusLabel.text = "连接中..."
+        // 状态标签（对齐安卓：主叫显示"正在等待对方接受邀请..."，被叫显示"对方邀请你语音通话"）
+        statusLabel.text = isCaller ? "正在等待对方接受邀请..." : "对方邀请你语音通话"
         statusLabel.font = ScreenAdapter.font(15)
         statusLabel.textColor = .systemGray4
         statusLabel.textAlignment = .center
@@ -260,6 +295,11 @@ class TRTCCallViewController: UIViewController {
                                  options: [.allowBluetooth, .defaultToSpeaker, .allowBluetoothA2DP])
         try? session.setActive(true)
 
+        // 主叫等待时播放回铃音（对齐安卓 WaitingAnswerActivity 的铃声）
+        if isCaller {
+            startRingbackTone()
+        }
+
         let params = TRTCParams()
         params.sdkAppId = sdkAppID
         params.userId = uid
@@ -338,12 +378,42 @@ extension TRTCCallViewController: TRTCCloudDelegate {
         }
     }
 
+    private var ringbackTimer: Timer?
+
+    /// 主叫回铃音（对齐安卓：等待接听时播放"嘟...嘟..."提示音）
+    private func startRingbackTone() {
+        stopRingbackTone()
+        // 使用系统提示音模拟回铃音（每2秒一次）
+        ringbackTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            AudioServicesPlaySystemSound(1057) // 系统提示音（类似电话回铃）
+        }
+        // 立即播放一次
+        AudioServicesPlaySystemSound(1057)
+    }
+
+    private func stopRingbackTone() {
+        ringbackTimer?.invalidate()
+        ringbackTimer = nil
+    }
+
     private func markConnected() {
         guard !isConnected else { return }
         isConnected = true
+        stopRingbackTone() // 接通后停止回铃音
         statusLabel.text = "通话中"
         durationLabel.isHidden = false
         startCallDurationTimer()
+    }
+
+    /// 对方拒绝/挂断/忙线时的提示（对齐安卓）
+    private func showPeerEndTip(_ text: String) {
+        statusLabel.text = text
+        statusLabel.textColor = .systemRed
+        // 3秒后自动消失
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self, !self.isConnected else { return }
+            self.endCall(notifyPeer: false)
+        }
     }
 
     func onExitRoom(_ reason: Int) {

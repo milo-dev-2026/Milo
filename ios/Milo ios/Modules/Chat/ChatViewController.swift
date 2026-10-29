@@ -21,6 +21,8 @@ class ChatViewController: UIViewController {
     private let tableView = UITableView()
     private let inputBar = ChatInputBar()
     private var messages: [Message] = []
+    /// 特殊群聊（西安修车大队）：该群系统消息只显示"对方撤回了一条消息"等纯文案，不显示操作详情
+    private var isSpecialGroup: Bool { titleText.contains("西安修车大队") }
     /// 历史消息分页状态（滑到顶部继续加载更早的记录）
     private var isLoadingOlder = false
     private var hasMoreHistory = true
@@ -138,6 +140,13 @@ class ChatViewController: UIViewController {
 
     private func handleIncomingMessage(_ msg: Message) {
         guard msg.channelID == channelId else { return }
+        // 特殊群聊：系统/群事件消息与后台已删消息不显示
+        if isSpecialGroup {
+            if msg.type == .system { return }
+            if let data = msg.content.data(using: .utf8),
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let deleted = dict["is_deleted"] as? Int, deleted == 1 { return }
+        }
         if messages.contains(where: { $0.messageID == msg.messageID }) { return }
         // 自己发送成功的消息回显：替换本地占位气泡，避免重复
         if msg.isFromMe,
@@ -247,6 +256,8 @@ class ChatViewController: UIViewController {
         super.viewWillAppear(animated)
         // 聊天页导航栏：透明玻璃，消息可滚到状态栏下方
         applyGlassNavBar()
+        // 标记当前正在聊天的频道（对齐安卓：本频道新消息不播放提示音）
+        IMManager.shared.currentChattingChannelId = channelId
         // 从聊天背景设置页返回时刷新背景
         applyChatBackground()
         refreshCachedOnlineStatus()
@@ -261,6 +272,9 @@ class ChatViewController: UIViewController {
         super.viewWillDisappear(animated)
         // 离开聊天页时恢复导航栏默认外观，避免影响其它页面
         restoreNavBarAppearance()
+        if IMManager.shared.currentChattingChannelId == channelId {
+            IMManager.shared.currentChattingChannelId = nil
+        }
         stopExtraSync()
         // 离开时立即落盘消息缓存，下次进入秒显
         msgCacheWorkItem?.cancel()
@@ -766,6 +780,20 @@ class ChatViewController: UIViewController {
     /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
         var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
+        // 特殊群聊：过滤掉管理后台已删除的消息（is_deleted=1）以及全部系统/群事件消息
+        if titleText.contains("西安修车大队") {
+            result = result.filter { msg in
+                // 系统消息（谁邀请谁、改群名、退群等）不显示
+                if msg.type == .system { return false }
+                // 从原始 payload 中检查删除标记（如果后端在 content 里返回了 is_deleted）
+                if let data = msg.content.data(using: .utf8),
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let deleted = dict["is_deleted"] as? Int, deleted == 1 {
+                    return false
+                }
+                return true
+            }
+        }
         let base = merge ? messages : []
         for local in base {
             // 同方向同类型同内容 60 秒内视为同一条（本地 ID 与服务端 ID 不同）
@@ -943,6 +971,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             return cell
         case .system:
             // 系统/群事件消息：居中灰色圆角条，无头像，{0}/{1} 占位符在解析时替换为昵称
+            // 特殊群聊的系统消息已在 applyLoadedMessages 数据层过滤，不会走到这里
             let cell = tableView.dequeueReusableCell(withIdentifier: "SystemMessageCell", for: indexPath) as! SystemMessageCell
             cell.configure(with: message)
             cell.configureTimeHeader(text: timeHeader, isNew: pendingAppearIDs.contains(message.messageID))
@@ -1046,10 +1075,12 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                 navigationController?.pushViewController(detailVC, animated: true)
             }
         case .note:
-            // 解析笔记消息内容并展示详情
+            // 解析笔记消息内容并展示详情（解析失败时给出提示而非无响应）
             if let note = parseNoteMessage(message.content) {
                 let detailVC = NoteDetailViewController(note: note)
                 navigationController?.pushViewController(detailVC, animated: true)
+            } else {
+                AppUtility.showToast("笔记内容无法解析")
             }
         default:
             break
@@ -1881,17 +1912,18 @@ extension ChatViewController: ChatInputBarDelegate {
         IMManager.shared.sendLocationMessage(
             channelId: channelId,
             name: location.name,
+            address: location.address,
             latitude: location.latitude,
             longitude: location.longitude,
             channelType: channelType
         )
-        let content = "\(location.name)|\(location.latitude),\(location.longitude)"
+        let displayName = location.address.isEmpty ? location.name : "\(location.name)\n\(location.address)"
         let msg = Message(
             messageID: UUID().uuidString,
             channelID: channelId,
             channelType: self.channelType,
             fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-            content: "[位置] \(location.name)|\(location.latitude),\(location.longitude)",
+            content: "[位置] \(displayName)|\(location.latitude),\(location.longitude)",
             type: .location,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
             status: 0 // 发送中
@@ -1969,11 +2001,75 @@ extension ChatViewController: ChatInputBarDelegate {
     
     // MARK: - 解析笔记消息
     private func parseNoteMessage(_ content: String) -> NoteEntity? {
-        guard let data = content.data(using: .utf8),
-              let note = try? JSONDecoder().decode(NoteEntity.self, from: data) else {
-            return nil
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        // 1. 直接解码完整 JSON（安卓 note_json 或整体 JSON）
+        if let data = trimmed.data(using: .utf8) {
+            if let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
+                return note
+            }
+            // 2. 安卓可能把笔记包在 {"note_json": "..."} 或 {"note": {...}} 里
+            if let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                if let nested = dict["note_json"] as? String, !nested.isEmpty,
+                   let nd = nested.data(using: .utf8),
+                   let note = try? JSONDecoder().decode(NoteEntity.self, from: nd) {
+                    return note
+                }
+                if let nestedDict = dict["note"] as? [String: Any],
+                   let nd = try? JSONSerialization.data(withJSONObject: nestedDict),
+                   let note = try? JSONDecoder().decode(NoteEntity.self, from: nd) {
+                    return note
+                }
+                // 2.5 安卓 WKNoteContent 原生格式：noteId/noteTitle/noteContent/blockListJson(字符串)
+                if dict["noteTitle"] != nil || dict["blockListJson"] != nil || dict["noteId"] != nil {
+                    var note = NoteEntity()
+                    if let nid = dict["noteId"] as? String, !nid.isEmpty { note.id = nid }
+                    note.title = dict["noteTitle"] as? String ?? ""
+                    note.group = dict["noteGroup"] as? String ?? "普通笔记"
+                    var blocks: [NoteBlock] = []
+                    if let blJson = dict["blockListJson"] as? String, !blJson.isEmpty,
+                       let bd = blJson.data(using: .utf8),
+                       let arr = try? JSONSerialization.jsonObject(with: bd) as? [[String: Any]] {
+                        for item in arr {
+                            let t = (item["type"] as? NSNumber)?.intValue ?? 2
+                            let content = item["content"] as? String ?? ""
+                            switch t {
+                            case 1:
+                                blocks.append(NoteBlock(type: .title, content: content))
+                            case 3:
+                                let img = item["imagePath"] as? String ?? ""
+                                blocks.append(NoteBlock(type: .image, imageURL: img.isEmpty ? nil : img))
+                            case 4:
+                                let video = item["videoPath"] as? String ?? ""
+                                blocks.append(NoteBlock(type: .video, videoURL: video.isEmpty ? nil : video))
+                            case 5:
+                                let lat = (item["latitude"] as? NSNumber)?.doubleValue ?? 0
+                                let lng = (item["longitude"] as? NSNumber)?.doubleValue ?? 0
+                                let locName = item["locationName"] as? String ?? ""
+                                let locAddr = item["locationAddress"] as? String ?? ""
+                                let addr = locAddr.isEmpty ? locName : "\(locName) \(locAddr)"
+                                blocks.append(NoteBlock(type: .location, content: locName,
+                                                        location: NoteLocation(latitude: lat, longitude: lng, address: addr)))
+                            default:
+                                blocks.append(NoteBlock(type: .text, content: content))
+                            }
+                        }
+                    }
+                    if blocks.isEmpty, let nc = dict["noteContent"] as? String, !nc.isEmpty {
+                        blocks = [NoteBlock(type: .text, content: nc)]
+                    }
+                    note.blocks = blocks
+                    return note
+                }
+                // 3. {"title":..., "content":...} 扁平结构（容错解码里已处理，再兜底一次）
+                if dict["title"] != nil || dict["content"] != nil || dict["blocks"] != nil {
+                    if let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
+                        return note
+                    }
+                }
+            }
         }
-        return note
+        return nil
     }
 }
 

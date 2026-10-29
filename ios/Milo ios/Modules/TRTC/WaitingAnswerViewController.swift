@@ -133,8 +133,11 @@ class WaitingAnswerViewController: UIViewController {
 
     private func startRinging() {
         AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+        // 播放铃声（对齐安卓：来电时播放铃声）
+        AudioServicesPlaySystemSound(1005) // 系统铃声
         ringTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            AudioServicesPlaySystemSound(1005)
         }
         // 45 秒无人接听自动拒绝（对齐安卓 WaitingAnswerActivity）
         let work = DispatchWorkItem { [weak self] in

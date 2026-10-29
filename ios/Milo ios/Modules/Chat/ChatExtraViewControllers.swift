@@ -135,6 +135,8 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var conversations: [(channelId: String, channelType: Int, name: String, avatar: String)] = []
     var onSelected: ((String, String) -> Void)?
+    /// 含 channelType 的选择回调（位置分享等场景使用）
+    var onSelectedWithType: ((String, Int, String) -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -189,6 +191,7 @@ class ChooseChatViewController: UIViewController, UITableViewDataSource, UITable
         tableView.deselectRow(at: indexPath, animated: true)
         let conv = conversations[indexPath.row]
         onSelected?(conv.channelId, conv.name)
+        onSelectedWithType?(conv.channelId, conv.channelType, conv.name)
         navigationController?.popViewController(animated: true)
     }
 }

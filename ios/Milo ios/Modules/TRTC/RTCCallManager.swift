@@ -43,6 +43,23 @@ final class RTCCallManager {
         self.peerChannelId = channelId
         self.peerName = peerName.isEmpty ? "用户" : peerName
         self.peerAvatar = peerAvatar
+        // 如果头像为空，尝试从网络获取
+        if peerAvatar.isEmpty {
+            Task {
+                do {
+                    let info: ChannelInfo = try await APIClient.shared.requestFlexible(
+                        .getChannelInfo(channelId: channelId, channelType: 1)
+                    )
+                    DispatchQueue.main.async {
+                        self.peerAvatar = info.logo ?? ""
+                        // 更新通话页面的头像
+                        if let callVC = self.callVC {
+                            callVC.updatePeerAvatar(info.logo ?? "")
+                        }
+                    }
+                } catch { }
+            }
+        }
         self.callType = callType
         isInCall = true
 
@@ -77,7 +94,21 @@ final class RTCCallManager {
             roomId = signalRoomId > 0 ? signalRoomId : Int(Date().timeIntervalSince1970)
             peerChannelId = fromUID
             peerName = callerName
+            // 获取对方头像（优先本地缓存，再尝试网络）
             peerAvatar = IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.logo ?? ""
+            if peerAvatar.isEmpty {
+                // 如果本地没有头像，尝试从网络获取
+                Task {
+                    do {
+                        let info: ChannelInfo = try await APIClient.shared.requestFlexible(
+                            .getChannelInfo(channelId: fromUID, channelType: 1)
+                        )
+                        DispatchQueue.main.async {
+                            self.peerAvatar = info.logo ?? ""
+                        }
+                    } catch { }
+                }
+            }
             callType = signalCallType
             isInCall = true
             presentWaitingAnswer(callerId: fromUID, callerName: callerName)

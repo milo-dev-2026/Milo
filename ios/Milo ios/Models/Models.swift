@@ -363,11 +363,13 @@ struct WKMessageData: Codable {
             let name = str("file_name").isEmpty ? str("name") : str("file_name")
             let size = anyToInt(dict["file_size"] ?? dict["size"])
             return (type, "\(name)|\(size)|\(str("url"))")
-        case 6: // 位置: "name|lat,lng"
-            let name = str("name")
-            let lat = anyToDouble(dict["latitude"] ?? dict["lat"])
-            let lng = anyToDouble(dict["longitude"] ?? dict["lng"])
-            return (type, "\(name)|\(lat),\(lng)")
+        case 6: // 位置: "name\naddress|lat,lng"（兼容安卓 title/address/lat/lng）
+            let name = firstNonEmpty([str("title"), str("name")])
+            let address = str("address")
+            let lat = anyToDouble(dict["lat"] ?? dict["latitude"])
+            let lng = anyToDouble(dict["lng"] ?? dict["longitude"])
+            let displayName = address.isEmpty ? name : "\(name)\n\(address)"
+            return (type, "\(displayName)|\(lat),\(lng)")
         case 7: // 名片: "uid|name|avatar|vercode"
             return (type, "\(str("uid"))|\(str("name"))|\(str("avatar"))|\(str("vercode"))")
         case 100: // 笔记: 优先note_json，否则整体JSON
@@ -854,7 +856,8 @@ extension WKMessage {
             type = .file
         case 6: // 位置
             if let locationContent = content as? WKLocationMessageContent {
-                body = "\(locationContent.name)|\(locationContent.latitude),\(locationContent.longitude)"
+                let locName = locationContent.address.isEmpty ? locationContent.name : "\(locationContent.name)\n\(locationContent.address)"
+                body = "\(locName)|\(locationContent.latitude),\(locationContent.longitude)"
             }
             type = .location
         case 7: // 名片

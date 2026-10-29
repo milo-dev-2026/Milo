@@ -49,6 +49,11 @@
     <string>需要本地网络权限进行设备发现</string>
     <key>AMapApiKey</key>
     <string>18fc1fe7d76180fe7ebde0ffdb6ddac0</string>
+    <!-- 允许检测高德地图 App 以便位置消息跳转导航 -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>iosamap</string>
+    </array>
     <key>UIStatusBarStyle</key>
     <string>UIStatusBarStyleDefault</string>
     <key>UIFileSharingEnabled</key>

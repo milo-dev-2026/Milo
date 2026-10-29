@@ -10,6 +10,7 @@ class LocationMessageCell: UITableViewCell {
     private let mapContainer = UIView()
     private let pinIcon = UIImageView()
     private let nameLabel = UILabel()
+    private let addressLabel = UILabel()
     private let tailView = ChatBubbleTailView()
     private var locationCoord: CLLocationCoordinate2D?
     private var mapView: MAMapView?
@@ -36,6 +37,10 @@ class LocationMessageCell: UITableViewCell {
         nameLabel.textColor = .label
         nameLabel.numberOfLines = 1
 
+        addressLabel.font = ScreenAdapter.font(11)
+        addressLabel.textColor = .secondaryLabel
+        addressLabel.numberOfLines = 1
+
         pinIcon.image = UIImage(systemName: "mappin.circle.fill")
         pinIcon.tintColor = .systemRed
         pinIcon.contentMode = .center
@@ -43,7 +48,12 @@ class LocationMessageCell: UITableViewCell {
         let infoBar = UIView()
         infoBar.backgroundColor = .systemBackground
 
-        let stack = UIStackView(arrangedSubviews: [pinIcon, nameLabel])
+        let textStack = UIStackView(arrangedSubviews: [nameLabel, addressLabel])
+        textStack.axis = .vertical
+        textStack.spacing = 2
+        textStack.alignment = .leading
+
+        let stack = UIStackView(arrangedSubviews: [pinIcon, textStack])
         stack.axis = .horizontal
         stack.spacing = ScreenAdapter.scaleW(6)
         stack.alignment = .center
@@ -71,7 +81,7 @@ class LocationMessageCell: UITableViewCell {
         infoBar.snp.makeConstraints { make in
             make.top.equalTo(mapContainer.snp.bottom)
             make.leading.trailing.bottom.equalToSuperview()
-            make.height.equalTo(ScreenAdapter.scaleH(38))
+            make.height.equalTo(ScreenAdapter.scaleH(52))
         }
     }
 
@@ -80,6 +90,7 @@ class LocationMessageCell: UITableViewCell {
         let content = message.content
         let raw = content.replacingOccurrences(of: "[位置] ", with: "")
         var name = raw
+        var address = ""
         var coord: CLLocationCoordinate2D?
         if raw.contains("|") {
             let parts = raw.components(separatedBy: "|")
@@ -97,7 +108,20 @@ class LocationMessageCell: UITableViewCell {
                 coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
             }
         }
+        // 如果 name 中包含换行或地址分隔，尝试拆分 name 和 address
+        if name.contains("\n") {
+            let lines = name.components(separatedBy: "\n")
+            name = lines.first ?? name
+            if lines.count > 1 { address = lines[1] }
+        } else if name.contains("|") {
+            // 部分安卓格式：name|address
+            let parts = name.components(separatedBy: "|")
+            name = parts.first ?? name
+            if parts.count > 1 { address = parts[1] }
+        }
         nameLabel.text = name.isEmpty ? "位置" : name
+        addressLabel.text = address
+        addressLabel.isHidden = address.isEmpty
         if let c = coord {
             locationCoord = c
             updateMapView(lat: c.latitude, lon: c.longitude)
@@ -148,8 +172,13 @@ class LocationMessageCell: UITableViewCell {
     }
 
     func openLocationMap(from vc: UIViewController) {
-        guard locationCoord != nil else { return }
-        let picker = LocationPickerViewController()
-        vc.navigationController?.pushViewController(picker, animated: true)
+        guard let coord = locationCoord else { return }
+        let detail = LocationDetailViewController(
+            name: nameLabel.text ?? "",
+            address: addressLabel.text ?? "",
+            latitude: coord.latitude,
+            longitude: coord.longitude
+        )
+        vc.navigationController?.pushViewController(detail, animated: true)
     }
 }

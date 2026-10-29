@@ -57,6 +57,8 @@ targets:
         NSFaceIDUsageDescription: 使用Face ID进行应用锁屏验证
         NSLocalNetworkUsageDescription: 需要本地网络权限进行设备发现
         AMapApiKey: "18fc1fe7d76180fe7ebde0ffdb6ddac0"
+        LSApplicationQueriesSchemes:
+          - iosamap
         UIStatusBarStyle: UIStatusBarStyleDefault
         UIFileSharingEnabled: true
         UISupportsDocumentBrowser: true
