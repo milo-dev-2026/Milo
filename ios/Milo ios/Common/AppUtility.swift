@@ -68,29 +68,57 @@ class AppUtility {
         return URL(string: APIConfig.apiBaseURL + path)
     }
 
+    // MARK: - 头像本地缓存（内存 + 沙盒文件，冷启动时同步读取，避免先闪首字符占位图）
+    private static let avatarMemory = NSCache<NSString, UIImage>()
+
+    private static func avatarCacheURL(_ key: String) -> URL? {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("AvatarCache", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_"))
+    }
+
     // MARK: - 加载频道头像（与Android AvatarView一致，失败显示首字符彩色头像）
     static func loadChannelAvatar(channelId: String, channelType: Int, name: String, into imageView: UIImageView) {
         let placeholder = defaultAvatarImage(name: name, size: 96)
-        guard let url = avatarURL(forChannelId: channelId, channelType: channelType) else {
-            imageView.image = placeholder
+        let key = "\(channelType)_\(channelId)"
+
+        // 1. 内存命中
+        if let cached = avatarMemory.object(forKey: key as NSString) {
+            imageView.image = cached
             return
         }
-        // 命中本地缓存（内存/磁盘）时直接展示真实头像，避免先闪一下首字符占位图
-        let key = url.absoluteString
-        if let cached = KingfisherManager.shared.cache.retrieveImageInMemoryCache(forKey: key)
-            ?? KingfisherManager.shared.cache.imageFromDiskCache(forKey: key) {
+        // 2. 本地文件命中（同步读取，冷启动也能直接显示真实头像）
+        if let path = avatarCacheURL(key),
+           let data = try? Data(contentsOf: path),
+           let cached = UIImage(data: data) {
+            avatarMemory.setObject(cached, forKey: key as NSString)
             imageView.image = cached
+            return
+        }
+
+        guard let url = avatarURL(forChannelId: channelId, channelType: channelType) else {
+            imageView.image = placeholder
             return
         }
         imageView.kf.setImage(
             with: url,
             placeholder: placeholder,
-            options: [
-                .cacheOriginalImage,
-                .backgroundDecode
-            ]
+            options: [.cacheOriginalImage, .backgroundDecode]
         ) { result in
-            if case .failure = result {
+            switch result {
+            case .success(let value):
+                avatarMemory.setObject(value.image, forKey: key as NSString)
+                let image = value.image
+                DispatchQueue.global(qos: .utility).async {
+                    if let data = image.jpegData(compressionQuality: 0.8),
+                       let path = avatarCacheURL(key) {
+                        try? data.write(to: path)
+                    }
+                }
+            case .failure:
                 imageView.image = placeholder
             }
         }
