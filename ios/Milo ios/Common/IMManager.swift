@@ -602,7 +602,7 @@ extension IMManager: WKChatManagerDelegate {
 
         // 黑名单过滤（微信逻辑：拉黑后不再接收对方消息）
         let fromUidRaw = wkMsg.fromUid ?? ""
-        if !fromUidRaw.isEmpty, Int(wkMsg.channelType) == 1 {
+        if !fromUidRaw.isEmpty, Int(wkMsg.channel.channelType) == 1 {
             let myUid0 = UserDefaults.standard.string(forKey: "uid") ?? ""
             if fromUidRaw != myUid0,
                (UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []).contains(fromUidRaw) {

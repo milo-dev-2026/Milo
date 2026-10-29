@@ -1581,12 +1581,14 @@ extension ChatViewController: ChatInputBarDelegate {
     /// 语音消息：本地占位 → 上传 → 发送
     func didSendVoiceMessage(fileURL: URL, duration: TimeInterval) {
         let messageID = UUID().uuidString
+        // 占位 content 直接带时长和本地文件路径：气泡秒数/宽度立即正确，上传完成前也能本地播放
+        let localPlaceholder = "\(max(1, Int(duration)))|\(fileURL.path)"
         let msg = Message(
             messageID: messageID,
             channelID: channelId,
             channelType: channelType,
             fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-            content: "local:\(messageID)",
+            content: localPlaceholder,
             type: .voice,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
             status: 0

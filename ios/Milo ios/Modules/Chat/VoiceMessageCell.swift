@@ -66,7 +66,12 @@ class VoiceMessageCell: UITableViewCell {
         }
         durationLabel.text = duration
 
-        voiceURL = APIConfig.chatMediaURL(path)
+        // 本地文件路径（刚录完待上传的自己的语音）直接用 file://，否则走服务器地址
+        if path.hasPrefix("/"), FileManager.default.fileExists(atPath: path) {
+            voiceURL = URL(fileURLWithPath: path)
+        } else {
+            voiceURL = APIConfig.chatMediaURL(path)
+        }
 
         let isFromMe = message.isFromMe
         // 时长越长气泡越宽（与 iMessage 语音条一致）：70pt 起步，每秒 +4pt，上限 190pt
@@ -93,10 +98,20 @@ class VoiceMessageCell: UITableViewCell {
 
     func playVoice() {
         guard let url = voiceURL else { return }
-        AudioRecorderManager.shared.playAudio(url: url)
+        let baseTint: UIColor = voiceIcon.tintColor
+        if url.isFileURL {
+            AudioRecorderManager.shared.playAudio(url: url)
+        } else {
+            // 远程语音：先下载到本地缓存再播放（AVAudioPlayer 不支持 http 流）
+            AudioRecorderManager.shared.playRemoteAudio(url, onDownloadStart: { [weak self] in
+                // 下载中：图标降为半透明提示
+                self?.voiceIcon.alpha = 0.4
+            })
+        }
         voiceIcon.tintColor = .systemGreen
         AudioRecorderManager.shared.onPlayFinished = { [weak self] in
-            self?.voiceIcon.tintColor = .themePrimary
+            self?.voiceIcon.tintColor = baseTint
+            self?.voiceIcon.alpha = 1.0
         }
     }
 }
