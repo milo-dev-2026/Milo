@@ -700,7 +700,6 @@ extension SearchResultViewController: UITableViewDataSource, UITableViewDelegate
 
     private func navigateToChat(channelId: String, title: String, channelType: Int) {
         let vc = ChatViewController(channelId: channelId, title: title, channelType: channelType)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 }

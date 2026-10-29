@@ -251,9 +251,58 @@ import WuKongIMSDK
     }
 }
 
+// MARK: - RTC 通话信令消息内容 (type: 9996，与安卓 WKRTCType.wk_video_call_received 一致)
+@objc public class WKRTCSignalMessageContent: WKMessageContent {
+    @objc public var signalType: Int = 0
+    @objc public var callType: Int = 0
+    @objc public var roomId: Int = 0
+    @objc public var callerId: String = ""
+    @objc public var callerName: String = ""
+
+    public override func encodeWithJSON() -> [AnyHashable : Any] {
+        var dict = [AnyHashable : Any]()
+        dict["signal_type"] = signalType
+        dict["call_type"] = callType
+        dict["room_id"] = roomId
+        dict["caller_id"] = callerId
+        dict["caller_name"] = callerName
+        dict["type"] = 9996
+        return dict
+    }
+
+    public override func decode(withJSON contentDic: [AnyHashable : Any]!) {
+        if let v = contentDic["signal_type"] as? Int {
+            self.signalType = v
+        } else if let v = contentDic["signal_type"] as? NSNumber {
+            self.signalType = v.intValue
+        }
+        if let v = contentDic["call_type"] as? Int {
+            self.callType = v
+        } else if let v = contentDic["call_type"] as? NSNumber {
+            self.callType = v.intValue
+        }
+        if let v = contentDic["room_id"] as? Int {
+            self.roomId = v
+        } else if let v = contentDic["room_id"] as? NSNumber {
+            self.roomId = v.intValue
+        }
+        if let v = contentDic["caller_id"] as? String {
+            self.callerId = v
+        }
+        if let v = contentDic["caller_name"] as? String {
+            self.callerName = v
+        }
+    }
+
+    public override class func contentType() -> NSNumber {
+        return NSNumber(value: 9996)
+    }
+}
+
 // MARK: - 消息内容类型注册
 class WKMessageContentRegistrar {
     static func registerAll() {
+        WKSDK.shared().registerMessageContent(WKRTCSignalMessageContent.self)
         WKSDK.shared().registerMessageContent(WKImageMessageContent.self)
         WKSDK.shared().registerMessageContent(WKVoiceMessageContent.self)
         WKSDK.shared().registerMessageContent(WKVideoMessageContent.self)

@@ -31,6 +31,7 @@ class ConversationListViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        loadNameCache()
         setupUI()
         loadData()
         setupIMObserver()
@@ -307,10 +308,27 @@ class ConversationListViewController: UIViewController {
     }
 
     // MARK: - 会话置顶（本地持久化，对齐安卓右滑置顶）
-    private static let pinnedKey = "pinned_channels"
+    /// 按账号隔离的置顶存储键，重新登录后仍是同一 uid，可继续保留置顶
+    private static func pinnedKey(for uid: String) -> String {
+        return "pinned_channels_v2_\(uid)"
+    }
+
+    private var pinnedStorageKey: String {
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
+        return ConversationListViewController.pinnedKey(for: uid)
+    }
 
     private var pinnedIDs: Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey: ConversationListViewController.pinnedKey) ?? [])
+        migrateLegacyPinsIfNeeded()
+        return Set(UserDefaults.standard.stringArray(forKey: pinnedStorageKey) ?? [])
+    }
+
+    /// 兼容旧版本的全局置顶键，首次升级时迁移到按账号键
+    private func migrateLegacyPinsIfNeeded() {
+        let legacyKey = "pinned_channels"
+        guard UserDefaults.standard.stringArray(forKey: pinnedStorageKey) == nil,
+              let legacy = UserDefaults.standard.stringArray(forKey: legacyKey), !legacy.isEmpty else { return }
+        UserDefaults.standard.set(legacy, forKey: pinnedStorageKey)
     }
 
     private func isPinned(_ conversation: Conversation) -> Bool {
@@ -318,13 +336,14 @@ class ConversationListViewController: UIViewController {
     }
 
     private func togglePin(_ conversation: Conversation) {
-        var ids = UserDefaults.standard.stringArray(forKey: ConversationListViewController.pinnedKey) ?? []
+        var ids = UserDefaults.standard.stringArray(forKey: pinnedStorageKey) ?? []
         if let idx = ids.firstIndex(of: conversation.channelID) {
             ids.remove(at: idx)
         } else {
             ids.append(conversation.channelID)
         }
-        UserDefaults.standard.set(ids, forKey: ConversationListViewController.pinnedKey)
+        UserDefaults.standard.set(ids, forKey: pinnedStorageKey)
+        UserDefaults.standard.synchronize()
     }
 
     /// 置顶会话排最前，其余按消息时间倒序（最新消息在最上面），与安卓一致
@@ -345,6 +364,42 @@ class ConversationListViewController: UIViewController {
     private var cacheKey: String {
         let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
         return "conversations_cache_v1_\(uid)"
+    }
+
+    /// 频道名称/头像持久缓存：冷启动时先用它填名字，避免昵称显示成 uid 或群号（约30s后才恢复）
+    private var channelNameCache: [String: [String: String]] = [:]
+
+    private var nameCacheFileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? "default"
+        return docs.appendingPathComponent("channel_names_\(uid).json")
+    }
+
+    private func loadNameCache() {
+        guard let data = try? Data(contentsOf: nameCacheFileURL),
+              let dict = try? JSONDecoder().decode([String: [String: String]].self, from: data) else { return }
+        channelNameCache = dict
+    }
+
+    private func persistNameCache() {
+        guard let data = try? JSONEncoder().encode(channelNameCache) else { return }
+        try? data.write(to: nameCacheFileURL, options: .atomic)
+    }
+
+    /// 用持久缓存补齐缺失名称（key = "type_channelID"）
+    private func applyNameCache(to list: [Conversation]) -> [Conversation] {
+        guard !channelNameCache.isEmpty else { return list }
+        return list.map { conv in
+            guard conv.name.isEmpty || conv.name == conv.channelID else { return conv }
+            let key = "\(conv.channelType)_\(conv.channelID)"
+            guard let cached = channelNameCache[key], let n = cached["name"], !n.isEmpty else { return conv }
+            var updated = conv
+            updated.name = n
+            if updated.avatar == nil, let a = cached["avatar"], !a.isEmpty {
+                updated.avatar = a
+            }
+            return updated
+        }
     }
 
     /// 会话列表落盘缓存文件路径（Documents 目录，比 UserDefaults 更可靠、可排查）
@@ -385,7 +440,7 @@ class ConversationListViewController: UIViewController {
             let data = try Data(contentsOf: cacheFileURL)
             if let list = try? JSONDecoder().decode([Conversation].self, from: data) {
                 CrashLogger.shared.log("[ConvCache] loaded \(list.count) from file \(cacheFileURL.lastPathComponent)")
-                return list
+                return applyNameCache(to: list)
             }
             CrashLogger.shared.log("[ConvCache] file decode failed (data \(data.count) bytes)")
         } catch {
@@ -395,7 +450,7 @@ class ConversationListViewController: UIViewController {
         if let data = UserDefaults.standard.data(forKey: cacheKey),
            let list = try? JSONDecoder().decode([Conversation].self, from: data) {
             CrashLogger.shared.log("[ConvCache] loaded \(list.count) from UserDefaults")
-            return list
+            return applyNameCache(to: list)
         }
         CrashLogger.shared.log("[ConvCache] no cache available")
         return []
@@ -472,13 +527,22 @@ class ConversationListViewController: UIViewController {
 
     /// 用已有名称/头像补齐缺失字段，避免刷新时名字闪空
     private func mergeNames(_ incoming: [Conversation], with existing: [Conversation]) -> [Conversation] {
-        guard !existing.isEmpty else { return incoming }
         var nameMap: [String: (name: String, avatar: String?)] = [:]
         for c in existing where !c.name.isEmpty {
             nameMap[c.channelID] = (c.name, c.avatar)
         }
+        // 持久名称缓存兜底（App 重启后仍能立刻显示正确昵称）
+        for (key, value) in channelNameCache {
+            guard let n = value["name"], !n.isEmpty else { continue }
+            guard let idPart = key.split(separator: "_", maxSplits: 1).last else { continue }
+            let channelID = String(idPart)
+            if nameMap[channelID] == nil {
+                nameMap[channelID] = (n, value["avatar"])
+            }
+        }
+        guard !nameMap.isEmpty else { return incoming }
         return incoming.map { conv in
-            guard (conv.name.isEmpty || conv.name == conv.channelID),
+            guard conv.name.isEmpty || conv.name == conv.channelID,
                   let cached = nameMap[conv.channelID] else { return conv }
             var updated = conv
             updated.name = cached.name
@@ -505,6 +569,16 @@ class ConversationListViewController: UIViewController {
                         }) else { return }
                         self.conversations[idx].name = channelInfo.displayName
                         self.conversations[idx].avatar = channelInfo.logo ?? channelInfo.avatar
+                        // 写入持久名称缓存，下次冷启动直接可用（丢弃空名/等于channelID的无效名）
+                        let displayName = channelInfo.displayName
+                        if !displayName.isEmpty && displayName != conv.channelID {
+                            let key = "\(conv.channelType)_\(conv.channelID)"
+                            self.channelNameCache[key] = [
+                                "name": displayName,
+                                "avatar": channelInfo.logo ?? channelInfo.avatar ?? ""
+                            ]
+                            self.persistNameCache()
+                        }
                         // 只刷新可见行，避免整表抖动
                         if self.tableView.indexPathsForVisibleRows?.contains(IndexPath(row: idx, section: 0)) == true {
                             self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
@@ -920,7 +994,9 @@ class ConversationCell: UITableViewCell {
     func configure(with conversation: Conversation) {
         // 系统账号：专属图标头像 + 默认昵称 + 官方徽标（ID 与昵称双重匹配，避免落到后端默认头像）
         let systemConf = ConversationCell.systemAccount(for: conversation.channelID, name: conversation.name)
-        let displayName = conversation.name.isEmpty ? (systemConf?.name ?? conversation.channelID) : conversation.name
+        // 名称兜底：群聊未拉到名称时显示"群聊"，单聊显示"用户"，避免直接暴露群号/uid（看起来像乱码）
+        let fallbackName = conversation.isGroup ? "群聊" : "用户"
+        let displayName = conversation.name.isEmpty ? (systemConf?.name ?? fallbackName) : conversation.name
         nameLabel.text = displayName
         lastMessageLabel.text = conversation.lastMessageDisplay
         timeLabel.text = conversation.timeString

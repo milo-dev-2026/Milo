@@ -137,7 +137,6 @@ class GroupMembersViewController: UIViewController, UITableViewDataSource, UITab
         vc.onMembersAdded = { [weak self] in
             self?.loadMembers(refresh: true)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -146,7 +145,6 @@ navigationController?.pushViewController(vc, animated: true)
         vc.onMembersRemoved = { [weak self] in
             self?.loadMembers(refresh: true)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -707,7 +705,6 @@ class ForbiddenMembersViewController: UIViewController, UITableViewDataSource, U
             guard let self = self, let uid = uids.first else { return }
             self.muteMember(uid: uid)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 

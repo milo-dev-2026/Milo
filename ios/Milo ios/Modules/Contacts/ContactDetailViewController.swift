@@ -513,7 +513,6 @@ class ContactDetailViewController: UIViewController {
             vcs.append(chatVC)
             navigationController?.setViewControllers(vcs, animated: true)
         } else {
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(chatVC, animated: true)
         }
     }

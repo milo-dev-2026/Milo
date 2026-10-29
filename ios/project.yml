@@ -34,6 +34,11 @@ targets:
       path: Milo ios/App/Info.plist
       properties:
         CFBundleDisplayName: Milo
+        CFBundleDevelopmentRegion: zh_CN
+        CFBundleLocalizations:
+          - zh-Hans
+          - zh-Hant
+          - en
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         UILaunchStoryboardName: LaunchScreen

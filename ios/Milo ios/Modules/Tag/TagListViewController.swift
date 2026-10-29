@@ -213,7 +213,6 @@ class TagListViewController: UIViewController {
         detailVC.onTagCreated = { [weak self] _ in
             self?.loadData()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(detailVC, animated: true)
     }
 
@@ -248,7 +247,6 @@ extension TagListViewController: UITableViewDataSource, UITableViewDelegate {
         detailVC.onTagDeleted = { [weak self] _ in
             self?.loadData()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(detailVC, animated: true)
     }
 

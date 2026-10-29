@@ -180,15 +180,16 @@ class ChatPersonalViewController: UIViewController {
             nav.popViewController(animated: true)
         } else {
             let vc = ChatViewController(channelId: channelId, title: chatTitle, channelType: channelType)
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
         }
     }
 
     private func startCall(voice: Bool) {
-        let vc = TRTCCallViewController(channelId: channelId)
-        vc.modalPresentationStyle = .fullScreen
-        present(vc, animated: true)
+        let peer = IMManager.shared.getChannelInfo(channelId: channelId, channelType: channelType)
+        RTCCallManager.shared.startCall(from: self,
+                                        channelId: channelId,
+                                        peerName: peer?.displayName ?? chatTitle,
+                                        peerAvatar: peer?.logo ?? peer?.avatar ?? "")
     }
 
     /// 从 /v1/user/search 读取 short_no（Milo号），无数据时保持隐藏
@@ -243,7 +244,6 @@ navigationController?.pushViewController(vc, animated: true)
 
     @objc private func didTapHeader() {
         let vc = ContactDetailViewController(uid: channelId)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 

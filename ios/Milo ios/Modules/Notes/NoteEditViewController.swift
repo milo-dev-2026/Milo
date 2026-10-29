@@ -355,7 +355,6 @@ class NoteEditViewController: UIViewController {
             self?.renderBlocks()
             self?.scrollToBottom()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(locVC, animated: true)
     }
     

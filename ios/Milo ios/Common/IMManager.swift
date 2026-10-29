@@ -500,6 +500,21 @@ class IMManager: NSObject {
         }
         _ = WKSDK.shared().chatManager.sendMessage(noteContent, channel: channel)
     }
+
+    // MARK: - 发送语音通话信令（type 9996，与安卓 RTCSignalContent 一致）
+    /// signalType: 0邀请 1接听 2取消 3挂断 4拒绝 5切语音 6切视频 7忙线
+    func sendRTCSignal(channelId: String, channelType: Int = 1, signalType: Int, callType: Int = 0, roomId: Int, callerName: String = "") {
+        let channel = WKChannel()
+        channel.channelId = channelId
+        channel.channelType = UInt8(channelType)
+        let signal = WKRTCSignalMessageContent()
+        signal.signalType = signalType
+        signal.callType = callType
+        signal.roomId = roomId
+        signal.callerId = UserDefaults.standard.string(forKey: "uid") ?? ""
+        signal.callerName = callerName
+        _ = WKSDK.shared().chatManager.sendMessage(signal, channel: channel)
+    }
 }
 
 // MARK: - WKChatManagerDelegate
@@ -507,6 +522,16 @@ extension IMManager: WKChatManagerDelegate {
 
     func onRecvMessages(_ message: WKMessage!, left: Int) {
         guard let wkMsg = message else { return }
+
+        // RTC 通话信令（type=9996）：不进聊天列表，交由通话管理器处理
+        if Int(wkMsg.content.realContentType) == 9996 {
+            let fromUID = wkMsg.fromUid ?? ""
+            let dict = (wkMsg.content.contentDict as? [String: Any]) ?? [:]
+            DispatchQueue.main.async {
+                RTCCallManager.shared.handleSignal(fromUID: fromUID, payload: dict)
+            }
+            return
+        }
 
         // 入群申请系统消息（type=1009，对齐 Android WKContentType.approveGroupMember）
         if Int(wkMsg.content.realContentType) == 1009 {

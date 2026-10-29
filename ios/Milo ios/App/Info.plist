@@ -4,6 +4,15 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>Milo</string>
+    <!-- 声明中文本地化，让系统菜单（复制/粘贴/全选等）显示中文而不是英文 -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh_CN</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>zh-Hans</string>
+        <string>zh-Hant</string>
+        <string>en</string>
+    </array>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundleVersion</key>

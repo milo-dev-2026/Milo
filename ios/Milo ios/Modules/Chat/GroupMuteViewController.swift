@@ -101,7 +101,6 @@ class ForbiddenGroupMembersViewController: UIViewController {
             guard let self = self, let user = users.first else { return }
             self.muteMember(uid: user.uid)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(pickerVC, animated: true)
     }
 

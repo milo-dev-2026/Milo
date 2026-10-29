@@ -46,6 +46,45 @@ class BaseNavigationController: UINavigationController {
     override var preferredStatusBarStyle: UIStatusBarStyle {
         return .default
     }
+
+    // MARK: - 底部 TabBar 保护
+    /// 统一在目标 VC 上开启 hidesBottomBarWhenPushed（在 self 上设置对已经显示的页面无效）
+    override func pushViewController(_ viewController: UIViewController, animated: Bool) {
+        if viewControllers.count > 0 {
+            viewController.hidesBottomBarWhenPushed = true
+        }
+        super.pushViewController(viewController, animated: animated)
+    }
+
+    override func popViewController(animated: Bool) -> UIViewController? {
+        let popped = super.popViewController(animated: animated)
+        restoreTabBarIfNeeded()
+        return popped
+    }
+
+    override func popToViewController(_ viewController: UIViewController, animated: Bool) -> [UIViewController]? {
+        let popped = super.popToViewController(viewController, animated: animated)
+        restoreTabBarIfNeeded()
+        return popped
+    }
+
+    override func popToRootViewController(animated: Bool) -> [UIViewController]? {
+        let popped = super.popToRootViewController(animated: animated)
+        restoreTabBarIfNeeded()
+        return popped
+    }
+
+    /// 回到一级页面时强制恢复底部导航栏，修复"退出后 TabBar 消失"
+    private func restoreTabBarIfNeeded() {
+        guard viewControllers.count == 1 else { return }
+        guard let tabBar = tabBarController?.tabBar else { return }
+        tabBar.isHidden = false
+        tabBar.alpha = 1
+        if let tabVC = tabBarController {
+            tabVC.view.setNeedsLayout()
+            tabVC.view.layoutIfNeeded()
+        }
+    }
 }
 
 // MARK: - UINavigationControllerDelegate

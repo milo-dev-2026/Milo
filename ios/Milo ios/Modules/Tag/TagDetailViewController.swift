@@ -340,7 +340,6 @@ extension TagDetailViewController: UITableViewDataSource, UITableViewDelegate {
                 self.selectedMembers = members
                 self.tableView.reloadRows(at: [IndexPath(row: 0, section: 2)], with: .none)
             }
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(selectVC, animated: true)
 
         case 3:

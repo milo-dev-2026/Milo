@@ -15,6 +15,7 @@ class WaitingAnswerViewController: UIViewController {
     private let acceptButton = UIButton(type: .system)
     private let rejectButton = UIButton(type: .system)
     private var ringTimer: Timer?
+    private var timeoutWorkItem: DispatchWorkItem?
 
     init(channelId: String, callerName: String, onAccept: @escaping () -> Void, onReject: @escaping () -> Void) {
         self.channelId = channelId
@@ -38,6 +39,7 @@ class WaitingAnswerViewController: UIViewController {
 
     deinit {
         ringTimer?.invalidate()
+        timeoutWorkItem?.cancel()
     }
 
     private func setupUI() {
@@ -134,9 +136,16 @@ class WaitingAnswerViewController: UIViewController {
         ringTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         }
+        // 45 秒无人接听自动拒绝（对齐安卓 WaitingAnswerActivity）
+        let work = DispatchWorkItem { [weak self] in
+            self?.reject()
+        }
+        timeoutWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45, execute: work)
     }
 
     @objc private func accept() {
+        timeoutWorkItem?.cancel()
         ringTimer?.invalidate()
         dismiss(animated: true) {
             self.onAccept?()
@@ -144,6 +153,7 @@ class WaitingAnswerViewController: UIViewController {
     }
 
     @objc private func reject() {
+        timeoutWorkItem?.cancel()
         ringTimer?.invalidate()
         dismiss(animated: true) {
             self.onReject?()

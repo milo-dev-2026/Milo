@@ -76,19 +76,31 @@ class LocationMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
+        // 兼容三种位置内容格式：安卓 "name|lat,lng"、旧版 "name,lat,lng"、本地占位 "[位置] name"
         let content = message.content
-        if content.hasPrefix("[位置] ") {
-            let parts = content.replacingOccurrences(of: "[位置] ", with: "").components(separatedBy: ",")
-            if parts.count >= 3 {
-                let name = parts[0]
-                let lat = Double(parts[1]) ?? 0
-                let lon = Double(parts[2]) ?? 0
-                nameLabel.text = name
-                locationCoord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                updateMapView(lat: lat, lon: lon)
+        let raw = content.replacingOccurrences(of: "[位置] ", with: "")
+        var name = raw
+        var coord: CLLocationCoordinate2D?
+        if raw.contains("|") {
+            let parts = raw.components(separatedBy: "|")
+            name = parts.first ?? raw
+            if parts.count >= 2 {
+                let nums = parts[1].components(separatedBy: ",")
+                if nums.count >= 2, let lat = Double(nums[0]), let lon = Double(nums[1]) {
+                    coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                }
             }
-        } else {
-            nameLabel.text = content
+        } else if raw.components(separatedBy: ",").count >= 3 {
+            let parts = raw.components(separatedBy: ",")
+            name = parts[0]
+            if let lat = Double(parts[1]), let lon = Double(parts[2]) {
+                coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            }
+        }
+        nameLabel.text = name.isEmpty ? "位置" : name
+        if let c = coord {
+            locationCoord = c
+            updateMapView(lat: c.latitude, lon: c.longitude)
         }
 
         let isFromMe = message.isFromMe
@@ -109,14 +121,19 @@ class LocationMessageCell: UITableViewCell {
     }
 
     private func updateMapView(lat: Double, lon: Double) {
-        mapView?.removeFromSuperview()
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        // 复用同一个地图实例（首次创建较慢，避免每次 configure 重建导致气泡长时间空白）
+        if let map = mapView {
+            map.setCenter(coord, animated: false)
+            map.zoomLevel = 16
+            return
+        }
         let map = MAMapView()
         map.isUserInteractionEnabled = false
         map.showsUserLocation = false
         map.showsScale = false
         map.showsCompass = false
         map.logoCenter = CGPoint(x: -100, y: -100)
-        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         map.setCenter(coord, animated: false)
         map.zoomLevel = 16
         mapContainer.addSubview(map)

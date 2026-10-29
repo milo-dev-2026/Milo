@@ -31,6 +31,8 @@ extension ChatInputBarDelegate {
 class ChatInputBar: UIView {
 
     weak var delegate: ChatInputBarDelegate?
+    /// 是否群聊（群聊才显示 @ 入口，与安卓一致）
+    var isGroupChat: Bool = false
 
     /// 输入行胶囊玻璃容器（包含语音/输入框/发送/+）
     private let pillContainer = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
@@ -535,15 +537,18 @@ class ChatInputBar: UIView {
             stack.alignment = .center
             stack.spacing = ScreenAdapter.scaleW(12)
 
-            let items: [(icon: String, title: String, action: Selector)] = [
+            var items: [(icon: String, title: String, action: Selector)] = [
                 ("face.smiling", "表情", #selector(toggleEmojiPanel)),
                 ("photo.on.rectangle", "图片", #selector(didTapPhoto)),
                 ("note.text", "笔记", #selector(didTapNote)),
                 ("star", "收藏", #selector(didTapFavorite)),
                 ("camera", "相机", #selector(didTapCamera)),
-                ("location", "定位", #selector(didTapLocation)),
-                ("at", "群聊@", #selector(didTapMention))
+                ("location", "定位", #selector(didTapLocation))
             ]
+            // 与安卓一致：@ 功能只在群聊工具栏显示
+            if isGroupChat {
+                items.append(("at", "群聊@", #selector(didTapMention)))
+            }
             for item in items {
                 stack.addArrangedSubview(makeToolButton(icon: item.icon, title: item.title, action: item.action))
             }

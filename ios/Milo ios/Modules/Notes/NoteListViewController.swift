@@ -176,7 +176,6 @@ extension NoteListViewController: UITableViewDataSource, UITableViewDelegate {
         detail.onDelete = { [weak self] _ in
             self?.loadData()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(detail, animated: true)
     }
     

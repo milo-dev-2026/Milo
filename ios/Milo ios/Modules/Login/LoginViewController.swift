@@ -1631,14 +1631,12 @@ class EntryLoginViewController: UIViewController {
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
-                                    self.hidesBottomBarWhenPushed = true
 self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(email: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
-                                    self.hidesBottomBarWhenPushed = true
 self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         }
@@ -1668,14 +1666,12 @@ self.navigationController?.pushViewController(vc, animated: true)
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
-                                    self.hidesBottomBarWhenPushed = true
 self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(phone: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
-                                    self.hidesBottomBarWhenPushed = true
 self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         }
@@ -2077,7 +2073,6 @@ class LoginViewController: UIViewController {
 
     @objc private func goForgotPassword() {
         let vc = ForgotPasswordViewController()
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -2190,12 +2185,21 @@ navigationController?.pushViewController(vc, animated: true)
             if isEmail {
                 Task {
                     do {
-                        CrashLogger.shared.log("doLogin: sending email code login")
-                        let resp: LoginResponse = try await APIClient.shared.requestRawLogin(.register(zone: "0086", phone: "", code: code, password: ""))
-                        CrashLogger.shared.log("doLogin: email code response received, uid=\(resp.uid ?? "nil")")
+                        CrashLogger.shared.log("doLogin: checking email register state")
+                        let check: SendCodeResponse = try await APIClient.shared.request(.isRegister(phone: nil, email: email))
                         DispatchQueue.main.async {
-                            // 邮箱验证码登录降级处理
-                            self.handleCodeLoginFallback(resp, phone: "", email: email)
+                            self.resetButton()
+                            if check.exist == 1 {
+                                // 注册接口必填密码，已注册账号不支持仅凭验证码登录（与安卓一致：验证码用于注册/找回密码）
+                                AppUtility.showToast("该邮箱已注册，请使用密码登录")
+                                self.segmentedControl.selectedIndex = 0
+                                self.switchLoginMode(0)
+                            } else {
+                                AppUtility.showToast("该邮箱未注册，请先注册")
+                                let vc = RegisterViewController(email: email, isEmail: true)
+                                vc.hidesBottomBarWhenPushed = true
+                                self.navigationController?.pushViewController(vc, animated: true)
+                            }
                         }
                     } catch {
                         CrashLogger.shared.log("doLogin: email code error: \(error.localizedDescription)")
@@ -2221,11 +2225,21 @@ navigationController?.pushViewController(vc, animated: true)
                 }
                 Task {
                     do {
-                        CrashLogger.shared.log("doLogin: sending phone code login, phone=\(phone)")
-                        let resp: LoginResponse = try await APIClient.shared.requestRawLogin(.register(zone: "0086", phone: phone, code: code, password: ""))
-                        CrashLogger.shared.log("doLogin: phone code response received, uid=\(resp.uid ?? "nil")")
+                        CrashLogger.shared.log("doLogin: checking phone register state, phone=\(phone)")
+                        let check: SendCodeResponse = try await APIClient.shared.request(.isRegister(phone: phone, email: nil))
                         DispatchQueue.main.async {
-                            self.handleCodeLoginFallback(resp, phone: phone, email: "")
+                            self.resetButton()
+                            if check.exist == 1 {
+                                // 注册接口必填密码，已注册账号不支持仅凭验证码登录（与安卓一致：验证码用于注册/找回密码）
+                                AppUtility.showToast("该手机号已注册，请使用密码登录")
+                                self.segmentedControl.selectedIndex = 0
+                                self.switchLoginMode(0)
+                            } else {
+                                AppUtility.showToast("该手机号未注册，请先注册")
+                                let vc = RegisterViewController(phone: phone, isEmail: false)
+                                vc.hidesBottomBarWhenPushed = true
+                                self.navigationController?.pushViewController(vc, animated: true)
+                            }
                         }
                     } catch {
                         CrashLogger.shared.log("doLogin: phone code error: \(error.localizedDescription)")
@@ -2932,7 +2946,6 @@ class RegisterViewController: UIViewController {
         // 跳转编辑资料
         let vc = ProfileEditViewController()
         vc.hidesBackButton = true
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 

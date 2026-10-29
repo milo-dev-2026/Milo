@@ -112,8 +112,9 @@ class LocationPickerViewController: UIViewController {
             AppUtility.showToast("请选择一个位置")
             return
         }
+        let poiName = (poi.name?.isEmpty == false ? poi.name : poi.address) ?? ""
         let picked = PickedLocation(
-            name: poi.name ?? "",
+            name: poiName,
             address: poi.address ?? "",
             latitude: poi.location.latitude,
             longitude: poi.location.longitude

@@ -190,7 +190,6 @@ class GroupBlackListViewController: UIViewController, UITableViewDataSource, UIT
             guard let self = self, let uid = uids.first else { return }
             self.addMemberToBlackList(uid: uid)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -269,39 +268,51 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
     }
 
     private func loadGroups() {
-        // 从会话列表获取群频道，按 channelId 去重（IM SDK 可能返回重复条目）
+        // 来源1：本地 IM SDK 会话列表中的群频道
         let conversations = IMManager.shared.getConversationList()
         var seenIDs = Set<String>()
         var list: [(groupId: String, name: String, memberCount: Int)] = []
-        for conv in conversations {
-            if conv.channel.channelType == 2 {
-                let gid = conv.channel.channelId ?? ""
-                guard !gid.isEmpty, !seenIDs.contains(gid) else { continue }
-                seenIDs.insert(gid)
-                var name = ""
-                if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2),
-                   !info.name.isEmpty {
-                    name = info.name
-                }
-                if name.isEmpty { name = "群聊" }
-                list.append((groupId: gid, name: name, memberCount: 0))
-            }
+        for conv in conversations where conv.channel.channelType == 2 {
+            let gid = conv.channel.channelId ?? ""
+            guard !gid.isEmpty, !seenIDs.contains(gid) else { continue }
+            seenIDs.insert(gid)
+            var name = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2)?.displayName ?? ""
+            if name.isEmpty { name = "群聊" }
+            list.append((groupId: gid, name: name, memberCount: 0))
         }
-        // 按名称排序
         list.sort { $0.name < $1.name }
         DispatchQueue.main.async {
             self.groups = list
             self.tableView.reloadData()
         }
-        // 异步补拉频道信息（群名/头像），回来刷新列表
-        for g in list {
-            IMManager.shared.fetchChannelInfo(channelId: g.groupId, channelType: 2) { [weak self] info in
-                guard let self = self, let info = info, !info.name.isEmpty else { return }
-                let newName = info.name
-                DispatchQueue.main.async {
-                    if let idx = self.groups.firstIndex(where: { $0.groupId == g.groupId }), self.groups[idx].name != newName {
-                        self.groups[idx].name = newName
-                        self.tableView.reloadData()
+
+        // 来源2：服务端会话列表（补齐本地库里缺失的群，修复"我加入的群聊里没有任何群"）
+        Task {
+            guard let resp: WKSyncChat = try? await APIClient.shared.requestFlexible(.syncConversations) else { return }
+            let serverGroupIDs = (resp.conversations ?? [])
+                .filter { $0.channel_type == 2 }
+                .compactMap { $0.channel_id }
+                .filter { !$0.isEmpty && !seenIDs.contains($0) }
+            guard !serverGroupIDs.isEmpty else { return }
+            var added: [(groupId: String, name: String, memberCount: Int)] = []
+            for gid in serverGroupIDs {
+                seenIDs.insert(gid)
+                added.append((groupId: gid, name: "群聊", memberCount: 0))
+            }
+            DispatchQueue.main.async {
+                self.groups.append(contentsOf: added)
+                self.groups.sort { $0.name < $1.name }
+                self.tableView.reloadData()
+            }
+            for g in added {
+                IMManager.shared.fetchChannelInfo(channelId: g.groupId, channelType: 2) { [weak self] info in
+                    guard let self = self, let info = info, !info.displayName.isEmpty else { return }
+                    let newName = info.displayName
+                    DispatchQueue.main.async {
+                        if let idx = self.groups.firstIndex(where: { $0.groupId == g.groupId }) {
+                            self.groups[idx].name = newName
+                            self.tableView.reloadData()
+                        }
                     }
                 }
             }
@@ -326,7 +337,6 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
         guard !groups.isEmpty else { return }
         let g = groups[indexPath.row]
         let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(chatVC, animated: true)
     }
 }
@@ -402,7 +412,6 @@ class SavedGroupsViewController: UIViewController, UITableViewDataSource, UITabl
                 }
             }
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(groups.count, 1) }
@@ -423,7 +432,6 @@ navigationController?.pushViewController(vc, animated: true)
         guard !groups.isEmpty else { return }
         let g = groups[indexPath.row]
         let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(chatVC, animated: true)
     }
 }

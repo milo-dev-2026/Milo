@@ -499,7 +499,6 @@ extension NoteHistoryViewController: UITableViewDataSource, UITableViewDelegate 
             guard let self = self else { return }
             let version = self.versions[indexPath.row]
             let vc = NoteVersionPreviewViewController(version: version)
-                    self.hidesBottomBarWhenPushed = true
 self.navigationController?.pushViewController(vc, animated: true)
             completion(true)
         }

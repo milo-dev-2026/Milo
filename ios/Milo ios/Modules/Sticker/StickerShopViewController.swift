@@ -302,7 +302,6 @@ class StickerShopViewController: UIViewController {
 
     @objc private func showMyStickers() {
         let vc = MyStickersViewController()
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 

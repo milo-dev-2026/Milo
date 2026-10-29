@@ -216,7 +216,6 @@ class MyInfoViewController: UIViewController {
 
     private func showQRCode() {
         let qrVC = UserQRCodeViewController(uid: uid, name: name)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(qrVC, animated: true)
     }
 

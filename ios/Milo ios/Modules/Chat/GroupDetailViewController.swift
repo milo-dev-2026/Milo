@@ -232,7 +232,6 @@ class GroupDetailViewController: UIViewController {
 
     @objc private func didTapAllMembers() {
         let vc = GroupMembersViewController(groupId: groupId)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -318,19 +317,49 @@ navigationController?.pushViewController(vc, animated: true)
     private func loadGroupInfo() {
         Task {
             do {
-                let response: APIResponse<Group> = try await APIClient.shared.request(.getGroupInfo(groupId: groupId))
-                if let data = response.data {
-                    group = data
-                    if let ms = data.members {
-                        members = ms
-                    }
-                    DispatchQueue.main.async {
-                        self.updateHeaderUI()
-                        self.tableView.reloadData()
+                // 后端没有 /v1/groups/info，群信息通过 /v1/channels/{group_no}/2 获取（与安卓一致）
+                let raw = try await APIClient.shared.requestRaw(
+                    .getChannelInfo(channelId: groupId, channelType: 2)
+                )
+                let payload = (raw["data"] as? [String: Any]) ?? raw
+                var dict: [String: Any] = ["group_id": groupId]
+                dict["name"] = (payload["name"] as? String) ?? ""
+                if let logo = payload["logo"] as? String, !logo.isEmpty { dict["avatar"] = logo }
+                if let notice = payload["notice"] as? String, !notice.isEmpty { dict["notice"] = notice }
+                if let mc = payload["member_count"] as? Int { dict["member_count"] = mc }
+                if let owner = (payload["creator"] as? String) ?? (payload["owner_uid"] as? String) {
+                    dict["owner_uid"] = owner
+                }
+                if let role = payload["role"] as? Int { dict["my_role"] = role }
+                if let top = payload["chat_top"] as? Bool { dict["chat_top"] = top }
+                if let disturb = payload["message_disturb"] as? Bool { dict["message_disturb"] = disturb }
+                let jsonData = try JSONSerialization.data(withJSONObject: dict)
+                var loaded = try JSONDecoder().decode(Group.self, from: jsonData)
+
+                // 群成员单独拉取（最多 200 人，桌面网格展示用）
+                if let rawMembers = try? await APIClient.shared.requestRaw(
+                    .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
+                ) {
+                    let list = (rawMembers["list"] as? [[String: Any]])
+                        ?? (rawMembers["data"] as? [[String: Any]]) ?? []
+                    if let listData = try? JSONSerialization.data(withJSONObject: list),
+                       let decoded = try? JSONDecoder().decode([GroupMember].self, from: listData) {
+                        loaded.members = decoded
+                        if loaded.memberCount == nil { loaded.memberCount = decoded.count }
                     }
                 }
+
+                let result = loaded
+                DispatchQueue.main.async {
+                    self.group = result
+                    if let ms = result.members { self.members = ms }
+                    self.updateHeaderUI()
+                    self.tableView.reloadData()
+                }
             } catch {
-                AppUtility.showToast("加载群信息失败")
+                DispatchQueue.main.async {
+                    AppUtility.showToast("加载群信息失败")
+                }
             }
         }
     }
@@ -359,7 +388,6 @@ navigationController?.pushViewController(vc, animated: true)
     @objc private func didTapNotice() {
         let notice = group?.notice ?? ""
         let vc = GroupNoticeViewController(groupId: groupId, notice: notice)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -368,7 +396,6 @@ navigationController?.pushViewController(vc, animated: true)
         vc.onMembersAdded = { [weak self] in
             self?.loadGroupInfo()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -675,17 +702,14 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
                     self?.group?.myNickname = nickname
                     self?.tableView.reloadData()
                 }
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 群二维码
                 let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             case 2:
                 // 群备注
                 let vc = SetGroupRemarkViewController(groupId: groupId)
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             default: break
             }
@@ -698,12 +722,10 @@ navigationController?.pushViewController(vc, animated: true)
             case 0:
                 // 群管理员
                 let vc = GroupAdminsViewController(groupId: groupId)
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 入群审核 - 跳转到群管理页面对应位置
                 let vc = GroupManageViewController(groupId: groupId)
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             default: break
             }
@@ -713,7 +735,6 @@ navigationController?.pushViewController(vc, animated: true)
             case 0:
                 // 查找聊天内容
                 let vc = SearchAllViewController()
-                        self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 清空聊天记录
@@ -947,7 +968,6 @@ class GroupAdminsViewController: UIViewController, UITableViewDataSource, UITabl
             guard let self = self, let uid = uids.first else { return }
             self.addAdminAction(uid: uid)
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 

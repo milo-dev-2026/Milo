@@ -1,13 +1,32 @@
 import UIKit
 import SnapKit
+import Kingfisher
+import AVFoundation
 import TXLiteAVSDK_TRTC
 
 // MARK: - TRTC语音通话页
 class TRTCCallViewController: UIViewController {
 
     private let channelId: String
+    private let peerName: String
+    private let peerAvatar: String
+    /// 通话房间号：由主叫生成并随信令同步给被叫（对齐安卓），0 表示本地推导
+    private let callRoomId: Int
+    private let isCaller: Bool
+    /// 通话结束回调（供 RTCCallManager 清理状态）
+    var onFinish: (() -> Void)?
     private var trtcCloud: TRTCCloud?
     private var remoteUserID: String?
+    private var isConnected = false
+    /// 稳定的房间号：由 channelId 计算（跨设备一致），仅在未传入 roomId 时使用
+    private var stableRoomId: UInt32 {
+        var hash: UInt32 = 2166136261
+        for ch in channelId.utf8 {
+            hash ^= UInt32(ch)
+            hash = hash &* 16777619
+        }
+        return hash & 0x7FFFFFFF
+    }
 
     private let avatarView = UIImageView()
     private let nameLabel = UILabel()
@@ -22,8 +41,12 @@ class TRTCCallViewController: UIViewController {
     private var callDurationTimer: Timer?
     private var callDuration: Int = 0
 
-    init(channelId: String) {
+    init(channelId: String, peerName: String = "语音通话", peerAvatar: String = "", roomId: Int = 0, isCaller: Bool = true) {
         self.channelId = channelId
+        self.peerName = peerName
+        self.peerAvatar = peerAvatar
+        self.callRoomId = roomId
+        self.isCaller = isCaller
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -37,11 +60,55 @@ class TRTCCallViewController: UIViewController {
         Task { await setupTRTC() }
     }
 
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // 页面关闭（无论何种原因）都通知管理器清理通话状态
+        if isBeingDismissed || navigationController?.isBeingDismissed == true || presentingViewController == nil {
+            onFinish?()
+        }
+    }
+
     deinit {
         stopCallDurationTimer()
         trtcCloud?.stopLocalAudio()
         trtcCloud?.exitRoom()
         TRTCCloud.destroySharedInstance()
+    }
+
+    /// 处理对方信令（由 RTCCallManager 调用）
+    func handleRemoteSignal(_ type: Int) {
+        DispatchQueue.main.async {
+            switch type {
+            case RTCCallManager.Signal.accept.rawValue:
+                self.statusLabel.text = self.isConnected ? "通话中" : "对方已接听，连接中..."
+            case RTCCallManager.Signal.refuse.rawValue:
+                self.statusLabel.text = "对方已拒绝"
+                self.stopCallDurationTimer()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.endCall(notifyPeer: false) }
+            case RTCCallManager.Signal.hangup.rawValue:
+                self.statusLabel.text = "对方已挂断"
+                self.stopCallDurationTimer()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.endCall(notifyPeer: false) }
+            case RTCCallManager.Signal.busy.rawValue:
+                self.statusLabel.text = "对方忙线中"
+                self.stopCallDurationTimer()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.endCall(notifyPeer: false) }
+            default:
+                break
+            }
+        }
+    }
+
+    private func endCall(notifyPeer: Bool) {
+        if notifyPeer {
+            RTCCallManager.shared.sendSignal(isConnected ? .hangup : .cancel, to: channelId)
+        }
+        stopCallDurationTimer()
+        trtcCloud?.stopLocalAudio()
+        trtcCloud?.exitRoom()
+        dismiss(animated: true) { [weak self] in
+            self?.onFinish?()
+        }
     }
 
     private func setupUI() {
@@ -73,11 +140,22 @@ class TRTCCallViewController: UIViewController {
         avatarView.image = UIImage(systemName: "phone.fill")
         avatarView.tintColor = .white
         avatarView.backgroundColor = UIColor.themePrimary.withAlphaComponent(0.8)
+        // 显示对方头像（对齐安卓通话页）
+        if !peerAvatar.isEmpty {
+            var urlString = peerAvatar
+            if !urlString.hasPrefix("http") {
+                urlString = APIConfig.chatMediaURL(peerAvatar)?.absoluteString ?? ""
+            }
+            if let url = URL(string: urlString), !urlString.isEmpty {
+                avatarView.kf.setImage(with: url, placeholder: UIImage(systemName: "phone.fill"))
+                avatarView.tintColor = nil
+            }
+        }
         avatarView.layer.borderWidth = 3
         avatarView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
 
         // 名称标签
-        nameLabel.text = "语音通话"
+        nameLabel.text = peerName.isEmpty ? "语音通话" : peerName
         nameLabel.font = ScreenAdapter.mediumFont(22)
         nameLabel.textColor = .white
         nameLabel.textAlignment = .center
@@ -170,25 +248,36 @@ class TRTCCallViewController: UIViewController {
         // 与安卓一致：本地生成 UserSig（SDKAppID + UserSig），不依赖后端接口
         let sdkAppID = TRTCConfig.sdkAppID
         let userSig = TRTCConfig.userSig
-        guard sdkAppID > 0, !userSig.isEmpty else {
+        guard sdkAppID > 0, !userSig.isEmpty, !uid.isEmpty else {
             AppUtility.showToast("TRTC未配置，请联系管理员")
             dismiss(animated: true)
             return
         }
 
+        // 音频会话：通话模式（保证能听到对方声音、支持耳机/蓝牙）
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .voiceChat,
+                                 options: [.allowBluetooth, .defaultToSpeaker, .allowBluetoothA2DP])
+        try? session.setActive(true)
+
         let params = TRTCParams()
         params.sdkAppId = sdkAppID
         params.userId = uid
-        params.roomId = UInt32(channelId.hashValue & 0x7FFFFFFF)
+        params.roomId = callRoomId > 0 ? UInt32(callRoomId) : stableRoomId
         params.role = .anchor
         params.userSig = userSig
 
+        print("[TRTC] enterRoom sdkAppId=\(sdkAppID) uid=\(uid) roomId=\(params.roomId) sigLen=\(userSig.count)")
         trtcCloud?.enterRoom(params, appScene: .audioCall)
         trtcCloud?.startLocalAudio(.default)
+        // 语音通话默认使用扬声器（与安卓一致）
+        if let speakerRoute = TRTCAudioRoute(rawValue: 1) {
+            trtcCloud?.setAudioRoute(speakerRoute)
+        }
     }
 
     @objc private func hangup() {
-        dismiss(animated: true)
+        endCall(notifyPeer: true)
     }
 
     @objc private func toggleMute() {
@@ -228,13 +317,33 @@ extension TRTCCallViewController: TRTCCloudDelegate {
     func onEnterRoom(_ result: Int) {
         DispatchQueue.main.async {
             if result > 0 {
-                self.statusLabel.text = "通话中"
-                self.durationLabel.isHidden = false
-                self.startCallDurationTimer()
+                self.statusLabel.text = self.isCaller ? "正在等待对方接受邀请..." : "通话中"
+                if !self.isCaller {
+                    self.markConnected()
+                }
             } else {
-                AppUtility.showToast("进入房间失败")
+                self.statusLabel.text = "进入房间失败(\(result))"
+                AppUtility.showToast("进入房间失败(\(result))")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    self.endCall(notifyPeer: self.isCaller)
+                }
             }
         }
+    }
+
+    func onError(_ errCode: Int, errMsg: String?, extInfo: [AnyHashable : Any]?) {
+        print("[TRTC] onError code=\(errCode) msg=\(errMsg ?? "")")
+        DispatchQueue.main.async {
+            self.statusLabel.text = "通话错误(\(errCode))"
+        }
+    }
+
+    private func markConnected() {
+        guard !isConnected else { return }
+        isConnected = true
+        statusLabel.text = "通话中"
+        durationLabel.isHidden = false
+        startCallDurationTimer()
     }
 
     func onExitRoom(_ reason: Int) {
@@ -244,21 +353,21 @@ extension TRTCCallViewController: TRTCCloudDelegate {
     func onUserAudioAvailable(_ userId: String, available: Bool) {
         if available {
             remoteUserID = userId
+            DispatchQueue.main.async {
+                self.markConnected()
+            }
         }
-    }
-
-    func onUserEnter(_ userId: String) {
-        remoteUserID = userId
     }
 
     func onUserLeave(_ userId: String, reason: Int) {
         if remoteUserID == userId {
             remoteUserID = nil
             DispatchQueue.main.async {
+                self.statusLabel.text = "对方已离开"
                 self.stopCallDurationTimer()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.dismiss(animated: true)
+                self.endCall(notifyPeer: false)
             }
         }
     }

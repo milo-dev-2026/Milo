@@ -383,18 +383,15 @@ extension GlobalSearchViewController: UITableViewDataSource, UITableViewDelegate
         switch item {
         case .channel(let channel):
             let vc = ChatViewController(channelId: channel.channelId, title: channel.name)
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
 
         case .message(let msg):
             let vc = ChatViewController(channelId: msg.channelId, title: msg.channelName)
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
 
         case .searchUserEntry:
             let vc = SearchUserViewController()
             vc.searchKeyword = currentKeyword
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
 
         default:

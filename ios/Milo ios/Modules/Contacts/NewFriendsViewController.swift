@@ -157,7 +157,6 @@ extension NewFriendsViewController: UITableViewDataSource, UITableViewDelegate {
         }
         cell.onAvatarTap = { [weak self] in
             let detailVC = ContactDetailViewController(uid: apply.uid)
-            self?.hidesBottomBarWhenPushed = true
             self?.navigationController?.pushViewController(detailVC, animated: true)
         }
         return cell
@@ -169,7 +168,6 @@ extension NewFriendsViewController: UITableViewDataSource, UITableViewDelegate {
         let apply = applies[indexPath.row]
         if apply.status == 1 {
             let detailVC = ContactDetailViewController(uid: apply.uid)
-                    self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(detailVC, animated: true)
         }
     }

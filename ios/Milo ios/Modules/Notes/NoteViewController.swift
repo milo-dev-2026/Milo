@@ -69,7 +69,6 @@ class NoteViewController: UIViewController {
             self?.saveData()
             self?.tableView.reloadData()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(editor, animated: true)
     }
 }
@@ -117,7 +116,6 @@ extension NoteViewController: UITableViewDataSource, UITableViewDelegate {
             self?.saveData()
             self?.tableView.reloadData()
         }
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(editor, animated: true)
     }
 

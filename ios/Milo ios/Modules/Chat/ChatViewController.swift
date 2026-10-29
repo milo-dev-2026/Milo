@@ -8,6 +8,7 @@ import AMapLocationKit
 import AMapSearchKit
 import UniformTypeIdentifiers
 import AVKit
+import CoreImage
 import WuKongIMSDK
 
 // MARK: - 聊天页
@@ -20,7 +21,13 @@ class ChatViewController: UIViewController {
     private let tableView = UITableView()
     private let inputBar = ChatInputBar()
     private var messages: [Message] = []
+    /// 历史消息分页状态（滑到顶部继续加载更早的记录）
+    private var isLoadingOlder = false
+    private var hasMoreHistory = true
     private var imagePicker: UIImagePickerController?
+    /// 消息扩展（已读回执/撤回）同步版本号与轮询定时器
+    private var extraVersion: Int64 = 0
+    private var extraSyncTimer: Timer?
 
     /// 上传中的本地缩略图（messageID → 图片），用于立刻展示占位气泡
     private var pendingMedia: [String: UIImage] = [:]
@@ -76,6 +83,7 @@ class ChatViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        inputBar.isGroupChat = (channelType == 2)
         setupLoadingView()
         setupNavBar()
         // 先读磁盘消息缓存秒显，再读 SDK 本地库，最后异步拉服务端补齐
@@ -242,12 +250,18 @@ class ChatViewController: UIViewController {
         // 从聊天背景设置页返回时刷新背景
         applyChatBackground()
         refreshCachedOnlineStatus()
+        // 进入会话立即清除未读数，并通知会话列表刷新（修复"看过了仍显示未读"）
+        IMManager.shared.clearConversationUnread(channelId: channelId, channelType: channelType)
+        NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
+        markMessagesAsRead()
+        startExtraSync()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         // 离开聊天页时恢复导航栏默认外观，避免影响其它页面
         restoreNavBarAppearance()
+        stopExtraSync()
         // 离开时立即落盘消息缓存，下次进入秒显
         msgCacheWorkItem?.cancel()
         let snapshot = Array(messages.suffix(50))
@@ -591,14 +605,11 @@ class ChatViewController: UIViewController {
     // MARK: - 单聊语音通话
     @objc private func startVoiceCall() {
         guard channelType == 1 else { return }
-        // 与安卓一致：本地生成 UserSig，不依赖后端接口
-        guard TRTCConfig.sdkAppID > 0, !TRTCConfig.userSig.isEmpty else {
-            AppUtility.showToast("TRTC未配置，请联系管理员")
-            return
-        }
-        let callVC = TRTCCallViewController(channelId: channelId)
-        callVC.modalPresentationStyle = .fullScreen
-        present(callVC, animated: true)
+        let peer = IMManager.shared.getChannelInfo(channelId: channelId, channelType: 1)
+        RTCCallManager.shared.startCall(from: self,
+                                        channelId: channelId,
+                                        peerName: peer?.displayName ?? titleText,
+                                        peerAvatar: peer?.logo ?? peer?.avatar ?? "")
     }
 
     // MARK: - 单聊在线状态（数据缺失时不显示，不伪造）
@@ -958,6 +969,52 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateScrollDownButtonVisibility()
+        // 滑到顶部附近自动拉取更早的历史消息（修复"部分聊天记录加载不出来"）
+        if scrollView.contentOffset.y < 50, !isLoadingOlder, hasMoreHistory, messages.count >= 15 {
+            loadOlderMessages()
+        }
+    }
+
+    // MARK: - 历史消息分页
+    /// 向上翻页：按最早一条的 seq 继续拉取服务端历史
+    private func loadOlderMessages() {
+        guard !isLoadingOlder, hasMoreHistory else { return }
+        guard let oldestSeq = messages.first(where: { $0.messageSeq > 1 })?.messageSeq else {
+            hasMoreHistory = false
+            return
+        }
+        isLoadingOlder = true
+        Task {
+            do {
+                let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
+                    .syncChannelMessages(channelId: channelId, channelType: channelType,
+                                         startMessageSeq: oldestSeq - 1, limit: 30)
+                )
+                DispatchQueue.main.async {
+                    self.isLoadingOlder = false
+                    let older = (response.messages ?? []).map { Message(from: $0) }
+                        .filter { o in !self.messages.contains(where: { $0.messageID == o.messageID }) }
+                    guard !older.isEmpty else {
+                        self.hasMoreHistory = false
+                        return
+                    }
+                    let oldHeight = self.tableView.contentSize.height
+                    let oldOffset = self.tableView.contentOffset.y
+                    self.messages = (older + self.messages).sorted { lhs, rhs in
+                        let lSeq = lhs.messageSeq == 0 ? Int.max : lhs.messageSeq
+                        let rSeq = rhs.messageSeq == 0 ? Int.max : rhs.messageSeq
+                        if lSeq != rSeq { return lSeq < rSeq }
+                        return lhs.timestamp < rhs.timestamp
+                    }
+                    self.tableView.reloadData()
+                    let newHeight = self.tableView.contentSize.height
+                    self.tableView.contentOffset.y = max(0, oldOffset + (newHeight - oldHeight))
+                    self.saveMessagesCacheDebounced()
+                }
+            } catch {
+                DispatchQueue.main.async { self.isLoadingOlder = false }
+            }
+        }
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -1014,6 +1071,12 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     AppUtility.showToast("已复制")
                 })
             }
+            // 图片消息：识别图中二维码（与安卓长按识图对齐，支持一张图多个二维码）
+            if message.type == .image {
+                actions.append(UIAction(title: "识别图中二维码", image: UIImage(systemName: "qrcode.viewfinder")) { [weak self] _ in
+                    self?.recognizeQRCode(in: message)
+                })
+            }
             // 转发
             actions.append(UIAction(title: "转发", image: UIImage(systemName: "arrowshape.turn.up.right")) { [weak self] _ in
                 self?.forwardMessage(message)
@@ -1044,6 +1107,66 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         }
     }
 
+    // MARK: - 长按识图（二维码）
+    /// 识别图片中的二维码，支持一张图里存在多个二维码
+    private func recognizeQRCode(in message: Message) {
+        guard let url = APIConfig.chatMediaURL(message.content) else {
+            AppUtility.showToast("图片地址无效")
+            return
+        }
+        AppUtility.showToast("正在识别…")
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                guard let image = UIImage(data: data), let ciImage = image.cgImage else {
+                    DispatchQueue.main.async { AppUtility.showToast("图片加载失败") }
+                    return
+                }
+                let detector = CIDetector(ofType: CIDetectorTypeQRCode,
+                                          context: nil,
+                                          options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
+                let features = detector?.features(in: ciImage) as? [CIQRCodeFeature] ?? []
+                let payloads = features.compactMap { $0.messageString }.filter { !$0.isEmpty }
+                DispatchQueue.main.async { self.handleQRPayloads(payloads) }
+            } catch {
+                DispatchQueue.main.async { AppUtility.showToast("识别失败") }
+            }
+        }
+    }
+
+    private func handleQRPayloads(_ payloads: [String]) {
+        guard !payloads.isEmpty else {
+            AppUtility.showToast("未识别到二维码")
+            return
+        }
+        if payloads.count == 1 {
+            openQRPayload(payloads[0])
+            return
+        }
+        // 多个二维码：弹出列表让用户选择要打开哪一个
+        let sheet = UIAlertController(title: "识别到 \(payloads.count) 个二维码", message: nil, preferredStyle: .actionSheet)
+        for (i, p) in payloads.enumerated() {
+            sheet.addAction(UIAlertAction(title: "\(i + 1). " + (p.count > 30 ? String(p.prefix(30)) + "…" : p), style: .default) { [weak self] _ in
+                self?.openQRPayload(p)
+            })
+        }
+        sheet.addAction(UIAlertAction(title: "取消", style: .cancel))
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        }
+        present(sheet, animated: true)
+    }
+
+    private func openQRPayload(_ payload: String) {
+        if let url = URL(string: payload), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) {
+            UIApplication.shared.open(url)
+        } else {
+            UIPasteboard.general.string = payload
+            AppUtility.showToast("已复制二维码内容")
+        }
+    }
+
     /// 菜单弹出时高亮区域对准气泡（而非整行），呈现 iMessage 式气泡浮起效果
     func tableView(_ tableView: UITableView, previewForHighlightingContextMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
         return targetedBubblePreview(configuration: configuration)
@@ -1062,20 +1185,104 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     // MARK: - 已读回执
+    /// 上报已读（对齐后端 /v1/message/readed），不再误删消息
     private func markMessagesAsRead() {
+        let incoming = messages.filter { !$0.isFromMe }
+        guard !incoming.isEmpty else { return }
+        let ids = incoming.map { $0.messageID }
+        let payload = incoming.map { msg -> [String: Any] in
+            ["message_id": msg.messageID, "message_seq": msg.messageSeq]
+        }
         Task {
-            for message in messages where !message.isFromMe && message.status == 0 {
-                do {
-                    _ = try await APIClient.shared.requestRaw(.deleteMessage(messageId: message.messageID))
-                } catch { }
+            _ = try? await APIClient.shared.requestRaw(.reportReaded(
+                channelId: channelId,
+                channelType: channelType,
+                messageIds: ids,
+                messages: payload
+            ))
+        }
+    }
+
+    // MARK: - 消息扩展同步（已读回执 + 对方撤回，对齐安卓 syncExtraMsg）
+    private func startExtraSync() {
+        extraSyncTimer?.invalidate()
+        syncMessageExtra()
+        extraSyncTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            self?.syncMessageExtra()
+        }
+    }
+
+    private func stopExtraSync() {
+        extraSyncTimer?.invalidate()
+        extraSyncTimer = nil
+    }
+
+    private func syncMessageExtra() {
+        Task {
+            guard let response = try? await APIClient.shared.requestRaw(.syncMessageExtra(
+                channelId: channelId, channelType: channelType, version: extraVersion)) else { return }
+            let items = ChatViewController.extraItems(from: response)
+            guard !items.isEmpty else { return }
+            DispatchQueue.main.async {
+                var changedRows: [IndexPath] = []
+                for item in items {
+                    if let ver = (item["version"] as? NSNumber)?.int64Value,
+                       ver > self.extraVersion { self.extraVersion = ver }
+                    if let ver = (item["extra_version"] as? NSNumber)?.int64Value,
+                       ver > self.extraVersion { self.extraVersion = ver }
+                    guard let mid = item["message_id"] as? String,
+                          let idx = self.messages.firstIndex(where: { $0.messageID == mid }) else { continue }
+                    let readed = (item["readed"] as? NSNumber)?.intValue ?? 0
+                    let readedCount = (item["readed_count"] as? NSNumber)?.intValue ?? 0
+                    let revoked = (item["revoke"] as? NSNumber)?.intValue ?? 0
+                    if revoked == 1 {
+                        if self.messages[idx].type != .system {
+                            self.messages[idx].type = .system
+                            self.messages[idx].content = self.messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+                            changedRows.append(IndexPath(row: idx, section: 0))
+                        }
+                    } else if self.messages[idx].isFromMe, readed == 1 || readedCount > 0,
+                              self.messages[idx].status != 2 {
+                        // 2 = 已读（双勾，主题色）
+                        self.messages[idx].status = 2
+                        changedRows.append(IndexPath(row: idx, section: 0))
+                    }
+                }
+                guard !changedRows.isEmpty else { return }
+                self.tableView.reloadRows(at: changedRows, with: .none)
             }
         }
+    }
+
+    /// 递归解析扩展同步返回（服务端可能返回 data/items/list 等多种包裹）
+    private static func extraItems(from value: Any) -> [[String: Any]] {
+        if let array = value as? [[String: Any]] {
+            if array.contains(where: { $0["message_id"] != nil }) { return array }
+            for item in array where item["message_id"] == nil {
+                let nested = extraItems(from: item)
+                if !nested.isEmpty { return nested }
+            }
+            return []
+        }
+        if let dict = value as? [String: Any] {
+            for (key, item) in dict where key != "message_id" {
+                let nested = extraItems(from: item)
+                if !nested.isEmpty { return nested }
+            }
+        }
+        return []
     }
 
     private func recallMessage(_ message: Message) {
         Task {
             do {
-                let response = try await APIClient.shared.requestRaw(.deleteMessage(messageId: message.messageID))
+                let response = try await APIClient.shared.requestRaw(.revokeMessage(
+                    channelId: channelId,
+                    channelType: channelType,
+                    messageId: message.messageID,
+                    clientMsgNo: message.messageID,
+                    messageSeq: UInt32(max(0, message.messageSeq))
+                ))
                 if response["status"] as? Int == 200 {
                     DispatchQueue.main.async {
                         if let idx = self.messages.firstIndex(where: { $0.messageID == message.messageID }) {
@@ -1084,6 +1291,9 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                         }
                         AppUtility.showToast("已撤回")
                     }
+                } else {
+                    let msg = (response["msg"] as? String) ?? "撤回失败"
+                    DispatchQueue.main.async { AppUtility.showToast(msg) }
                 }
             } catch {
                 AppUtility.showToast("撤回失败")
@@ -1239,14 +1449,31 @@ extension ChatViewController: ChatInputBarDelegate {
             AppUtility.showToast("相机不可用")
             return
         }
+        // 与安卓一致：拍照和录像都可选
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "拍摄照片", style: .default) { [weak self] _ in
+            self?.requestCameraAccess(mode: .photo)
+        })
+        alert.addAction(UIAlertAction(title: "录制视频", style: .default) { [weak self] _ in
+            self?.requestCameraAccess(mode: .video)
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.maxY, width: 1, height: 1)
+        }
+        present(alert, animated: true)
+    }
+
+    private func requestCameraAccess(mode: UIImagePickerController.CameraCaptureMode) {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .authorized {
-            presentCamera()
+            presentCamera(mode: mode)
         } else {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted {
-                        self?.presentCamera()
+                        self?.presentCamera(mode: mode)
                     } else {
                         AppUtility.showToast("请在设置中允许访问相机")
                     }
@@ -1358,12 +1585,17 @@ extension ChatViewController: ChatInputBarDelegate {
         present(picker, animated: true)
     }
 
-    private func presentCamera() {
+    private func presentCamera(mode: UIImagePickerController.CameraCaptureMode) {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.mediaTypes = [UTType.image.identifier, UTType.movie.identifier]
-        picker.videoQuality = .typeMedium
-        picker.videoMaximumDuration = 60
+        picker.cameraCaptureMode = mode
+        if mode == .video {
+            picker.mediaTypes = [UTType.movie.identifier]
+            picker.videoQuality = .typeMedium
+            picker.videoMaximumDuration = 60
+        } else {
+            picker.mediaTypes = [UTType.image.identifier]
+        }
         picker.delegate = self
         imagePicker = picker
         present(picker, animated: true)
@@ -1659,7 +1891,7 @@ extension ChatViewController: ChatInputBarDelegate {
             channelID: channelId,
             channelType: self.channelType,
             fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
-            content: "[位置] \(location.name)",
+            content: "[位置] \(location.name)|\(location.latitude),\(location.longitude)",
             type: .location,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
             status: 0 // 发送中

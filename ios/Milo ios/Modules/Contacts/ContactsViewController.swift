@@ -161,31 +161,26 @@ class ContactsViewController: UIViewController {
     // MARK: - 入口项点击
     @objc private func showFriendApplyList() {
         let vc = NewFriendsViewController()
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSavedGroups() {
         let vc = SavedGroupsViewController()
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showJoinedGroups() {
         let vc = JoinedGroupsViewController()
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showFileHelper() {
         let vc = FileHelperViewController(mode: .fileHelper)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSystemNotice() {
         let vc = FileHelperViewController(mode: .systemNotice)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -317,7 +312,6 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
               indexPath.row < groupedContacts[indexPath.section].users.count else { return }
         let user = groupedContacts[indexPath.section].users[indexPath.row]
         let detailVC = ContactDetailViewController(uid: user.uid)
-                self.hidesBottomBarWhenPushed = true
 navigationController?.pushViewController(detailVC, animated: true)
     }
 

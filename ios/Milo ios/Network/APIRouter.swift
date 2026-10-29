@@ -116,6 +116,11 @@ enum APIRouter: URLRequestConvertible {
     case getGroupQrCode(groupId: String)
     case updateGroupSetting(groupId: String, key: String, value: Int)
     case updateGroupSettingString(groupId: String, key: String, value: String)
+    // 消息撤回 / 已读上报（与后端 /v1/message/revoke、/v1/message/readed 对齐）
+    case revokeMessage(channelId: String, channelType: Int, messageId: String, clientMsgNo: String, messageSeq: UInt32)
+    case reportReaded(channelId: String, channelType: Int, messageIds: [String], messages: [[String: Any]])
+    // 消息扩展同步（已读回执 / 撤回，与后端 /v1/message/extra/sync 对齐）
+    case syncMessageExtra(channelId: String, channelType: Int, version: Int64)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -224,6 +229,31 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: fields)
         case let .getGroupInfo(groupId):
             request = try URLEncoding.default.encode(request, with: ["group_id": groupId])
+        case let .syncMessageExtra(channelId, channelType, version):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "channel_id": channelId,
+                "channel_type": channelType,
+                "version": version,
+                "limit": 200,
+                "source": UIDevice.current.identifierForVendor?.uuidString ?? ""
+            ])
+        case let .reportReaded(channelId, channelType, messageIds, messages):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "channel_id": channelId,
+                "channel_type": channelType,
+                "message_ids": messageIds,
+                "messages": messages
+            ])
+        case let .revokeMessage(channelId, channelType, messageId, clientMsgNo, messageSeq):
+            var comps = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
+            comps?.queryItems = [
+                URLQueryItem(name: "message_id", value: messageId),
+                URLQueryItem(name: "channel_id", value: channelId),
+                URLQueryItem(name: "channel_type", value: String(channelType)),
+                URLQueryItem(name: "client_msg_no", value: clientMsgNo),
+                URLQueryItem(name: "message_seq", value: String(messageSeq))
+            ]
+            request.url = comps?.url
         case let .uploadFile(fileName, data):
             request.setValue("multipart/form-data", forHTTPHeaderField: "Content-Type")
         case let .applyFriend(uid, remark, vercode):
@@ -497,6 +527,9 @@ enum APIRouter: URLRequestConvertible {
         case .approveGroupApply: return "/v1/group/apply/approve"
         case .rejectGroupApply: return "/v1/group/apply/reject"
         case .getGroupQrCode(let groupId): return "/v1/groups/\(groupId)/qrcode"
+        case .revokeMessage: return "/v1/message/revoke"
+        case .reportReaded: return "/v1/message/readed"
+        case .syncMessageExtra: return "/v1/message/extra/sync"
         case .updateGroupSetting(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         case .updateGroupSettingString(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         }

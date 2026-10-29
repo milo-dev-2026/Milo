@@ -355,9 +355,9 @@ struct WKMessageData: Codable {
             let duration = anyToInt(dict["duration"] ?? dict["second"] ?? dict["time_tradition"])
             let url = str("url").isEmpty ? str("voice_url") : str("url")
             return (type, "\(duration)|\(url)")
-        case 4: // 视频: "thumbURL|videoURL"
-            let thumb = str("thumb_url").isEmpty ? (str("thumb").isEmpty ? str("cover") : str("thumb")) : str("thumb_url")
-            let video = str("video_url").isEmpty ? str("url") : str("video_url")
+        case 4: // 视频: "thumbURL|videoURL"（兼容安卓驼峰字段）
+            let thumb = firstNonEmpty([str("thumb_url"), str("thumbURL"), str("thumbUrl"), str("thumb"), str("cover")])
+            let video = firstNonEmpty([str("video_url"), str("videoURL"), str("videoUrl"), str("url"), str("video")])
             return (type, "\(thumb)|\(video)")
         case 5: // 文件: "fileName|fileSize|url"
             let name = str("file_name").isEmpty ? str("name") : str("file_name")
@@ -374,12 +374,30 @@ struct WKMessageData: Codable {
             if let noteJSON = dict["note_json"] as? String, !noteJSON.isEmpty {
                 return (type, noteJSON)
             }
+            if let n = dict["note"] {
+                if let s = n as? String, !s.isEmpty {
+                    return (type, s)
+                }
+                if let data = try? JSONSerialization.data(withJSONObject: n),
+                   let s = String(data: data, encoding: .utf8) {
+                    return (type, s)
+                }
+            }
             if let data = try? JSONSerialization.data(withJSONObject: dict),
                let s = String(data: data, encoding: .utf8) {
                 return (type, s)
             }
             return (type, "")
         default:
+            // 兼容安卓端未带 type 或字段不同的笔记消息
+            if dict["note_json"] != nil || (dict["title"] != nil && dict["content"] != nil && str("blocks").isEmpty) {
+                let payload = (dict["note_json"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                if let p = payload { return (100, p) }
+                if let data = try? JSONSerialization.data(withJSONObject: dict),
+                   let s = String(data: data, encoding: .utf8) {
+                    return (100, s)
+                }
+            }
             if (1000...2000).contains(type) {
                 // 系统/群事件消息：content+extra 重新打包为 JSON，供 SystemMessageCell 替换 {0} 占位符
                 var repack: [String: Any] = ["content": str("content")]
@@ -397,6 +415,12 @@ struct WKMessageData: Codable {
             }
             return (type, content)
         }
+    }
+
+    /// 取第一个非空字符串（兼容不同端字段命名）
+    private static func firstNonEmpty(_ values: [String]) -> String {
+        for v in values where !v.isEmpty { return v }
+        return ""
     }
 }
 
