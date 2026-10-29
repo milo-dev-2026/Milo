@@ -1,6 +1,7 @@
 import UIKit
 import AVFoundation
 import SnapKit
+import PhotosUI
 
 // MARK: - 扫描页
 class ScanViewController: UIViewController {
@@ -177,10 +178,18 @@ class ScanViewController: UIViewController {
         }
     }
 
-    // MARK: - 相册识别二维码
+    // MARK: - 相册识别二维码（PHPicker 无权限弹窗、秒开）
     @objc private func openAlbum() {
-        let picker = UIImagePickerController()
-        picker.sourceType = .photoLibrary
+        // 先停掉相机采集，避免弹出相册时摄像头仍在跑导致卡顿
+        if captureSession.isRunning {
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.captureSession.stopRunning()
+            }
+        }
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         present(picker, animated: true)
     }
@@ -227,25 +236,26 @@ extension ScanViewController: AVCaptureMetadataOutputObjectsDelegate {
     }
 }
 
-// MARK: - UIImagePickerControllerDelegate（相册选图识别二维码）
-extension ScanViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+// MARK: - PHPickerViewControllerDelegate（相册选图识别二维码）
+extension ScanViewController: PHPickerViewControllerDelegate {
 
-    func imagePickerController(_ picker: UIImagePickerController,
-                               didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
-        guard let image = info[.originalImage] as? UIImage else { return }
-        if let result = detectQRCode(in: image) {
-            captureSession.stopRunning()
-            AppUtility.lightFeedback()
-            onScanResult?(result)
-            navigationController?.popViewController(animated: true)
-        } else {
-            AppUtility.showToast("未识别到二维码")
+        guard let provider = results.first?.itemProvider,
+              provider.canLoadObject(ofClass: UIImage.self) else { return }
+        provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+            guard let self = self, let image = object as? UIImage else { return }
+            DispatchQueue.main.async {
+                if let result = self.detectQRCode(in: image) {
+                    self.captureSession.stopRunning()
+                    AppUtility.lightFeedback()
+                    self.onScanResult?(result)
+                    self.navigationController?.popViewController(animated: true)
+                } else {
+                    AppUtility.showToast("未识别到二维码")
+                }
+            }
         }
-    }
-
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        picker.dismiss(animated: true)
     }
 }
 

@@ -43,6 +43,7 @@ enum APIRouter: URLRequestConvertible {
     case updateGroupAnnouncement(groupId: String, notice: String)
     // Group management
     case getGroupMembers(groupId: String, page: Int, size: Int, keyword: String?)
+    case createGroup(name: String, members: [String], memberNames: [String])
     case addGroupMembers(groupId: String, uids: [String])
     case removeGroupMembers(groupId: String, uids: [String])
     case updateGroupInfo(groupId: String, name: String?, avatar: String?)
@@ -264,6 +265,13 @@ enum APIRouter: URLRequestConvertible {
             var params: [String: Any] = ["group_id": groupId, "page": page, "size": size]
             if let kw = keyword { params["keyword"] = kw }
             request = try URLEncoding.default.encode(request, with: params)
+        case let .createGroup(name, members, memberNames):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "name": name,
+                "members": members,
+                "member_names": memberNames,
+                "msg_auto_delete": 0
+            ])
         case let .addGroupMembers(groupId, uids):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uids": uids])
         case let .removeGroupMembers(groupId, uids):
@@ -427,6 +435,7 @@ enum APIRouter: URLRequestConvertible {
         case .getGroupAnnouncement(let groupId): return "/v1/groups/\(groupId)/announcement"
         case .updateGroupAnnouncement(let groupId, _): return "/v1/groups/\(groupId)/announcement"
         case .getGroupMembers: return "/v1/groups/members"
+        case .createGroup: return "/v1/group/create"
         case .addGroupMembers: return "/v1/groups/members/add"
         case .removeGroupMembers: return "/v1/groups/members/remove"
         case .updateGroupInfo: return "/v1/groups/info/update"

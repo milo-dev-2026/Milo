@@ -225,23 +225,39 @@ class ConversationListViewController: UIViewController {
     private func startGroupChat() {
         let chooseVC = ChooseContactsViewController(maxSelection: 99)
         chooseVC.title = "选择联系人"
-        chooseVC.onContactsSelected = { [weak self] selectedUids in
-            self?.createGroup(with: selectedUids)
+        chooseVC.onSelected = { [weak self] selected in
+            self?.createGroup(selected: selected)
         }
         navigationController?.pushViewController(chooseVC, animated: true)
     }
 
-    private func createGroup(with uids: [String]) {
-        guard !uids.isEmpty else { return }
+    /// 创建群聊（对齐安卓：群名取前三位成员，成功后直接进入群聊）
+    private func createGroup(selected: [(uid: String, name: String)]) {
+        guard !selected.isEmpty else { return }
+        let uids = selected.map { $0.uid }
+        let names = selected.map { $0.name }
+        let groupName = names.prefix(3).joined(separator: "、")
         AppUtility.showToast("正在创建群聊...")
         Task {
             do {
-                let groupId = "group_\(Int(Date().timeIntervalSince1970))"
-                let response = try await APIClient.shared.requestRaw(.addGroupMembers(groupId: groupId, uids: uids))
-                if response["status"] as? Int == 200 {
-                    DispatchQueue.main.async {
-                        AppUtility.showToast("群聊创建成功")
-                    }
+                let response = try await APIClient.shared.requestRaw(
+                    .createGroup(name: groupName, members: uids, memberNames: names)
+                )
+                // 兼容 {"group_no": "..."} 与 {"data": {"group_no": "..."}} 两种返回结构
+                let payload = (response["data"] as? [String: Any]) ?? response
+                var groupNo: String?
+                if let s = payload["group_no"] as? String { groupNo = s }
+                else if let i = payload["group_no"] as? Int { groupNo = String(i) }
+                else if let s = payload["group_id"] as? String { groupNo = s }
+
+                guard let gid = groupNo, !gid.isEmpty else {
+                    DispatchQueue.main.async { AppUtility.showToast("创建群聊失败") }
+                    return
+                }
+                DispatchQueue.main.async {
+                    AppUtility.showToast("群聊创建成功")
+                    let chatVC = ChatViewController(channelId: gid, title: groupName, channelType: 2)
+                    self.navigationController?.pushViewController(chatVC, animated: true)
                 }
             } catch {
                 DispatchQueue.main.async {

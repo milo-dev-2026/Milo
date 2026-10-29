@@ -75,12 +75,19 @@ class AppUtility {
             imageView.image = placeholder
             return
         }
+        // 命中本地缓存（内存/磁盘）时直接展示真实头像，避免先闪一下首字符占位图
+        let key = url.absoluteString
+        if let cached = KingfisherManager.shared.cache.retrieveImageInMemoryCache(forKey: key)
+            ?? KingfisherManager.shared.cache.imageFromDiskCache(forKey: key) {
+            imageView.image = cached
+            return
+        }
         imageView.kf.setImage(
             with: url,
             placeholder: placeholder,
             options: [
-                .transition(.fade(0.2)),
-                .cacheOriginalImage
+                .cacheOriginalImage,
+                .backgroundDecode
             ]
         ) { result in
             if case .failure = result {

@@ -17,7 +17,13 @@ class ChooseContactsViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let indexBar = ContactIndexBar()
 
-    /// 标题栏右侧「确定」按钮（对齐安卓：确定(N)）
+    /// 自绘标题栏（避免系统导航栏在 push 时安全区变化导致页面先错位再回正）
+    private let titleBarView = UIView()
+    private let titleLabel = UILabel()
+    private let backButton = UIButton(type: .system)
+    private let confirmGlass = UIVisualEffectView(effect: nil)
+
+    /// 标题栏右侧「确定」按钮（对齐安卓：确定(N)，iOS 26 液态玻璃质感）
     private let navConfirmButton = UIButton(type: .custom)
 
     // MARK: - 数据
@@ -47,39 +53,92 @@ class ChooseContactsViewController: UIViewController {
         super.viewDidLoad()
         title = "选择联系人"
         view.backgroundColor = .themeBg
-        setupNav()
+        setupTitleBar()
         setupSearchBar()
         setupSelectedHeader()
         setupTableView()
         loadData()
     }
 
-    private func setupNav() {
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "chevron.left"),
-            style: .plain,
-            target: self,
-            action: #selector(backTapped)
-        )
-        // 确定按钮放在「选择联系人」标题右侧（对齐安卓标题栏右按钮）
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 隐藏系统导航栏，使用自绘标题栏（布局稳定，不出现先错位后跳正）
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
+    // MARK: - 自绘标题栏：返回 + 标题 + 液态玻璃「确定」
+    private func setupTitleBar() {
+        titleBarView.backgroundColor = .themeBg
+        view.addSubview(titleBarView)
+        titleBarView.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            make.leading.trailing.equalToSuperview()
+            make.height.equalTo(44)
+        }
+
+        backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        backButton.tintColor = .label
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        titleBarView.addSubview(backButton)
+        backButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(10)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(34)
+        }
+
+        titleLabel.text = "选择联系人"
+        titleLabel.font = ScreenAdapter.mediumFont(17)
+        titleLabel.textColor = .label
+        titleLabel.textAlignment = .center
+        titleBarView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.greaterThanOrEqualTo(backButton.snp.trailing)
+            make.trailing.lessThanOrEqualToSuperview().offset(-90)
+        }
+
+        // 液态玻璃背板（iOS 26 原生 UIGlassEffect，低版本回退超薄毛玻璃）
+        confirmGlass.effect = ChooseContactsViewController.makeGlassEffect()
+        confirmGlass.layer.cornerRadius = 17
+        confirmGlass.layer.cornerCurve = .continuous
+        confirmGlass.clipsToBounds = true
+        confirmGlass.layer.borderWidth = 0.5
+        confirmGlass.layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
+        titleBarView.addSubview(confirmGlass)
+        confirmGlass.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalToSuperview()
+            make.height.equalTo(34)
+            make.width.greaterThanOrEqualTo(64)
+        }
+
         navConfirmButton.setTitle("确定", for: .normal)
-        navConfirmButton.setTitleColor(.white, for: .normal)
-        navConfirmButton.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .disabled)
+        navConfirmButton.setTitleColor(.themeColorPrimary, for: .normal)
+        navConfirmButton.setTitleColor(UIColor.themeColorPrimary.withAlphaComponent(0.45), for: .disabled)
         navConfirmButton.titleLabel?.font = ScreenAdapter.mediumFont(14)
-        navConfirmButton.backgroundColor = .themeColorPrimary
-        navConfirmButton.layer.cornerRadius = 15
-        navConfirmButton.clipsToBounds = true
+        navConfirmButton.backgroundColor = .clear
         navConfirmButton.isEnabled = false
-        navConfirmButton.alpha = 0.4
-        navConfirmButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+        navConfirmButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
         navConfirmButton.addTarget(self, action: #selector(done), for: .touchUpInside)
-        let container = UIView()
-        container.addSubview(navConfirmButton)
+        confirmGlass.contentView.addSubview(navConfirmButton)
         navConfirmButton.snp.makeConstraints { make in
             make.edges.equalToSuperview()
-            make.height.equalTo(30)
         }
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: container)
+        confirmGlass.alpha = 0.55
+    }
+
+    /// iOS 26 原生液态玻璃效果；低版本回退到超薄材质毛玻璃
+    private static func makeGlassEffect() -> UIVisualEffect {
+        if let glassType = NSClassFromString("UIGlassEffect") as? NSObject.Type,
+           let effect = glassType.init() as? UIVisualEffect {
+            return effect
+        }
+        return UIBlurEffect(style: .systemUltraThinMaterial)
     }
 
     @objc private func backTapped() {
@@ -92,7 +151,7 @@ class ChooseContactsViewController: UIViewController {
         searchBar.layer.cornerRadius = 18
         view.addSubview(searchBar)
         searchBar.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(12)
+            make.top.equalTo(titleBarView.snp.bottom).offset(8)
             make.leading.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().offset(-16)
             make.height.equalTo(36)
@@ -172,6 +231,8 @@ class ChooseContactsViewController: UIViewController {
         tableView.separatorColor = .themeSeparator
         tableView.backgroundColor = .themeBg
         tableView.tableFooterView = UIView()
+        // 不再随导航栏隐藏自动调整内边距，避免首屏内容跳动
+        tableView.contentInsetAdjustmentBehavior = .never
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
             make.top.equalTo(selectedHeader.snp.bottom)
@@ -200,7 +261,7 @@ class ChooseContactsViewController: UIViewController {
         // 标题栏确定按钮：带数量，未选时置灰
         navConfirmButton.setTitle(has ? "确定(\(selectedOrder.count))" : "确定", for: .normal)
         navConfirmButton.isEnabled = has
-        navConfirmButton.alpha = has ? 1 : 0.4
+        confirmGlass.alpha = has ? 1 : 0.55
         UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
         selectedHeader.reloadData()
         if has {

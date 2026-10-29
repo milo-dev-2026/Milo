@@ -266,6 +266,8 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        // 数据刷新与布局存在时序差，越界时返回 nil 而不是崩溃
+        guard section < groupedContacts.count else { return nil }
         return groupedContacts[section].title
     }
 
@@ -281,23 +283,29 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        guard section < groupedContacts.count else { return 0 }
         return groupedContacts[section].users.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as! ContactCell
+        guard indexPath.section < groupedContacts.count,
+              indexPath.row < groupedContacts[indexPath.section].users.count else { return cell }
         cell.configure(with: groupedContacts[indexPath.section].users[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        guard indexPath.section < groupedContacts.count,
+              indexPath.row < groupedContacts[indexPath.section].users.count else { return }
         let user = groupedContacts[indexPath.section].users[indexPath.row]
         let detailVC = ContactDetailViewController(uid: user.uid)
         navigationController?.pushViewController(detailVC, animated: true)
     }
 
     func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        guard section < groupedContacts.count else { return UIView() }
         // 最后一个 section 的 footer 显示联系人总数
         if section == groupedContacts.count - 1 {
             let footerView = UIView()
