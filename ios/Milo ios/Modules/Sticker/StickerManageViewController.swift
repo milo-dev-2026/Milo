@@ -642,6 +642,9 @@ class CustomStickerCell: UICollectionViewCell {
     private let imageView = UIImageView()
     private var longPressGesture: UILongPressGestureRecognizer?
 
+    /// 贴纸图内存缓存：避免滑动时每个 cell 重复从磁盘解码，造成掉帧
+    private static let imageCache = NSCache<NSString, UIImage>()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -669,7 +672,13 @@ class CustomStickerCell: UICollectionViewCell {
     }
 
     func configure(imagePath: String) {
+        let key = imagePath as NSString
+        if let cached = Self.imageCache.object(forKey: key) {
+            imageView.image = cached
+            return
+        }
         if let image = UIImage(contentsOfFile: imagePath) {
+            Self.imageCache.setObject(image, forKey: key)
             imageView.image = image
         } else {
             imageView.image = UIImage(systemName: "photo")

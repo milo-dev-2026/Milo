@@ -274,10 +274,13 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
         for conv in conversations {
             if conv.channel.channelType == 2 {
                 let gid = conv.channel.channelId ?? ""
-                var name = gid
-                if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2) {
-                    name = info.name ?? gid
+                // 优先用 SDK 已同步的频道名，避免把群号 hex 当昵称显示成“乱码”
+                var name = ""
+                if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2),
+                   let n = info.name, !n.isEmpty {
+                    name = n
                 }
+                if name.isEmpty { name = "群聊" }
                 list.append((groupId: gid, name: name, memberCount: 0))
             }
         }
@@ -287,17 +290,29 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
             self.groups = list
             self.tableView.reloadData()
         }
+        // 异步补拉频道信息（群名/头像），回来刷新列表
+        for g in list {
+            IMManager.shared.fetchChannelInfo(channelId: g.groupId, channelType: 2) { [weak self] info in
+                guard let self = self, let info = info, let newName = info.name, !newName.isEmpty else { return }
+                DispatchQueue.main.async {
+                    if let idx = self.groups.firstIndex(where: { $0.groupId == g.groupId }), self.groups[idx].name != newName {
+                        self.groups[idx].name = newName
+                        self.tableView.reloadData()
+                    }
+                }
+            }
+        }
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(groups.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "JGCell", for: indexPath)
-        if groups.isEmpty { cell.textLabel?.text = "暂未加入群组"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none }
+        if groups.isEmpty { cell.textLabel?.text = "暂未加入群组"; cell.textLabel?.textColor = .secondaryLabel; cell.textLabel?.textAlignment = .center; cell.selectionStyle = .none; cell.imageView?.image = nil }
         else {
             let g = groups[indexPath.row]
             cell.textLabel?.text = g.name
             cell.detailTextLabel?.text = "\(g.memberCount)人"
-            cell.imageView?.image = UIImage(systemName: "person.3.fill")
-            cell.imageView?.tintColor = .themePrimary
+            // 先占位图兜底，再异步换成真实群头像
+            cell.imageView?.image = AppUtility.defaultAvatarImage(name: g.name, size: 96)
             AppUtility.loadChannelAvatar(channelId: g.groupId, channelType: 2, name: g.name, into: cell.imageView!)
         }
         return cell

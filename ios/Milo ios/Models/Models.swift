@@ -380,7 +380,17 @@ struct WKMessageData: Codable {
             }
             return (type, "")
         default:
-            // 未知/系统消息：优先可读文本，其次保留原始 type
+            if (1000...2000).contains(type) {
+                // 系统/群事件消息：content+extra 重新打包为 JSON，供 SystemMessageCell 替换 {0} 占位符
+                var repack: [String: Any] = ["content": str("content")]
+                if let extra = dict["extra"] { repack["extra"] = extra }
+                if let data = try? JSONSerialization.data(withJSONObject: repack),
+                   let s = String(data: data, encoding: .utf8) {
+                    return (type, s)
+                }
+                return (type, str("content"))
+            }
+            // 未知消息：优先可读文本，其次保留原始 type
             let content = str("content")
             if content.isEmpty {
                 type = 1
@@ -484,7 +494,12 @@ struct Message: Codable {
         self.fromUID = wk.from_uid ?? ""
         let decoded = wk.decodedPayload
         self.content = decoded.content
-        self.type = MessageType(rawValue: decoded.type) ?? .text
+        // 与安卓一致：contentType 1000~2000 为系统/群事件消息（邀请入群、退群等）
+        if (1000...2000).contains(decoded.type) {
+            self.type = .system
+        } else {
+            self.type = MessageType(rawValue: decoded.type) ?? .text
+        }
         self.timestamp = (wk.timestamp ?? 0) * 1000
         self.status = 1
         self.messageSeq = wk.message_seq ?? 0

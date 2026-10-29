@@ -237,6 +237,22 @@ class AddFriendViewController: UIViewController {
             make.width.height.equalTo(48)
         }
 
+        // 按钮必须先加入视图层级，resultName/resultSub 的 trailing 约束才能引用它
+        resultAddButton.setTitle("添加", for: .normal)
+        resultAddButton.setTitleColor(.white, for: .normal)
+        resultAddButton.titleLabel?.font = ScreenAdapter.mediumFont(14)
+        resultAddButton.backgroundColor = .themeColorPrimary
+        resultAddButton.layer.cornerRadius = 15
+        resultAddButton.clipsToBounds = true
+        resultAddButton.addTarget(self, action: #selector(addTapped), for: .touchUpInside)
+        resultCard.addSubview(resultAddButton)
+        resultAddButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-14)
+            make.centerY.equalToSuperview()
+            make.width.equalTo(64)
+            make.height.equalTo(30)
+        }
+
         resultName.font = ScreenAdapter.mediumFont(16)
         resultName.textColor = .label
         resultName.lineBreakMode = .byTruncatingTail
@@ -256,21 +272,6 @@ class AddFriendViewController: UIViewController {
             make.leading.equalTo(resultName)
             make.trailing.lessThanOrEqualTo(resultAddButton.snp.leading).offset(-8)
             make.bottom.equalTo(resultAvatar.snp.bottom).offset(-4)
-        }
-
-        resultAddButton.setTitle("添加", for: .normal)
-        resultAddButton.setTitleColor(.white, for: .normal)
-        resultAddButton.titleLabel?.font = ScreenAdapter.mediumFont(14)
-        resultAddButton.backgroundColor = .themeColorPrimary
-        resultAddButton.layer.cornerRadius = 15
-        resultAddButton.clipsToBounds = true
-        resultAddButton.addTarget(self, action: #selector(addTapped), for: .touchUpInside)
-        resultCard.addSubview(resultAddButton)
-        resultAddButton.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-14)
-            make.centerY.equalToSuperview()
-            make.width.equalTo(64)
-            make.height.equalTo(30)
         }
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(resultTapped))

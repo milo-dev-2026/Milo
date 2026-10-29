@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "ChatBgPattern.png",
+      "filename" : "chat_bg_pattern.png",
       "idiom" : "universal",
       "scale" : "1x"
     },

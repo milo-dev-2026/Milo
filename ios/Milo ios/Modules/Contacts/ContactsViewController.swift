@@ -27,7 +27,7 @@ class ContactsViewController: UIViewController {
         ("seal.fill", "保存的群聊", #selector(showSavedGroups)),
         ("message.fill", "我加入的群", #selector(showJoinedGroups)),
         ("folder.fill", "文件传输助手", #selector(showFileHelper)),
-        ("", "系统通知", #selector(showSystemNotice))
+        ("", "系统账号", #selector(showSystemNotice))
     ]
 
     override func viewDidLoad() {
@@ -492,8 +492,8 @@ class ContactsHeaderCell: UIView {
             iconView.tintColor = .white
             officialBadge.image = ConversationCell.makeTextBadge("官方", colorHex: "F53F3F")
             officialBadge.isHidden = false
-        case "系统通知":
-            // 对齐安卓：系统通知使用 Milo Logo 头像
+        case "系统账号":
+            // 对齐安卓：系统账号使用 Milo Logo 头像
             iconView.image = UIImage(named: "LoginLogo")
             iconView.contentMode = .scaleAspectFill
             iconView.backgroundColor = .clear

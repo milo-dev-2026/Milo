@@ -256,6 +256,8 @@ class ConversationListViewController: UIViewController {
                 }
                 DispatchQueue.main.async {
                     AppUtility.showToast("群聊创建成功")
+                    // 通知会话列表刷新，新群立即出现在聊天页
+                    NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
                     let chatVC = ChatViewController(channelId: gid, title: groupName, channelType: 2)
                     self.navigationController?.pushViewController(chatVC, animated: true)
                 }
@@ -847,12 +849,12 @@ class ConversationCell: UITableViewCell {
             || lower.contains("official") || lower.contains("robot")
     }
 
-    /// 系统账号专属头像与默认昵称（对齐安卓：文件传输助手=绿色文件夹，系统通知=橙色铃铛，系统团队=双人图标）
+    /// 系统账号专属头像与默认昵称（对齐安卓：文件传输助手=绿色文件夹，系统账号=Milo Logo，系统团队=双人图标）
     private static let systemAccountMap: [String: (icon: String, bgHex: String, name: String)] = [
         "system_file_helper": ("folder.fill", "4CAF50", "文件传输助手"),
         "filehelper": ("folder.fill", "4CAF50", "文件传输助手"),
-        "system_notice": ("bell.fill", "FFA940", "系统通知"),
-        "u_10000": ("bell.fill", "FFA940", "系统通知"),
+        "system_notice": ("milo_logo", "", "系统账号"),
+        "u_10000": ("milo_logo", "", "系统账号"),
         "system_team": ("person.2.fill", "7F92D6", "系统团队")
     ]
 
@@ -864,8 +866,8 @@ class ConversationCell: UITableViewCell {
         if name.contains("文件传输助手") {
             return ("folder.fill", "4CAF50", "文件传输助手")
         }
-        if name.contains("系统通知") {
-            return ("bell.fill", "FFA940", "系统通知")
+        if name.contains("系统通知") || name.contains("系统账号") {
+            return ("milo_logo", "", "系统账号")
         }
         return nil
     }
@@ -942,7 +944,12 @@ class ConversationCell: UITableViewCell {
         }
 
         if let conf = systemConf {
-            avatarView.image = ConversationCell.makeIconAvatar(icon: conf.icon, bgHex: conf.bgHex)
+            if conf.icon == "milo_logo" {
+                // 系统账号头像与通讯录一致：Milo Logo
+                avatarView.image = UIImage(named: "LoginLogo") ?? ConversationCell.makeIconAvatar(icon: "bell.fill", bgHex: "FFA940")
+            } else {
+                avatarView.image = ConversationCell.makeIconAvatar(icon: conf.icon, bgHex: conf.bgHex)
+            }
         } else {
             // 与Android一致：通过 /v1/users/{uid}/avatar 或 /v1/groups/{gid}/avatar 加载
             AppUtility.loadChannelAvatar(

@@ -1,7 +1,7 @@
 import UIKit
 import SnapKit
 import Kingfisher
-import Photos
+import PhotosUI
 import UniformTypeIdentifiers
 
 // MARK: - 笔记编辑页
@@ -325,35 +325,20 @@ class NoteEditViewController: UIViewController {
     }
     
     @objc private func addImageBlock() {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if status == .authorized || status == .limited {
-            presentImagePicker()
-        } else {
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] newStatus in
-                DispatchQueue.main.async {
-                    if newStatus == .authorized || newStatus == .limited {
-                        self?.presentImagePicker()
-                    } else {
-                        AppUtility.showToast("请在设置中允许访问相册")
-                    }
-                }
-            }
-        }
-    }
-    
-    private func presentImagePicker() {
-        let picker = UIImagePickerController()
-        picker.sourceType = .photoLibrary
-        picker.mediaTypes = [UTType.image.identifier]
+        // PHPicker 为系统级选择器，无需相册权限、无授权弹窗，秒开
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         present(picker, animated: true)
     }
-    
+
     @objc private func addVideoBlock() {
-        let picker = UIImagePickerController()
-        picker.sourceType = .photoLibrary
-        picker.mediaTypes = [UTType.movie.identifier]
-        picker.videoQuality = .typeMedium
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .videos
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         present(picker, animated: true)
     }
@@ -494,68 +479,83 @@ extension NoteEditViewController: UITextViewDelegate {
     }
 }
 
-// MARK: - UIImagePickerControllerDelegate
-extension NoteEditViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-    
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        picker.dismiss(animated: true)
-        
-        if let mediaType = info[.mediaType] as? String {
-            if mediaType == UTType.image.identifier {
-                if let image = info[.originalImage] as? UIImage {
-                    // 先插入本地图片块立即展示，再后台上传回填 URL
-                    let block = NoteBlock(type: .image)
-                    localImages[block.id] = image
-                    blocks.append(block)
-                    renderBlocks()
-                    scrollToBottom()
+// MARK: - PHPickerViewControllerDelegate
+extension NoteEditViewController: PHPickerViewControllerDelegate {
 
-                    guard let data = image.jpegData(compressionQuality: 0.6) else { return }
-                    let blockId = block.id
-                    Task { [weak self] in
-                        guard let self = self else { return }
-                        do {
-                            let fileName = "note_img_\(Int(Date().timeIntervalSince1970)).jpg"
-                            let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                            DispatchQueue.main.async {
-                                if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
-                                    self.blocks[idx].imageURL = path
-                                }
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let provider = results.first?.itemProvider else { return }
+
+        if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+                guard let self = self, let image = object as? UIImage else { return }
+                let block = NoteBlock(type: .image)
+                let blockId = block.id
+                DispatchQueue.main.async {
+                    // 先插入本地图片块立即展示，再后台上传回填 URL
+                    self.localImages[blockId] = image
+                    self.blocks.append(block)
+                    self.renderBlocks()
+                    self.scrollToBottom()
+                }
+                guard let data = image.jpegData(compressionQuality: 0.6) else { return }
+                Task {
+                    do {
+                        let fileName = "note_img_\(Int(Date().timeIntervalSince1970)).jpg"
+                        let path = try await APIClient.shared.upload(data: data, fileName: fileName)
+                        DispatchQueue.main.async {
+                            if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
+                                self.blocks[idx].imageURL = path
                             }
-                        } catch {
-                            DispatchQueue.main.async {
-                                AppUtility.showToast("图片上传失败")
-                            }
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            AppUtility.showToast("图片上传失败")
                         }
                     }
                 }
-            } else if mediaType == UTType.movie.identifier {
-                if let videoURL = info[.mediaURL] as? URL {
-                    Task {
-                        do {
-                            guard let data = try? Data(contentsOf: videoURL) else {
-                                AppUtility.showToast("视频读取失败")
-                                return
+            }
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, _ in
+                guard let self = self, let url = url else { return }
+                // 回调结束后临时 URL 即失效，先拷贝到本地临时目录
+                let tmpURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("note_video_\(Int(Date().timeIntervalSince1970)).mp4")
+                do {
+                    try? FileManager.default.removeItem(at: tmpURL)
+                    try FileManager.default.copyItem(at: url, to: tmpURL)
+                } catch {
+                    DispatchQueue.main.async { AppUtility.showToast("视频读取失败") }
+                    return
+                }
+                // 先插入视频块占位立即展示，再后台上传回填 URL
+                let block = NoteBlock(type: .video)
+                let blockId = block.id
+                DispatchQueue.main.async {
+                    self.blocks.append(block)
+                    self.renderBlocks()
+                    self.scrollToBottom()
+                }
+                Task {
+                    do {
+                        guard let data = try? Data(contentsOf: tmpURL) else {
+                            DispatchQueue.main.async { AppUtility.showToast("视频读取失败") }
+                            return
+                        }
+                        let path = try await APIClient.shared.upload(data: data, fileName: tmpURL.lastPathComponent)
+                        try? FileManager.default.removeItem(at: tmpURL)
+                        DispatchQueue.main.async {
+                            if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
+                                self.blocks[idx].videoURL = path
                             }
-                            let fileName = "note_video_\(Int(Date().timeIntervalSince1970)).mp4"
-                            let path = try await APIClient.shared.upload(data: data, fileName: fileName)
-                            DispatchQueue.main.async { [weak self] in
-                                self?.blocks.append(NoteBlock(type: .video, videoURL: path))
-                                self?.renderBlocks()
-                                self?.scrollToBottom()
-                            }
-                        } catch {
-                            DispatchQueue.main.async {
-                                AppUtility.showToast("视频上传失败")
-                            }
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            AppUtility.showToast("视频上传失败")
                         }
                     }
                 }
             }
         }
-    }
-    
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        picker.dismiss(animated: true)
     }
 }

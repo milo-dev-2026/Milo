@@ -463,10 +463,11 @@ class ChatViewController: UIViewController {
 
         let hasStatus = channelType == 1
         if hasStatus {
+            // 单聊：昵称+在线状态两行整体与头像垂直居中（总高约 34pt）
             navTitleLabel.snp.makeConstraints { make in
                 make.leading.equalTo(navAvatar.snp.trailing).offset(ScreenAdapter.scaleW(8))
                 make.trailing.lessThanOrEqualToSuperview()
-                make.top.equalToSuperview().offset(ScreenAdapter.scaleH(7))
+                make.top.equalTo(navAvatar.snp.top).offset(-ScreenAdapter.scaleH(2))
             }
             onlineStatusLabel.snp.makeConstraints { make in
                 make.leading.equalTo(navTitleLabel)
@@ -474,10 +475,11 @@ class ChatViewController: UIViewController {
                 make.top.equalTo(navTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(1))
             }
         } else {
+            // 群聊：昵称与头像同一水平线（垂直中心对齐头像）
             navTitleLabel.snp.makeConstraints { make in
                 make.leading.equalTo(navAvatar.snp.trailing).offset(ScreenAdapter.scaleW(8))
                 make.trailing.lessThanOrEqualToSuperview()
-                make.centerY.equalToSuperview()
+                make.centerY.equalTo(navAvatar.snp.centerY)
             }
         }
 
@@ -1184,10 +1186,21 @@ extension ChatViewController: ChatInputBarDelegate {
             status: 0 // 发送中
         )
         messages.append(msg)
+        // 纳入回显匹配集：SDK 回显时替换本地占位气泡（此前文本消息漏插，导致时钟占位不消、消息重复）
+        confirmedLocalIDs.insert(msg.messageID)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
+        }
+        // 乐观超时：2 秒内未收到回显则直接置为已发送，去掉“发送中”白色占位圈
+        let localID = msg.messageID
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self = self,
+                  self.confirmedLocalIDs.contains(localID),
+                  let idx = self.messages.firstIndex(where: { $0.messageID == localID }) else { return }
+            self.messages[idx].status = 1
+            self.tableView.reloadData()
         }
     }
 
