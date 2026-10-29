@@ -343,6 +343,16 @@ class ChatViewController: UIViewController {
 
     private func applyChatBackground() {
         let defaults = UserDefaults.standard
+
+        // 一次性迁移：清空旧版本写入的纯色背景设置，统一回退到与安卓一致的浅灰纹理背景
+        if !defaults.bool(forKey: "chat_bg_migrated_v3") {
+            for key in defaults.dictionaryRepresentation().keys
+            where key.hasPrefix("chat_bg_") && key != "chat_bg_migrated_v3" {
+                defaults.removeObject(forKey: key)
+            }
+            defaults.set(true, forKey: "chat_bg_migrated_v3")
+        }
+
         var color: UIColor?
 
         // 会话级背景：chat_bg_<channelId>
@@ -372,7 +382,9 @@ class ChatViewController: UIViewController {
                 chatBgImageInstalled = true
                 chatBgImageView.contentMode = .scaleAspectFill
                 chatBgImageView.isUserInteractionEnabled = false
-                chatBgImageView.image = UIImage(named: "ChatBgPattern") ?? ChatViewController.makeDefaultChatBackground()
+                let pattern = UIImage(named: "ChatBgPattern") ?? UIImage(named: "chat_bg_pattern")
+                chatBgImageView.image = pattern ?? ChatViewController.makeDefaultChatBackground()
+                print("[Chat] 聊天背景图加载: \(pattern == nil ? "失败(回退渐变)" : "成功")")
                 view.insertSubview(chatBgImageView, at: 0)
                 chatBgImageView.snp.makeConstraints { make in
                     make.edges.equalToSuperview()
@@ -695,11 +707,12 @@ class ChatViewController: UIViewController {
 
     /// 首屏先用 SDK 本地消息库渲染，避免等待网络导致白屏
     private func loadCachedMessages() {
-        IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 30) { [weak self] wkMessages, _ in
+        // 从 SDK 本地库读取最近消息：条数提升到 100 条，进入会话即可见较完整记录
+        IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 100) { [weak self] wkMessages, _ in
             guard let self = self, let wkMessages = wkMessages, !wkMessages.isEmpty else { return }
             let cached = wkMessages.map { $0.toBusinessMessage() }
             guard cached.contains(where: { !($0.type == .text && $0.content.isEmpty) }) else { return }
-            self.applyLoadedMessages(cached, scroll: true, finish: false)
+            self.applyLoadedMessages(cached, scroll: true, finish: false, merge: true)
         }
     }
 
@@ -739,8 +752,19 @@ class ChatViewController: UIViewController {
     }
 
     /// 合并服务端消息与本地消息（保留发送中/失败占位），按 seq + 时间排序
-    private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool) {
+    /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
+    private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
         var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
+        let base = merge ? messages : []
+        for local in base {
+            // 同方向同类型同内容 60 秒内视为同一条（本地 ID 与服务端 ID 不同）
+            let duplicated = result.contains { r in
+                r.messageID == local.messageID ||
+                (r.isFromMe == local.isFromMe && r.type == local.type &&
+                 r.content == local.content && abs(r.timestamp - local.timestamp) < 60_000)
+            }
+            if !duplicated { result.append(local) }
+        }
         for local in messages where (local.status == 0 || local.status == -1) {
             if !result.contains(where: { $0.messageID == local.messageID }) {
                 result.append(local)
@@ -771,11 +795,12 @@ class ChatViewController: UIViewController {
                 )
                 DispatchQueue.main.async {
                     if let msgs = response.messages {
-                        print("[Chat] 加载到 \(msgs.count) 条消息")
-                        self.applyLoadedMessages(msgs.map { Message(from: $0) }, scroll: true, finish: true)
+                        print("[Chat] 加载到 \(msgs.count) 条服务端消息")
+                        // merge: 服务端只返回部分消息时保留本地已有内容，避免"加载不完整"
+                        self.applyLoadedMessages(msgs.map { Message(from: $0) }, scroll: self.messages.isEmpty, finish: true, merge: true)
                     } else {
                         print("[Chat] 消息列表为空")
-                        self.applyLoadedMessages([], scroll: false, finish: true)
+                        self.applyLoadedMessages([], scroll: false, finish: true, merge: true)
                     }
                 }
             } catch {
@@ -1175,7 +1200,8 @@ extension ChatViewController: ChatInputBarDelegate {
         if !IMManager.shared.isConnected {
             AppUtility.showToast("连接已断开，正在重连...")
         }
-        IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
+        // 立即判断发送结果：成功直接显示单勾，失败显示红色感叹号，不再停留在“发送中”转圈
+        let sentOK = IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
         let msg = Message(
             messageID: UUID().uuidString,
             channelID: channelId,
@@ -1184,24 +1210,15 @@ extension ChatViewController: ChatInputBarDelegate {
             content: text,
             type: .text,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0 // 发送中
+            status: sentOK ? 1 : -1
         )
         messages.append(msg)
-        // 纳入回显匹配集：SDK 回显时替换本地占位气泡（此前文本消息漏插，导致时钟占位不消、消息重复）
+        // 纳入回显匹配集：SDK 回显时替换本地气泡，避免重复
         confirmedLocalIDs.insert(msg.messageID)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
             self.scrollToBottom()
-        }
-        // 乐观超时：2 秒内未收到回显则直接置为已发送，去掉“发送中”白色占位圈
-        let localID = msg.messageID
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            guard let self = self,
-                  self.confirmedLocalIDs.contains(localID),
-                  let idx = self.messages.firstIndex(where: { $0.messageID == localID }) else { return }
-            self.messages[idx].status = 1
-            self.tableView.reloadData()
         }
     }
 
@@ -1577,22 +1594,11 @@ extension ChatViewController: ChatInputBarDelegate {
         throw APIError.noData
     }
 
-    /// 优先直传腾讯云 COS（与安卓共用同一存储桶，返回公网 URL，两端均可直接访问）
-    /// COS 失败时自动回退后端中转上传（返回相对路径）
+    /// 与安卓完全一致：走后端 /v1/file/upload 中转上传，返回相对路径（/channelType/channelId/xxx.ext）
+    /// 说明：COS 桶为私有读（匿名访问返回 403），直传得到的公网 URL 双方都无法打开，
+    /// 因此聊天图片/视频统一走后端中转，安卓端收到的相对路径也能正常拼接展示。
     private func uploadMedia(data: Data, fileName: String, contentType: String) async throws -> String {
-        do {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                COSUploadManager.shared.uploadFile(data: data,
-                                                   fileName: fileName,
-                                                   contentType: contentType,
-                                                   progress: nil) { result in
-                    continuation.resume(with: result)
-                }
-            }
-        } catch {
-            print("[Chat] COS 直传失败，回退后端上传: \(error.localizedDescription)")
-            return try await uploadChatFile(data: data, fileName: fileName)
-        }
+        return try await uploadChatFile(data: data, fileName: fileName)
     }
 
     private func sendFileMessage(url: URL) {

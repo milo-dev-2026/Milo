@@ -397,7 +397,9 @@ class IMManager: NSObject {
     }
 
     // MARK: - 发送文本消息
-    func sendTextMessage(channelId: String, content: String, channelType: Int = 1) {
+    /// 返回是否成功交给 SDK 发送（nil 表示发送失败），供 UI 立即标记已发送状态
+    @discardableResult
+    func sendTextMessage(channelId: String, content: String, channelType: Int = 1) -> Bool {
         if !isConnected {
             print("[IM] 发送时未连接，尝试重新连接")
             connect()
@@ -406,7 +408,8 @@ class IMManager: NSObject {
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         let textContent = WKTextContent(content: content)
-        _ = WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
+        let sent = WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
+        return sent != nil
     }
 
     // MARK: - 发送图片消息
