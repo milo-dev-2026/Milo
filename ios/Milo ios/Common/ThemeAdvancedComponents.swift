@@ -293,6 +293,10 @@ class AlertDialog: UIViewController {
         dimView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+        // 点击遮罩空白处关闭弹窗，避免"打开了收不回来"
+        dimView.isUserInteractionEnabled = true
+        let dimTap = UITapGestureRecognizer(target: self, action: #selector(dimTapped))
+        dimView.addGestureRecognizer(dimTap)
 
         // 容器
         containerView.backgroundColor = .themePopupBg
@@ -410,6 +414,13 @@ class AlertDialog: UIViewController {
     @objc private func confirmTapped() {
         dismissAlert { [weak self] in
             self?.onConfirm?()
+        }
+    }
+
+    /// 点击遮罩关闭弹窗
+    @objc private func dimTapped() {
+        dismissAlert { [weak self] in
+            self?.onCancel?()
         }
     }
 

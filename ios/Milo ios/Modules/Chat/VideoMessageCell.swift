@@ -63,18 +63,8 @@ class VideoMessageCell: UITableViewCell {
             videoPath = message.content
         }
 
-        let thumbURL: URL?
-        if thumbPath.hasPrefix("http") {
-            thumbURL = URL(string: thumbPath)
-        } else {
-            thumbURL = URL(string: APIConfig.apiBaseURL + "/" + thumbPath)
-        }
-
-        if videoPath.hasPrefix("http") {
-            videoURL = URL(string: videoPath)
-        } else {
-            videoURL = URL(string: APIConfig.apiBaseURL + "/" + videoPath)
-        }
+        let thumbURL: URL? = APIConfig.chatMediaURL(thumbPath)
+        videoURL = APIConfig.chatMediaURL(videoPath)
 
         if let url = thumbURL {
             thumbnailView.kf.setImage(with: url, placeholder: UIImage(systemName: "video"))

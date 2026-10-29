@@ -66,13 +66,7 @@ class VoiceMessageCell: UITableViewCell {
         }
         durationLabel.text = duration
 
-        if path.hasPrefix("http") {
-            voiceURL = URL(string: path)
-        } else if path.hasPrefix("/") {
-            voiceURL = URL(string: APIConfig.apiBaseURL + path)
-        } else {
-            voiceURL = URL(string: APIConfig.apiBaseURL + "/" + path)
-        }
+        voiceURL = APIConfig.chatMediaURL(path)
 
         let isFromMe = message.isFromMe
         // 时长越长气泡越宽（与 iMessage 语音条一致）：70pt 起步，每秒 +4pt，上限 190pt

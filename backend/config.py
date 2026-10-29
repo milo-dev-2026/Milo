@@ -17,11 +17,11 @@ class Config:
     # 阿里云号码认证服务API端点
     ALIYUN_DYPNS_ENDPOINT = "dypnsapi.aliyuncs.com"
 
-    # 短信签名名称 - 在号码认证控制台 -> 赠送签名配置页面获取
+    # 短信签名名称 - 需在阿里云「短信服务-签名管理」申请并完成实名报备后才能下发
     ALIYUN_SMS_SIGN_NAME = os.getenv("ALIYUN_SMS_SIGN_NAME", "恒创联众")
 
-    # 短信模板CODE - 默认赠送模板编号为 100001
-    ALIYUN_SMS_TEMPLATE_CODE = os.getenv("ALIYUN_SMS_TEMPLATE_CODE", "100001")
+    # 短信模板CODE - 以 SMS_ 开头走「短信服务」SendSms；纯数字走「号码认证服务」赠送模板
+    ALIYUN_SMS_TEMPLATE_CODE = os.getenv("ALIYUN_SMS_TEMPLATE_CODE", "SMS_338460374")
 
     # ==================== Redis配置 ====================
     REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")

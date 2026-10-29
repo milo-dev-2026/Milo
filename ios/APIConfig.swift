@@ -73,4 +73,22 @@ struct APIConfig {
         if aliyunAuthSDKInfo.contains("__PLACEHOLDER") { result.append("阿里云号码认证SDK Info - 需在阿里云控制台获取") }
         return result
     }
+
+    // MARK: - 8. 聊天媒体路径解析（与安卓 WKApiConfig.getShowUrl 对齐）
+    /// 后端 /v1/file/upload 上传成功后返回的相对路径形如 `static/chat/xxx.m4a`，
+    /// 实际下载路由是 `/v1/static/chat/<filename>`，因此相对路径统一补 `/v1` 前缀。
+    static func chatMediaURL(_ rawPath: String) -> URL? {
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty else { return nil }
+        if path.hasPrefix("http://") || path.hasPrefix("https://") {
+            return URL(string: path)
+        }
+        if path.hasPrefix("/v1/") || path.hasPrefix("v1/") {
+            return URL(string: apiBaseURL + (path.hasPrefix("/") ? path : "/" + path))
+        }
+        if path.hasPrefix("/") {
+            return URL(string: apiBaseURL + "/v1" + path)
+        }
+        return URL(string: apiBaseURL + "/v1/" + path)
+    }
 }

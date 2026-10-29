@@ -2,6 +2,7 @@ import UIKit
 import UserNotifications
 import IQKeyboardManagerSwift
 import MAMapKit
+import AMapLocationKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -17,6 +18,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         CrashLogger.shared.log("Step 1: setupGlobalTheme")
         setupGlobalTheme()
         CrashLogger.shared.log("Step 1: done")
+
+        // 高德隐私合规必须在任何地图创建之前完成（否则地图白屏）
+        setupAMapPrivacy()
 
         // 2. 创建 window
         CrashLogger.shared.log("Step 2: creating window")
@@ -61,7 +65,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             self.setupKeyboardManager()
             self.registerPushNotification(application)
             self.setupAppLockCheck()
-            self.setupAMapPrivacy()
             CrashLogger.shared.log("Step 5: COSUploadManager setup")
             COSUploadManager.shared.setup()
             CrashLogger.shared.log("Step 5: all SDK init complete")
@@ -111,13 +114,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: - 高德隐私合规
     private func setupAMapPrivacy() {
-        // 高德 SDK 初始化（已在 Podfile 中配置）
-        // 注意：高德地图 SDK 需要在主线程初始化
-        DispatchQueue.main.async {
-            _ = MAMapView() // 触发 SDK 加载
-            AMapServices.shared().enableHTTPS = true
-            AMapServices.shared().apiKey = APIConfig.amapKey
-        }
+        // 高德地图/定位 iOS 2.x 必须在地图创建前显式声明隐私合规，否则地图白屏/打不开
+        MAMapView.updatePrivacyShow(.didShow, privacyInfo: .didContain)
+        MAMapView.updatePrivacyAgree(.didAgree)
+        AMapLocationManager.updatePrivacyShow(.didShow, privacyInfo: .didContain)
+        AMapLocationManager.updatePrivacyAgree(.didAgree)
+        AMapServices.shared().enableHTTPS = true
+        AMapServices.shared().apiKey = APIConfig.amapKey
     }
 
     // MARK: - 推送注册

@@ -1,4 +1,4 @@
-﻿import UIKit
+import UIKit
 import SnapKit
 import Kingfisher
 
@@ -39,14 +39,7 @@ class ImageMessageCell: UITableViewCell {
 
     func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
         let content = message.content
-        let imgURL: URL?
-        if content.hasPrefix("http") {
-            imgURL = URL(string: content)
-        } else if content.hasPrefix("/") {
-            imgURL = URL(string: APIConfig.apiBaseURL + content)
-        } else {
-            imgURL = URL(string: APIConfig.apiBaseURL + "/" + content)
-        }
+        let imgURL: URL? = APIConfig.chatMediaURL(content)
 
         if let url = imgURL {
             imageView_.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))

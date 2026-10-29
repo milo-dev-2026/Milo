@@ -606,6 +606,8 @@ class PopupMenuView: UIView {
 
     private let backgroundView = UIView()
     private let stackView = UIStackView()
+    /// 全屏点击遮罩：点击菜单以外任何位置都能关闭菜单
+    private weak var dismissOverlay: UIView?
     var onSelect: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
 
@@ -685,16 +687,26 @@ class PopupMenuView: UIView {
 
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
-        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(handleDismissTap(_:)))
-        dismissTap.cancelsTouchesInView = false
-        self.superview?.addGestureRecognizer(dismissTap)
+        guard superview != nil, dismissOverlay == nil else { return }
+        // 铺一层全屏透明遮罩在菜单下方，任何位置的点击都能关闭菜单（列表/按钮也会被拦截）
+        let overlay = UIView()
+        overlay.backgroundColor = .clear
+        superview?.insertSubview(overlay, belowSubview: self)
+        overlay.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        overlay.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(overlayTapped)))
+        dismissOverlay = overlay
     }
 
-    @objc private func handleDismissTap(_ gesture: UITapGestureRecognizer) {
-        let location = gesture.location(in: self)
-        if !self.bounds.contains(location) {
-            onDismiss?()
-        }
+    @objc private func overlayTapped() {
+        onDismiss?()
+    }
+
+    override func removeFromSuperview() {
+        dismissOverlay?.removeFromSuperview()
+        dismissOverlay = nil
+        super.removeFromSuperview()
     }
 }
 

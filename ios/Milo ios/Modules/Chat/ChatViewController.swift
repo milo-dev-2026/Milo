@@ -967,15 +967,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         if pendingMedia[message.messageID] != nil { return }
         switch message.type {
         case .image:
-            let content = message.content
-            let imgURL: URL?
-            if content.hasPrefix("http") {
-                imgURL = URL(string: content)
-            } else if content.hasPrefix("/") {
-                imgURL = URL(string: APIConfig.apiBaseURL + content)
-            } else {
-                imgURL = URL(string: APIConfig.apiBaseURL + "/" + content)
-            }
+            guard let imgURL = APIConfig.chatMediaURL(message.content) else { return }
             let previewVC = ImagePreviewViewController(url: imgURL)
             previewVC.modalPresentationStyle = .fullScreen
             present(previewVC, animated: true)
@@ -1585,7 +1577,9 @@ extension ChatViewController: ChatInputBarDelegate {
 
         let (responseData, response) = try await uploadSession.data(for: request)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw APIError.serverError(message: "上传失败(\(http.statusCode))", code: http.statusCode)
+            let body = String(data: responseData, encoding: .utf8) ?? ""
+            print("[Chat] 上传失败 HTTP \(http.statusCode): \(body)")
+            throw APIError.serverError(message: "上传失败(\(http.statusCode)) \(body)", code: http.statusCode)
         }
         if let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
            let path = json["path"] as? String, !path.isEmpty {

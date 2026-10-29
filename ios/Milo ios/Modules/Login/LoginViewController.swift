@@ -2114,8 +2114,11 @@ navigationController?.pushViewController(vc, animated: true)
             }
             Task {
                 do {
-                    _ = try await APIClient.shared.requestRaw(.sendSMSCode(phone: phone))
+                    let response = try await APIClient.shared.requestRaw(.sendSMSCode(phone: phone))
                     DispatchQueue.main.async {
+                        AppUtility.handleSMSCodeEcho(response) { code in
+                            self.codeField.textField.text = code
+                        }
                         AppUtility.showToast("验证码已发送")
                         self.startCountdown()
                     }
@@ -2822,8 +2825,11 @@ class RegisterViewController: UIViewController {
             }
             Task {
                 do {
-                    _ = try await APIClient.shared.requestRaw(.sendSMSCode(phone: phone))
+                    let response = try await APIClient.shared.requestRaw(.sendSMSCode(phone: phone))
                     DispatchQueue.main.async {
+                        AppUtility.handleSMSCodeEcho(response) { code in
+                            self.codeField.textField.text = code
+                        }
                         AppUtility.showToast("验证码已发送")
                         self.startCountdown()
                     }
@@ -3149,8 +3155,11 @@ class ForgotPasswordViewController: UIViewController {
         }
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.sendForgetSMSCode(phone: phone))
+                let response = try await APIClient.shared.requestRaw(.sendForgetSMSCode(phone: phone))
                 DispatchQueue.main.async {
+                    AppUtility.handleSMSCodeEcho(response) { code in
+                        self.codeField.textField.text = code
+                    }
                     AppUtility.showToast("验证码已发送")
                     self.startCountdown()
                 }
