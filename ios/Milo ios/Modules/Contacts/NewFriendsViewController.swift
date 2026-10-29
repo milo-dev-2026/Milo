@@ -157,8 +157,8 @@ extension NewFriendsViewController: UITableViewDataSource, UITableViewDelegate {
         }
         cell.onAvatarTap = { [weak self] in
             let detailVC = ContactDetailViewController(uid: apply.uid)
-            self?.        self.hidesBottomBarWhenPushed = true
-navigationController?.pushViewController(detailVC, animated: true)
+            self?.hidesBottomBarWhenPushed = true
+            self?.navigationController?.pushViewController(detailVC, animated: true)
         }
         return cell
     }
