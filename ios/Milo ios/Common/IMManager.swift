@@ -23,6 +23,8 @@ class IMManager: NSObject {
     var onReminderChanged: ((WKChannel, [WKReminder]) -> Void)?
 
     private var isSetup = false
+    /// 当前正在聊天的频道ID（对齐安卓 chattingChannelID：在该聊天页内不播放新消息提示音）
+    var currentChattingChannelId: String?
     /// 当前 IM 连接状态（由 onConnectStatus 回调维护）
     private(set) var isConnected = false
     /// 当前连接状态原始值（WKConnectStatus.rawValue：0未连接 1连接中 2收取中 3已连接 4断开）
@@ -551,9 +553,6 @@ extension IMManager: WKChatManagerDelegate {
             self.playInAppMessageAlertIfNeeded(msg)
         }
     }
-
-    /// 当前正在聊天的频道ID（对齐安卓 chattingChannelID：在该聊天页内不播放新消息提示音）
-    var currentChattingChannelId: String?
 
     /// 应用内新消息提醒：遵循「设置-消息通知」开关（总开关/声音/震动/免打扰时段），对齐安卓行为
     private func playInAppMessageAlertIfNeeded(_ msg: Message) {

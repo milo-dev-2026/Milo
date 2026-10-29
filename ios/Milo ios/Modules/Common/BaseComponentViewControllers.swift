@@ -37,39 +37,7 @@ class SearchLocationViewController: UIViewController, UITableViewDataSource, UIT
     }
 }
 
-// MARK: - 位置详情
-class LocationDetailViewController: UIViewController {
-    private var name: String; private var address: String; private var lat: Double; private var lng: Double
-    private let nameLabel = UILabel()
-    private let addressLabel = UILabel()
-    private let mapView = UIView()
-    private let sendButton = UIButton(type: .system)
-    var onSend: (() -> Void)?
-
-    init(name: String, address: String, lat: Double, lng: Double) {
-        self.name = name; self.address = address; self.lat = lat; self.lng = lng
-        super.init(nibName: nil, bundle: nil)
-    }
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidLoad() {
-        super.viewDidLoad(); title = "位置详情"; view.backgroundColor = .themeBackground
-        mapView.backgroundColor = .systemGray5; mapView.layer.cornerRadius = 12
-        nameLabel.text = name; nameLabel.font = ScreenAdapter.boldFont(18)
-        addressLabel.text = address; addressLabel.font = ScreenAdapter.font(14); addressLabel.textColor = .secondaryLabel; addressLabel.numberOfLines = 0
-        sendButton.setTitle("发送位置", for: .normal); sendButton.titleLabel?.font = ScreenAdapter.font(17)
-        sendButton.backgroundColor = .themePrimary; sendButton.setTitleColor(.white, for: .normal)
-        sendButton.layer.cornerRadius = ScreenAdapter.scaleW(10); sendButton.addTarget(self, action: #selector(send), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [mapView, nameLabel, addressLabel, sendButton]); stack.axis = .vertical; stack.spacing = 12
-        view.addSubview(stack); stack.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(16)
-            make.leading.equalToSuperview().offset(16); make.trailing.equalToSuperview().offset(-16)
-        }
-        mapView.snp.makeConstraints { make in make.height.equalTo(ScreenAdapter.scaleH(200)) }
-        sendButton.snp.makeConstraints { make in make.height.equalTo(ScreenAdapter.scaleH(48)) }
-    }
-    @objc private func send() { onSend?(); navigationController?.popViewController(animated: true) }
-}
+// MARK: - 位置详情（真实实现见 Modules/Location/LocationDetailViewController.swift，已对齐安卓 LocationDetailActivity）
 
 // MARK: - 群组通话
 class GroupCallViewController: UIViewController {

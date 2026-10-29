@@ -41,6 +41,7 @@ class TRTCCallViewController: UIViewController {
     private var isSpeakerOn = true
     private var callDurationTimer: Timer?
     private var callDuration: Int = 0
+    private var ringbackTimer: Timer?
 
     init(channelId: String, peerName: String = "语音通话", peerAvatar: String = "", roomId: Int = 0, isCaller: Bool = true) {
         self.channelId = channelId
@@ -377,8 +378,6 @@ extension TRTCCallViewController: TRTCCloudDelegate {
             self.statusLabel.text = "通话错误(\(errCode))"
         }
     }
-
-    private var ringbackTimer: Timer?
 
     /// 主叫回铃音（对齐安卓：等待接听时播放"嘟...嘟..."提示音）
     private func startRingbackTone() {
