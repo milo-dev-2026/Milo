@@ -198,10 +198,36 @@ class LockScreenVerifyViewController: UIViewController {
                 subtitleLabel.text = "请再次输入密码"
             } else {
                 if firstInput == inputPassword {
-                    LocalStore.shared.lockPassword = inputPassword
-                    LocalStore.shared.isAppLockEnabled = true
-                    AppUtility.showToast("应用锁已开启")
-                    navigationController?.popViewController(animated: true)
+                    let pwd = inputPassword
+                    // 同步到后端（对齐安卓：锁屏密码云端保存，换设备可恢复）
+                    Task {
+                        do {
+                            let resp = try await APIClient.shared.requestRaw(.setLockScreenPwd(pwd: pwd))
+                            let status = resp["status"] as? Int ?? 0
+                            DispatchQueue.main.async {
+                                if status == 200 {
+                                    LocalStore.shared.lockPassword = pwd
+                                    LocalStore.shared.isAppLockEnabled = true
+                                    AppUtility.showToast("应用锁已开启")
+                                    self.navigationController?.popViewController(animated: true)
+                                } else {
+                                    AppUtility.showToast(resp["msg"] as? String ?? "设置失败")
+                                    self.shakeDots()
+                                    self.inputPassword = ""
+                                    self.firstInput = ""
+                                    self.updateDots()
+                                }
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                AppUtility.showToast("网络异常，设置失败")
+                                self.shakeDots()
+                                self.inputPassword = ""
+                                self.firstInput = ""
+                                self.updateDots()
+                            }
+                        }
+                    }
                 } else {
                     AppUtility.showToast("两次密码不一致")
                     shakeDots()

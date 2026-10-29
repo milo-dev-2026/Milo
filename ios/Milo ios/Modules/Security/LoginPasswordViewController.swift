@@ -92,7 +92,7 @@ class LoginPasswordViewController: UIViewController {
         switch verifyMode {
         case .phone:
             guard !bindPhone.isEmpty else { AppUtility.showToast("未绑定手机号"); return }
-            sendCode(zone: "+86", phone: bindPhone)
+            sendCode(zone: "0086", phone: bindPhone)
         case .email:
             guard !bindEmail.isEmpty else { AppUtility.showToast("未绑定邮箱"); return }
             sendEmailCode(email: bindEmail)
@@ -102,8 +102,12 @@ class LoginPasswordViewController: UIViewController {
     private func sendCode(zone: String, phone: String) {
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.sendChangePwdPhoneCode(zone: zone, phone: phone))
-                DispatchQueue.main.async { self.startCountdown() }
+                let resp = try await APIClient.shared.requestRaw(.sendChangePwdPhoneCode(zone: zone, phone: phone))
+                DispatchQueue.main.async {
+                    if AppUtility.handleSMSCodeEcho(resp, onCode: { [weak self] c in self?.codeField.text = c }) { return }
+                    self.startCountdown()
+                    AppUtility.showToast("验证码已发送")
+                }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("发送失败") }
             }
@@ -113,8 +117,12 @@ class LoginPasswordViewController: UIViewController {
     private func sendEmailCode(email: String) {
         Task {
             do {
-                _ = try await APIClient.shared.requestRaw(.sendChangePwdEmailCode(email: email))
-                DispatchQueue.main.async { self.startCountdown() }
+                let resp = try await APIClient.shared.requestRaw(.sendChangePwdEmailCode(email: email))
+                DispatchQueue.main.async {
+                    if AppUtility.handleSMSCodeEcho(resp, onCode: { [weak self] c in self?.codeField.text = c }) { return }
+                    self.startCountdown()
+                    AppUtility.showToast("验证码已发送")
+                }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("发送失败") }
             }
@@ -151,7 +159,7 @@ class LoginPasswordViewController: UIViewController {
                 let resp: [String: Any]
                 switch self.verifyMode {
                 case .phone:
-                    resp = try await APIClient.shared.requestRaw(.changePwdByPhone(zone: "+86", phone: self.bindPhone, code: code, pwd: pwd))
+                    resp = try await APIClient.shared.requestRaw(.changePwdByPhone(zone: "0086", phone: self.bindPhone, code: code, pwd: pwd))
                 case .email:
                     resp = try await APIClient.shared.requestRaw(.changePwdByEmail(email: self.bindEmail, code: code, pwd: pwd))
                 }

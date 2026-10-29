@@ -41,19 +41,18 @@ class AppUtility {
         }
     }
 
-    // MARK: - 短信验证码回显处理
-    /// 短信通道不可用（如签名未报备）时后端会回显验证码，弹窗提示并回调填充，保障注册/登录流程可用
+    // MARK: - 短信/邮件验证码回显处理
+    /// 短信/邮件通道不可用（如签名未报备）时后端会回显验证码，弹窗提示并回调填充，保障流程可用
     @discardableResult
     static func handleSMSCodeEcho(_ response: [String: Any], onCode: ((String) -> Void)? = nil) -> Bool {
-        guard (response["sms_sent"] as? Bool) == false,
-              let code = response["code"] as? String, !code.isEmpty else { return false }
-        let reason = response["sms_msg"] as? String ?? "短信通道异常"
+        guard let code = response["code"] as? String, !code.isEmpty else { return false }
+        let reason = (response["sms_msg"] as? String) ?? (response["mail_msg"] as? String) ?? "发送通道异常"
         DispatchQueue.main.async {
             onCode?(code)
             guard let root = ScreenAdapter.keyWindow?.rootViewController else { return }
             var top = root
             while let presented = top.presentedViewController { top = presented }
-            let alert = UIAlertController(title: "短信未送达", message: "\(reason)\n本次验证码：\(code)", preferredStyle: .alert)
+            let alert = UIAlertController(title: "验证码未送达", message: "\(reason)\n本次验证码：\(code)", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "知道了", style: .default))
             top.present(alert, animated: true)
         }

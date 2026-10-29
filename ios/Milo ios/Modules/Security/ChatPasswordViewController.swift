@@ -105,9 +105,29 @@ class ChatPasswordViewController: UIViewController {
             return
         }
 
-        UserDefaults.standard.set(pwd, forKey: "chat_pwd_\(uid)")
-        UserDefaults.standard.set(true, forKey: "chat_pwd_set_\(uid)")
-        AppUtility.showToast("设置成功")
-        navigationController?.popViewController(animated: true)
+        // 对齐安卓：先调后端校验登录密码，正确后才本地保存聊天密码
+        submitButton.isEnabled = false
+        Task {
+            do {
+                let resp = try await APIClient.shared.requestRaw(.verifyLoginPwd(pwd: loginPwd))
+                let status = resp["status"] as? Int ?? 0
+                DispatchQueue.main.async {
+                    self.submitButton.isEnabled = true
+                    if status == 200 {
+                        UserDefaults.standard.set(pwd, forKey: "chat_pwd_\(self.uid)")
+                        UserDefaults.standard.set(true, forKey: "chat_pwd_set_\(self.uid)")
+                        AppUtility.showToast("设置成功")
+                        self.navigationController?.popViewController(animated: true)
+                    } else {
+                        AppUtility.showToast(resp["msg"] as? String ?? "登录密码错误")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.submitButton.isEnabled = true
+                    AppUtility.showToast("操作失败，请检查网络")
+                }
+            }
+        }
     }
 }

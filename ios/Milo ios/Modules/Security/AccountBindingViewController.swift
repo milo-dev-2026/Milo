@@ -320,13 +320,17 @@ class AccountBindingViewController: UIViewController {
     private func sendCode(type: BindType, account: String) {
         Task {
             do {
+                var resp: [String: Any]
                 switch type {
                 case .phone:
-                    _ = try await APIClient.shared.requestRaw(.sendBindPhoneCode(zone: "+86", phone: account))
+                    resp = try await APIClient.shared.requestRaw(.sendBindPhoneCode(zone: "0086", phone: account))
                 case .email:
-                    _ = try await APIClient.shared.requestRaw(.sendBindEmailCode(email: account))
+                    resp = try await APIClient.shared.requestRaw(.sendBindEmailCode(email: account))
                 }
-                DispatchQueue.main.async { AppUtility.showToast("验证码已发送") }
+                DispatchQueue.main.async {
+                    if AppUtility.handleSMSCodeEcho(resp) { return }
+                    AppUtility.showToast("验证码已发送")
+                }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("发送失败") }
             }
@@ -339,7 +343,7 @@ class AccountBindingViewController: UIViewController {
                 var resp: [String: Any]
                 switch type {
                 case .phone:
-                    resp = try await APIClient.shared.requestRaw(.bindPhone(zone: "+86", phone: account, code: code))
+                    resp = try await APIClient.shared.requestRaw(.bindPhone(zone: "0086", phone: account, code: code))
                 case .email:
                     resp = try await APIClient.shared.requestRaw(.bindEmail(email: account, code: code))
                 }

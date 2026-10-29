@@ -371,8 +371,12 @@ class ResetLoginPwdViewController: UIViewController {
             }
             Task {
                 do {
-                    _ = try await APIClient.shared.requestRaw(.sendEmailCode(email: email))
-                    DispatchQueue.main.async { self.startCountdown() }
+                    let resp = try await APIClient.shared.requestRaw(.sendForgetEmailCode(email: email))
+                    DispatchQueue.main.async {
+                        if AppUtility.handleSMSCodeEcho(resp, onCode: { [weak self] c in self?.codeField.textField.text = c }) { return }
+                        self.startCountdown()
+                        AppUtility.showToast("验证码已发送")
+                    }
                 } catch { DispatchQueue.main.async { AppUtility.showToast("发送失败") } }
             }
         } else {
@@ -381,8 +385,12 @@ class ResetLoginPwdViewController: UIViewController {
             }
             Task {
                 do {
-                    _ = try await APIClient.shared.requestRaw(.sendSMSCode(phone: phone))
-                    DispatchQueue.main.async { self.startCountdown() }
+                    let resp = try await APIClient.shared.requestRaw(.sendForgetSMSCode(phone: phone))
+                    DispatchQueue.main.async {
+                        if AppUtility.handleSMSCodeEcho(resp, onCode: { [weak self] c in self?.codeField.textField.text = c }) { return }
+                        self.startCountdown()
+                        AppUtility.showToast("验证码已发送")
+                    }
                 } catch { DispatchQueue.main.async { AppUtility.showToast("发送失败") } }
             }
         }
@@ -424,7 +432,7 @@ class ResetLoginPwdViewController: UIViewController {
             Task {
                 do {
                     // 邮箱重置密码：通过邮箱验证码重置
-                    let resp = try await APIClient.shared.requestRaw(.changePwdByEmail(email: email, code: code, pwd: pwd))
+                    let resp = try await APIClient.shared.requestRaw(.resetPasswordByEmail(email: email, code: code, password: pwd))
                     let status = resp["status"] as? Int ?? 0
                     DispatchQueue.main.async {
                         self.submitButton.isEnabled = true
@@ -456,7 +464,7 @@ class ResetLoginPwdViewController: UIViewController {
             submitButton.isEnabled = false
             Task {
                 do {
-                    let resp = try await APIClient.shared.requestRaw(.changePwdByPhone(zone: "+86", phone: phone, code: code, pwd: pwd))
+                    let resp = try await APIClient.shared.requestRaw(.resetPasswordByPhone(phone: phone, code: code, password: pwd))
                     let status = resp["status"] as? Int ?? 0
                     DispatchQueue.main.async {
                         self.submitButton.isEnabled = true

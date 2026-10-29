@@ -459,12 +459,16 @@ class InputDestroyCodeViewController: UIViewController {
     private func sendCode() {
         Task {
             do {
+                var resp: [String: Any]
                 if verifyType == "phone" {
-                    _ = try await APIClient.shared.requestRaw(.sendDestroyPhoneCode(zone: "+86", phone: account))
+                    resp = try await APIClient.shared.requestRaw(.sendDestroyPhoneCode(zone: "0086", phone: account))
                 } else {
-                    _ = try await APIClient.shared.requestRaw(.sendDestroyEmailCode(email: account))
+                    resp = try await APIClient.shared.requestRaw(.sendDestroyEmailCode(email: account))
                 }
-                DispatchQueue.main.async { self.startCountdown() }
+                DispatchQueue.main.async {
+                    if AppUtility.handleSMSCodeEcho(resp, onCode: { [weak self] c in self?.codeField.text = c }) { return }
+                    self.startCountdown()
+                }
             } catch {
                 DispatchQueue.main.async { AppUtility.showToast("发送失败，请稍后重试") }
             }
@@ -502,7 +506,7 @@ class InputDestroyCodeViewController: UIViewController {
                     account: self.account,
                     code: code,
                     type: self.verifyType,
-                    zone: self.verifyType == "phone" ? "+86" : ""
+                    zone: self.verifyType == "phone" ? "0086" : ""
                 ))
                 let status = resp["status"] as? Int ?? 0
                 DispatchQueue.main.async {

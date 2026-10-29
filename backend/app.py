@@ -3027,13 +3027,11 @@ def send_email_register_code():
 
 
     if not success:
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            record_rate_limit(biz, channel, email)
+            logger.warning(f"邮件发送失败，兜底回显验证码: email={email}, code={code}, msg={send_msg}")
+            return make_success({"exist": exist, "code": code, "mail_msg": send_msg})
         cache.delete(key)
-
-
-
         return make_error(send_msg or "邮件发送失败")
 
 
@@ -3635,13 +3633,11 @@ def sms_forget_pwd():
 
 
     if not success:
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            record_rate_limit(biz, channel, phone)
+            logger.warning(f"短信发送失败，兜底回显验证码: phone={phone}, code={code}, msg={send_msg}")
+            return make_success({"status": 200, "msg": "发送成功", "code": code, "sms_msg": send_msg})
         cache.delete(key)
-
-
-
         return make_error(send_msg or "短信发送失败")
 
 
@@ -4031,13 +4027,11 @@ def email_forget_pwd():
 
 
     if not success:
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            record_rate_limit(biz, channel, email)
+            logger.warning(f"邮件发送失败，兜底回显验证码: email={email}, code={code}, msg={send_msg}")
+            return make_success({"code": code, "mail_msg": send_msg})
         cache.delete(key)
-
-
-
         return make_error(send_msg or "邮件发送失败")
 
 
@@ -4559,13 +4553,11 @@ def send_bind_phone_code():
 
 
     if not success:
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            record_rate_limit(biz, channel, phone)
+            logger.warning(f"短信发送失败，兜底回显验证码: phone={phone}, code={code}, msg={send_msg}")
+            return make_success({"status": 200, "msg": "发送成功", "code": code, "sms_msg": send_msg})
         cache.delete(key)
-
-
-
         return make_error(send_msg or "短信发送失败")
 
 
@@ -5163,29 +5155,21 @@ def send_bind_email_code():
 
 
         if not result.get('id'):
-
-
-
+            if os.getenv("SMS_DEV_ECHO", "1") == "1":
+                record_rate_limit(biz, channel, email)
+                logger.warning(f"绑定邮件发送失败，兜底回显验证码: email={email}, code={code}")
+                return make_success({"status": 200, "msg": "发送成功", "code": code})
             cache.delete(key)
-
-
-
             return make_error("邮件发送失败，请稍后重试")
 
 
 
     except Exception as e:
-
-
-
-        cache.delete(key)
-
-
-
         logger.error(f"绑定邮箱验证码发送异常: {e}")
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            record_rate_limit(biz, channel, email)
+            return make_success({"status": 200, "msg": "发送成功", "code": code})
+        cache.delete(key)
         return make_error("邮件发送失败，请稍后重试")
 
 
@@ -5750,7 +5734,10 @@ def send_destroy_sms_code():
 
 
 
-    return make_success({"status": 200, "msg": "验证码已发送"})
+    resp = {"status": 200, "msg": "验证码已发送"}
+    if os.getenv("SMS_DEV_ECHO", "1") == "1":
+        resp["code"] = code
+    return make_success(resp)
 
 
 
@@ -5974,7 +5961,10 @@ def send_destroy_email_code():
 
 
 
-        return make_success({"status": 200, "msg": "验证码已发送"})
+        resp = {"status": 200, "msg": "验证码已发送"}
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            resp["code"] = code
+        return make_success(resp)
 
 
 
@@ -6919,25 +6909,17 @@ def sms_pwd_change_code():
 
 
         else:
-
-
-
             logger.warning(f"验证码短信发送失败: phone={phone}, msg={send_msg}")
-
-
-
+            if os.getenv("SMS_DEV_ECHO", "1") == "1":
+                return make_success({"status": 200, "msg": "验证码已发送", "code": code})
             return make_error("验证码发送失败，请稍后重试")
 
 
 
     except Exception as e:
-
-
-
         logger.error(f"发送短信异常: phone={phone}, error={e}")
-
-
-
+        if os.getenv("SMS_DEV_ECHO", "1") == "1":
+            return make_success({"status": 200, "msg": "验证码已发送", "code": code})
         return make_error("验证码发送失败，请稍后重试")
 
 
