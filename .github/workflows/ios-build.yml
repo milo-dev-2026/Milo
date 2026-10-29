@@ -69,29 +69,14 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Inject APIConfig.swift from secret
-        env:
-          API_CONFIG_BASE64: ${{ secrets.IOS_API_CONFIG_SWIFT }}
-          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
-          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+      - name: Prepare APIConfig.swift
         run: |
-          if [ -n "$API_CONFIG_BASE64" ]; then
-            echo "$API_CONFIG_BASE64" | base64 --decode > ios/APIConfig.swift
-            echo "::notice::APIConfig.swift injected from secret"
-          elif [ -f ios/APIConfig.swift ]; then
-            echo "::notice::Using existing APIConfig.swift from repo"
+          # 以仓库内的 APIConfig.swift 为准（服务器地址/存储桶配置与安卓保持一致）
+          if [ -f ios/APIConfig.swift ]; then
+            echo "::notice::Using APIConfig.swift from repo"
           else
             echo "::warning::No APIConfig.swift found, using template"
             cp ios/APIConfig.template.swift ios/APIConfig.swift
-            # 注入 COS 密钥（如果配置了 secrets）
-            if [ -n "$COS_SECRET_ID" ]; then
-              sed -i '' "s/__PLACEHOLDER_COS_SID__/$COS_SECRET_ID/g" ios/APIConfig.swift
-              echo "::notice::COS Secret ID injected"
-            fi
-            if [ -n "$COS_SECRET_KEY" ]; then
-              sed -i '' "s/__PLACEHOLDER_COS_KEY__/$COS_SECRET_KEY/g" ios/APIConfig.swift
-              echo "::notice::COS Secret Key injected"
-            fi
           fi
 
       - name: Generate Xcode project

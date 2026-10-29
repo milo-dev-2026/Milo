@@ -32,7 +32,7 @@ backend/.env.*
 *.key
 
 # iOS sensitive files (contains API keys)
-ios/APIConfig.swift
+# 注意: APIConfig.swift 已改为随仓库提交，CI 直接使用仓库内配置（服务器地址/COS 与安卓一致）
 *.jks
 app/leihuhu.jks
 app/agconnect-services.json

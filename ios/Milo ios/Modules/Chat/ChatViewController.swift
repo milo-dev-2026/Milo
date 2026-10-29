@@ -1472,13 +1472,13 @@ extension ChatViewController: ChatInputBarDelegate {
                 switch upload.type {
                 case .image:
                     guard let data = upload.data else { throw APIError.noData }
-                    path = try await uploadChatFile(data: data, fileName: upload.fileName)
+                    path = try await uploadMedia(data: data, fileName: upload.fileName, contentType: "image/jpeg")
                 case .video:
                     guard let url = upload.sourceURL else { throw APIError.noData }
                     let videoData = try Data(contentsOf: url)
-                    path = try await uploadChatFile(data: videoData, fileName: upload.fileName)
+                    path = try await uploadMedia(data: videoData, fileName: upload.fileName, contentType: "video/mp4")
                     if let thumbData = upload.thumbnail?.jpegData(compressionQuality: 0.7) {
-                        thumbPath = (try? await uploadChatFile(data: thumbData, fileName: "thumb.jpg")) ?? ""
+                        thumbPath = (try? await uploadMedia(data: thumbData, fileName: "thumb.jpg", contentType: "image/jpeg")) ?? ""
                     }
                 default:
                     throw APIError.noData
@@ -1569,6 +1569,24 @@ extension ChatViewController: ChatInputBarDelegate {
             return path
         }
         throw APIError.noData
+    }
+
+    /// 优先直传腾讯云 COS（与安卓共用同一存储桶，返回公网 URL，两端均可直接访问）
+    /// COS 失败时自动回退后端中转上传（返回相对路径）
+    private func uploadMedia(data: Data, fileName: String, contentType: String) async throws -> String {
+        do {
+            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                COSUploadManager.shared.uploadFile(data: data,
+                                                   fileName: fileName,
+                                                   contentType: contentType,
+                                                   progress: nil) { result in
+                    continuation.resume(with: result)
+                }
+            }
+        } catch {
+            print("[Chat] COS 直传失败，回退后端上传: \(error.localizedDescription)")
+            return try await uploadChatFile(data: data, fileName: fileName)
+        }
     }
 
     private func sendFileMessage(url: URL) {
