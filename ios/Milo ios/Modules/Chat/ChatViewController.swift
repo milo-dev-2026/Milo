@@ -609,7 +609,7 @@ class ChatViewController: UIViewController {
         RTCCallManager.shared.startCall(from: self,
                                         channelId: channelId,
                                         peerName: peer?.displayName ?? titleText,
-                                        peerAvatar: peer?.logo ?? peer?.avatar ?? "")
+                                        peerAvatar: peer?.logo ?? "")
     }
 
     // MARK: - 单聊在线状态（数据缺失时不显示，不伪造）
@@ -1125,7 +1125,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                 let detector = CIDetector(ofType: CIDetectorTypeQRCode,
                                           context: nil,
                                           options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
-                let features = detector?.features(in: ciImage) as? [CIQRCodeFeature] ?? []
+                let features = detector?.features(in: CIImage(cgImage: ciImage)) as? [CIQRCodeFeature] ?? []
                 let payloads = features.compactMap { $0.messageString }.filter { !$0.isEmpty }
                 DispatchQueue.main.async { self.handleQRPayloads(payloads) }
             } catch {

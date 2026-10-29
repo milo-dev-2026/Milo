@@ -189,7 +189,7 @@ navigationController?.pushViewController(vc, animated: true)
         RTCCallManager.shared.startCall(from: self,
                                         channelId: channelId,
                                         peerName: peer?.displayName ?? chatTitle,
-                                        peerAvatar: peer?.logo ?? peer?.avatar ?? "")
+                                        peerAvatar: peer?.logo ?? "")
     }
 
     /// 从 /v1/user/search 读取 short_no（Milo号），无数据时保持隐藏

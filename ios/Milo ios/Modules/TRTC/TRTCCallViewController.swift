@@ -331,7 +331,7 @@ extension TRTCCallViewController: TRTCCloudDelegate {
         }
     }
 
-    func onError(_ errCode: Int, errMsg: String?, extInfo: [AnyHashable : Any]?) {
+    func onError(_ errCode: Int, errMsg: String?, extInfo: [AnyHashable : Any]!) {
         print("[TRTC] onError code=\(errCode) msg=\(errMsg ?? "")")
         DispatchQueue.main.async {
             self.statusLabel.text = "通话错误(\(errCode))"

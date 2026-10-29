@@ -58,7 +58,8 @@ final class RTCCallManager {
     func handleSignal(fromUID: String, payload: [String: Any]) {
         let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
         guard !fromUID.isEmpty, fromUID != myUid else { return }
-        guard let signalType = intValue(payload["signal_type"]) else { return }
+        guard let signalType = intValue(payload["signal_type"]),
+              let signal = Signal(rawValue: signalType) else { return }
         let signalRoomId = intValue(payload["room_id"]) ?? 0
         let signalCallType = intValue(payload["call_type"]) ?? 0
         var callerName = (payload["caller_name"] as? String) ?? ""
@@ -76,8 +77,7 @@ final class RTCCallManager {
             roomId = signalRoomId > 0 ? signalRoomId : Int(Date().timeIntervalSince1970)
             peerChannelId = fromUID
             peerName = callerName
-            peerAvatar = IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.logo
-                ?? IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.avatar ?? ""
+            peerAvatar = IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.logo ?? ""
             callType = signalCallType
             isInCall = true
             presentWaitingAnswer(callerId: fromUID, callerName: callerName)
