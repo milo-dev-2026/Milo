@@ -261,7 +261,8 @@ extension RobotListViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         let robot = displayRobots[indexPath.row]
         let chatVC = RobotChatViewController(robot: robot)
-        navigationController?.pushViewController(chatVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
     }
 
     // MARK: - 添加按钮处理

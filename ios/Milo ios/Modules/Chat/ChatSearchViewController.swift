@@ -349,7 +349,8 @@ class ChatSearchViewController: UIViewController {
     // MARK: - 跳转聊天页
     private func navigateToChat() {
         let chatVC = ChatViewController(channelId: channelId, title: channelTitle, channelType: channelType)
-        navigationController?.pushViewController(chatVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
     }
 }
 

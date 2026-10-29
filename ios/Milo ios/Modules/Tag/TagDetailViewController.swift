@@ -340,7 +340,8 @@ extension TagDetailViewController: UITableViewDataSource, UITableViewDelegate {
                 self.selectedMembers = members
                 self.tableView.reloadRows(at: [IndexPath(row: 0, section: 2)], with: .none)
             }
-            navigationController?.pushViewController(selectVC, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(selectVC, animated: true)
 
         case 3:
             // 删除标签

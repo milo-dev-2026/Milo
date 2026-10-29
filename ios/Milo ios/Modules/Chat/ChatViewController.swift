@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import Kingfisher
 import Photos
+import PhotosUI
 import MAMapKit
 import AMapLocationKit
 import AMapSearchKit
@@ -1220,20 +1221,8 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     func didTapPhotoButton() {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if status == .authorized || status == .limited {
-            presentPhotoPicker()
-        } else {
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] newStatus in
-                DispatchQueue.main.async {
-                    if newStatus == .authorized || newStatus == .limited {
-                        self?.presentPhotoPicker()
-                    } else {
-                        AppUtility.showToast("请在设置中允许访问相册")
-                    }
-                }
-            }
-        }
+        // PHPicker 系统选择器，无需相册权限弹窗，秒开
+        presentPhotoPicker()
     }
 
     func didTapCameraButton() {
@@ -1352,11 +1341,11 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     private func presentPhotoPicker() {
-        let picker = UIImagePickerController()
-        picker.sourceType = .photoLibrary
-        picker.mediaTypes = [UTType.image.identifier]
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
-        imagePicker = picker
         present(picker, animated: true)
     }
 
@@ -1485,11 +1474,15 @@ extension ChatViewController: ChatInputBarDelegate {
                 switch upload.type {
                 case .image:
                     guard let data = upload.data else { throw APIError.noData }
+                    print("[Chat] 开始上传图片 \(data.count) bytes")
                     path = try await uploadMedia(data: data, fileName: upload.fileName, contentType: "image/jpeg")
+                    print("[Chat] 图片上传成功: \(path)")
                 case .video:
                     guard let url = upload.sourceURL else { throw APIError.noData }
                     let videoData = try Data(contentsOf: url)
+                    print("[Chat] 开始上传视频 \(videoData.count) bytes")
                     path = try await uploadMedia(data: videoData, fileName: upload.fileName, contentType: "video/mp4")
+                    print("[Chat] 视频上传成功: \(path)")
                     if let thumbData = upload.thumbnail?.jpegData(compressionQuality: 0.7) {
                         thumbPath = (try? await uploadMedia(data: thumbData, fileName: "thumb.jpg", contentType: "image/jpeg")) ?? ""
                     }
@@ -1500,7 +1493,7 @@ extension ChatViewController: ChatInputBarDelegate {
                     self.completeUpload(messageID: messageID, path: path, thumbPath: thumbPath, upload: upload)
                 }
             } catch {
-                print("媒体上传失败: \(error.localizedDescription)")
+                print("[Chat] 媒体上传失败: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     if let index = self.messages.firstIndex(where: { $0.messageID == messageID }) {
                         self.messages[index].status = -1
@@ -1752,7 +1745,32 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 }
 
-// MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
+// MARK: - PHPickerViewControllerDelegate（相册秒选）
+extension ChatViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let provider = results.first?.itemProvider else { return }
+
+        if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+                guard let self = self, let image = object as? UIImage else { return }
+                guard let data = image.jpegData(compressionQuality: 0.6) else { return }
+                Task { @MainActor in self.sendImageMessage(data: data) }
+            }
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, _ in
+                guard let self = self, let url = url else { return }
+                let tmpURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("chat_video_\(UUID().uuidString).mp4")
+                try? FileManager.default.removeItem(at: tmpURL)
+                try? FileManager.default.copyItem(at: url, to: tmpURL)
+                Task { @MainActor in self.sendVideoMessage(url: tmpURL) }
+            }
+        }
+    }
+}
+
+// MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate（仅相机）
 extension ChatViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {

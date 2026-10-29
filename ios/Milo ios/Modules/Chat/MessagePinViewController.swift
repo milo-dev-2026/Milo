@@ -141,7 +141,8 @@ class MessagePinViewController: UIViewController {
             nav.popToViewController(chatVC, animated: true)
         } else {
             let chatVC = ChatViewController(channelId: channelId, title: "", channelType: channelType)
-            navigationController?.pushViewController(chatVC, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
         }
     }
 }

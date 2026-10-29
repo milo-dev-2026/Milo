@@ -69,7 +69,8 @@ class NoteViewController: UIViewController {
             self?.saveData()
             self?.tableView.reloadData()
         }
-        navigationController?.pushViewController(editor, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(editor, animated: true)
     }
 }
 
@@ -116,7 +117,8 @@ extension NoteViewController: UITableViewDataSource, UITableViewDelegate {
             self?.saveData()
             self?.tableView.reloadData()
         }
-        navigationController?.pushViewController(editor, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(editor, animated: true)
     }
 
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {

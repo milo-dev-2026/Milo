@@ -214,17 +214,20 @@ class MySettingViewController: UIViewController, UIGestureRecognizerDelegate {
 
     @objc private func showNotes() {
         let notesVC = NoteListViewController()
-        navigationController?.pushViewController(notesVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(notesVC, animated: true)
     }
 
     @objc private func showFavorites() {
         let favVC = FavoriteViewController()
-        navigationController?.pushViewController(favVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(favVC, animated: true)
     }
 
     @objc private func showSettings() {
         let settingsVC = SettingMainViewController()
-        navigationController?.pushViewController(settingsVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(settingsVC, animated: true)
     }
 }
 

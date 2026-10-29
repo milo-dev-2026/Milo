@@ -101,7 +101,8 @@ class ForbiddenGroupMembersViewController: UIViewController {
             guard let self = self, let user = users.first else { return }
             self.muteMember(uid: user.uid)
         }
-        navigationController?.pushViewController(pickerVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(pickerVC, animated: true)
     }
 
     private func muteMember(uid: String) {

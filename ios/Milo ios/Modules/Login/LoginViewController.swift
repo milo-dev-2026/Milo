@@ -1631,13 +1631,15 @@ class EntryLoginViewController: UIViewController {
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
-                            self.navigationController?.pushViewController(vc, animated: true)
+                                    self.hidesBottomBarWhenPushed = true
+self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(email: email, isEmail: true)
                             print("push vc: \(type(of: vc))")
-                            self.navigationController?.pushViewController(vc, animated: true)
+                                    self.hidesBottomBarWhenPushed = true
+self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         }
                     }
@@ -1666,13 +1668,15 @@ class EntryLoginViewController: UIViewController {
                             // 已注册 → 登录页
                             let vc = LoginViewController(account: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
-                            self.navigationController?.pushViewController(vc, animated: true)
+                                    self.hidesBottomBarWhenPushed = true
+self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         } else {
                             // 未注册 → 注册页
                             let vc = RegisterViewController(phone: phone, isEmail: false)
                             print("push vc: \(type(of: vc))")
-                            self.navigationController?.pushViewController(vc, animated: true)
+                                    self.hidesBottomBarWhenPushed = true
+self.navigationController?.pushViewController(vc, animated: true)
                             print("push completed: \(type(of: vc))")
                         }
                     }
@@ -2073,7 +2077,8 @@ class LoginViewController: UIViewController {
 
     @objc private func goForgotPassword() {
         let vc = ForgotPasswordViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func goRegister() {
@@ -2921,7 +2926,8 @@ class RegisterViewController: UIViewController {
         // 跳转编辑资料
         let vc = ProfileEditViewController()
         vc.hidesBackButton = true
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     private func resetButton() {

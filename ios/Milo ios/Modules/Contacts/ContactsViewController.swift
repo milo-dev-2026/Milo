@@ -161,27 +161,32 @@ class ContactsViewController: UIViewController {
     // MARK: - 入口项点击
     @objc private func showFriendApplyList() {
         let vc = NewFriendsViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSavedGroups() {
         let vc = SavedGroupsViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showJoinedGroups() {
         let vc = JoinedGroupsViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showFileHelper() {
         let vc = FileHelperViewController(mode: .fileHelper)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSystemNotice() {
         let vc = FileHelperViewController(mode: .systemNotice)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     /// 通讯录本地缓存（先渲染缓存再拉网络，对齐安卓本地优先）
@@ -312,7 +317,8 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
               indexPath.row < groupedContacts[indexPath.section].users.count else { return }
         let user = groupedContacts[indexPath.section].users[indexPath.row]
         let detailVC = ContactDetailViewController(uid: user.uid)
-        navigationController?.pushViewController(detailVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(detailVC, animated: true)
     }
 
     func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {

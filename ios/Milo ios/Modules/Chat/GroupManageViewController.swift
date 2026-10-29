@@ -203,25 +203,30 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
             switch indexPath.row {
             case 0:
                 let vc = ForbiddenGroupMembersViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 1:
                 let vc = GroupForbiddenWordViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             default: break
             }
 
         case .adminManage:
             let vc = GroupAdminsViewController(groupId: groupId)
-            navigationController?.pushViewController(vc, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
 
         case .memberManage:
             switch indexPath.row {
             case 0:
                 let vc = GroupBlackListViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 1:
                 let vc = LeftGroupMembersViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             default: break
             }
 
@@ -230,7 +235,8 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
             vc.onTransferSuccess = { [weak self] in
                 self?.loadGroupInfo()
             }
-            navigationController?.pushViewController(vc, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
         }
     }
 

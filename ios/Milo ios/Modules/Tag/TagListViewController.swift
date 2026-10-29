@@ -213,7 +213,8 @@ class TagListViewController: UIViewController {
         detailVC.onTagCreated = { [weak self] _ in
             self?.loadData()
         }
-        navigationController?.pushViewController(detailVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(detailVC, animated: true)
     }
 
     @objc private func searchTextDidChange(_ textField: UITextField) {
@@ -247,7 +248,8 @@ extension TagListViewController: UITableViewDataSource, UITableViewDelegate {
         detailVC.onTagDeleted = { [weak self] _ in
             self?.loadData()
         }
-        navigationController?.pushViewController(detailVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(detailVC, animated: true)
     }
 
     // MARK: - 左滑删除

@@ -180,7 +180,8 @@ class ChatPersonalViewController: UIViewController {
             nav.popViewController(animated: true)
         } else {
             let vc = ChatViewController(channelId: channelId, title: chatTitle, channelType: channelType)
-            navigationController?.pushViewController(vc, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
         }
     }
 
@@ -242,7 +243,8 @@ class ChatPersonalViewController: UIViewController {
 
     @objc private func didTapHeader() {
         let vc = ContactDetailViewController(uid: channelId)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     // MARK: - Switch Actions

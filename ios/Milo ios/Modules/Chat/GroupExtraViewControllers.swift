@@ -190,7 +190,8 @@ class GroupBlackListViewController: UIViewController, UITableViewDataSource, UIT
             guard let self = self, let uid = uids.first else { return }
             self.addMemberToBlackList(uid: uid)
         }
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     private func addMemberToBlackList(uid: String) {
@@ -325,7 +326,8 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
         guard !groups.isEmpty else { return }
         let g = groups[indexPath.row]
         let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
-        navigationController?.pushViewController(chatVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
     }
 }
 
@@ -400,7 +402,8 @@ class SavedGroupsViewController: UIViewController, UITableViewDataSource, UITabl
                 }
             }
         }
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { max(groups.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -420,7 +423,8 @@ class SavedGroupsViewController: UIViewController, UITableViewDataSource, UITabl
         guard !groups.isEmpty else { return }
         let g = groups[indexPath.row]
         let chatVC = ChatViewController(channelId: g.groupId, title: g.name, channelType: 2)
-        navigationController?.pushViewController(chatVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
     }
 }
 

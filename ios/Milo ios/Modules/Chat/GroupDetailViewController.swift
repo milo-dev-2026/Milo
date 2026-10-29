@@ -232,7 +232,8 @@ class GroupDetailViewController: UIViewController {
 
     @objc private func didTapAllMembers() {
         let vc = GroupMembersViewController(groupId: groupId)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     private struct HeaderCache {
@@ -358,7 +359,8 @@ class GroupDetailViewController: UIViewController {
     @objc private func didTapNotice() {
         let notice = group?.notice ?? ""
         let vc = GroupNoticeViewController(groupId: groupId, notice: notice)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func didTapAddMember() {
@@ -366,7 +368,8 @@ class GroupDetailViewController: UIViewController {
         vc.onMembersAdded = { [weak self] in
             self?.loadGroupInfo()
         }
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     // MARK: - Switch Actions
@@ -672,15 +675,18 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
                     self?.group?.myNickname = nickname
                     self?.tableView.reloadData()
                 }
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 群二维码
                 let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 2:
                 // 群备注
                 let vc = SetGroupRemarkViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             default: break
             }
 
@@ -692,11 +698,13 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             case 0:
                 // 群管理员
                 let vc = GroupAdminsViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 入群审核 - 跳转到群管理页面对应位置
                 let vc = GroupManageViewController(groupId: groupId)
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             default: break
             }
 
@@ -705,7 +713,8 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             case 0:
                 // 查找聊天内容
                 let vc = SearchAllViewController()
-                navigationController?.pushViewController(vc, animated: true)
+                        self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
             case 1:
                 // 清空聊天记录
                 confirmClearHistory()
@@ -938,7 +947,8 @@ class GroupAdminsViewController: UIViewController, UITableViewDataSource, UITabl
             guard let self = self, let uid = uids.first else { return }
             self.addAdminAction(uid: uid)
         }
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     private func addAdminAction(uid: String) {

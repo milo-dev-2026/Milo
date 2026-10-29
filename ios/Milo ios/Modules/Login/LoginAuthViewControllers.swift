@@ -83,7 +83,8 @@ class LoginAuthViewController: UIViewController {
                     self.startButton.isEnabled = true
                     if resp.status == 200 {
                         let vc = InputLoginAuthCodeViewController(uid: self.uid, phone: self.phone)
-                        self.navigationController?.pushViewController(vc, animated: true)
+                                self.hidesBottomBarWhenPushed = true
+self.navigationController?.pushViewController(vc, animated: true)
                     } else {
                         AppUtility.showToast(resp.msg ?? "操作失败")
                     }

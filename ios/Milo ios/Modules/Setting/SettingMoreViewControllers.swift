@@ -344,7 +344,8 @@ class FaqViewController: UIViewController {
 
     @objc private func showFeedback() {
         let vc = FeedbackViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 }
 

@@ -585,15 +585,41 @@ struct Conversation: Codable {
         }
     }
 
-    /// 系统消息会话列表预览：从 JSON content 里提取纯文本，否则返回通用文案
+    /// 系统消息会话列表预览：从 JSON content 里提取纯文本 + extra 替换 {0}/{1} 占位符
     private func parseSystemPreview(_ content: String) -> String {
-        // 尝试从 JSON 中取出原始 content 字段（WKMessageData.decode default 分支重打包的格式）
-        if let data = content.data(using: .utf8),
-           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let raw = dict["content"] as? String, !raw.isEmpty {
-            return raw
+        guard !content.isEmpty else { return "" }
+        // 尝试解析为 JSON（WKMessageData.decode default 分支重打包的格式）
+        guard let data = content.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            // 不是 JSON（裸模板），清理占位符后返回
+            return Self.stripLeftoverPlaceholders(content)
         }
-        return "[系统消息]"
+        // 从 JSON 中取模板 content
+        guard let template = json["content"] as? String, !template.isEmpty else {
+            return Self.stripLeftoverPlaceholders(content)
+        }
+        // extra 数组：[{"name":"xxx"}, ...] —— 按序替换 {0}/{1}/{2}
+        if let extra = json["extra"] as? [[String: Any]] {
+            var result = template
+            for (index, item) in extra.enumerated() {
+                let name = item["name"] as? String ?? item["value"] as? String ?? ""
+                result = result.replacingOccurrences(of: "{\(index)}", with: name)
+            }
+            return Self.stripLeftoverPlaceholders(result)
+        }
+        // extra 单对象
+        if let extraObj = json["extra"] as? [String: Any],
+           let name = extraObj["name"] as? String {
+            return Self.stripLeftoverPlaceholders(template.replacingOccurrences(of: "{0}", with: name))
+        }
+        return Self.stripLeftoverPlaceholders(template)
+    }
+
+    /// 清理残留的 {n} 占位符
+    private static func stripLeftoverPlaceholders(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: "\\{\\d+\\}") else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "").trimmingCharacters(in: .whitespaces)
     }
 
     init(channelID: String, channelType: Int, name: String, avatar: String?, lastMessage: String?, lastMessageTimestamp: Int64?, unreadCount: Int, lastMsgSeq: Int = 0, lastMessageType: Int = 1) {

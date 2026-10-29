@@ -264,12 +264,14 @@ class StickerManageViewController: UIViewController {
 
     @objc private func addTapped() {
         let shopVC = StickerShopViewController()
-        navigationController?.pushViewController(shopVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(shopVC, animated: true)
     }
 
     @objc private func customStickerTapped() {
         let vc = CustomStickerViewController()
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 
     // MARK: - 删除贴纸包

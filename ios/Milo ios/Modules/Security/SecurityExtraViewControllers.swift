@@ -289,7 +289,8 @@ extension SecretChatSettingViewController: UITableViewDataSource, UITableViewDel
 
         if indexPath.section == 0 && indexPath.row == 0 {
             let vc = SecretDeleteTimerViewController()
-            navigationController?.pushViewController(vc, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
         }
     }
 

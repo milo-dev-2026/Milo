@@ -143,7 +143,8 @@ extension SearchWithMemberViewController: UITableViewDataSource, UITableViewDele
         tableView.deselectRow(at: indexPath, animated: true)
         let member = members[indexPath.row]
         let vc = SearchMemberMessagesViewController(channelId: channelId, channelType: channelType, member: member)
-        navigationController?.pushViewController(vc, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(vc, animated: true)
     }
 }
 

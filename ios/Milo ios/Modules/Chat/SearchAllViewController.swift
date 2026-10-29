@@ -162,13 +162,16 @@ extension SearchAllViewController: UITableViewDataSource, UITableViewDelegate {
         switch item.type {
         case .user:
             let detailVC = ContactDetailViewController(uid: item.uid)
-            navigationController?.pushViewController(detailVC, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(detailVC, animated: true)
         case .group:
             let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "群聊")
-            navigationController?.pushViewController(chatVC, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
         case .message:
             let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "聊天")
-            navigationController?.pushViewController(chatVC, animated: true)
+                    self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(chatVC, animated: true)
         }
     }
 }

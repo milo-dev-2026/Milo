@@ -355,7 +355,8 @@ class NoteEditViewController: UIViewController {
             self?.renderBlocks()
             self?.scrollToBottom()
         }
-        navigationController?.pushViewController(locVC, animated: true)
+                self.hidesBottomBarWhenPushed = true
+navigationController?.pushViewController(locVC, animated: true)
     }
     
     @objc private func deleteBlock(_ sender: UIButton) {
