@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 // MARK: - 通话消息内容解析
@@ -110,6 +110,8 @@ class CallMessageCell: UITableViewCell, TimeHeaderConfigurable {
     // MARK: - UI 设置
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         let avatarSize = ScreenAdapter.scaleW(36)
         let bubblePad = ScreenAdapter.scaleW(12)

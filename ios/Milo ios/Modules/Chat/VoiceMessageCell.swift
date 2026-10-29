@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 import Kingfisher
 
@@ -21,6 +21,8 @@ class VoiceMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
 

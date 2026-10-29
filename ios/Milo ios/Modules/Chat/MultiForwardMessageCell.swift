@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 // MARK: - 合并转发消息解析
@@ -114,6 +114,8 @@ class MultiForwardMessageCell: UITableViewCell, TimeHeaderConfigurable {
     // MARK: - UI 设置
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         let avatarSize = ScreenAdapter.scaleW(36)
 

@@ -188,19 +188,30 @@ class ContactsViewController: UIViewController {
     private static let contactsCacheKey = "contacts_cache_v1"
 
     private func loadData() {
+        // 系统账号/文件传输助手保留在 header 入口里，过滤掉后端同步到好友列表的重复条目
+        let isSystemUid: (String) -> Bool = { uid in
+            let lower = uid.lowercased()
+            return ["system_file_helper", "filehelper", "system_notice", "u_10000", "system_team"].contains(lower)
+        }
+        let isSystemName: (String) -> Bool = { name in
+            name.contains("系统账号") || name.contains("系统通知") || name.contains("文件传输助手")
+        }
+
         // 先渲染本地缓存好友列表，避免空白等待
         if let data = UserDefaults.standard.data(forKey: ContactsViewController.contactsCacheKey),
-           let cached = try? JSONDecoder().decode([User].self, from: data),
-           !cached.isEmpty {
-            contacts = cached
-            filteredContacts = cached
+           let cached = try? JSONDecoder().decode([User].self, from: data) {
+            let filtered = cached.filter { !isSystemUid($0.uid) && !isSystemName($0.name) }
+            contacts = filtered
+            filteredContacts = filtered
             rebuildSections()
         }
 
         Task {
             do {
                 let friends: [FriendSyncInfo] = try await APIClient.shared.requestFlexible(.syncFriends)
-                let list = friends.map { $0.toUser() }.sorted { $0.name < $1.name }
+                let list = friends.map { $0.toUser() }
+                    .filter { !isSystemUid($0.uid) && !isSystemName($0.name) }
+                    .sorted { $0.name < $1.name }
                 // 写入本地缓存供下次秒开
                 if let data = try? JSONEncoder().encode(list) {
                     UserDefaults.standard.set(data, forKey: ContactsViewController.contactsCacheKey)

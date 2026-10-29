@@ -1805,6 +1805,8 @@ class TextMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         messageLabel.font = ScreenAdapter.font(16)
         messageLabel.numberOfLines = 0
@@ -1887,6 +1889,8 @@ final class PendingMediaMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true

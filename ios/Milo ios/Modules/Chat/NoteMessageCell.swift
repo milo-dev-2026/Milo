@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 // MARK: - 笔记消息Cell
@@ -26,6 +26,8 @@ class NoteMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         bubbleView.layer.cornerRadius = ThemeDimension.bubbleCornerRadius
         bubbleView.clipsToBounds = true

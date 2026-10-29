@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 class FileMessageCell: UITableViewCell {
@@ -20,6 +20,8 @@ class FileMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         let bubblePad = ScreenAdapter.scaleW(12)
 

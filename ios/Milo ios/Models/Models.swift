@@ -575,8 +575,25 @@ struct Conversation: Codable {
         case MessageType.location.rawValue: return "[位置]"
         case MessageType.card.rawValue: return "[名片]"
         case MessageType.note.rawValue: return "[笔记]"
-        default: return msg
+        case MessageType.system.rawValue: return parseSystemPreview(msg)
+        default:
+            // WuKongIM 系统/群事件消息 contentType 1000~2000（邀请入群、退群等）
+            if (1000...2000).contains(lastMessageType) {
+                return parseSystemPreview(msg)
+            }
+            return msg
         }
+    }
+
+    /// 系统消息会话列表预览：从 JSON content 里提取纯文本，否则返回通用文案
+    private func parseSystemPreview(_ content: String) -> String {
+        // 尝试从 JSON 中取出原始 content 字段（WKMessageData.decode default 分支重打包的格式）
+        if let data = content.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let raw = dict["content"] as? String, !raw.isEmpty {
+            return raw
+        }
+        return "[系统消息]"
     }
 
     init(channelID: String, channelType: Int, name: String, avatar: String?, lastMessage: String?, lastMessageTimestamp: Int64?, unreadCount: Int, lastMsgSeq: Int = 0, lastMessageType: Int = 1) {

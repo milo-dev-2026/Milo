@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 import Kingfisher
 
@@ -146,6 +146,8 @@ class GIFMessageCell: UITableViewCell {
 
     private func setupUI() {
         selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
 
         let avatarSize = ScreenAdapter.scaleW(36)
         let vPad = ScreenAdapter.scaleH(12)

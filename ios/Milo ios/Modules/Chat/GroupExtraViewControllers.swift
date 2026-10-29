@@ -268,13 +268,15 @@ class JoinedGroupsViewController: UIViewController, UITableViewDataSource, UITab
     }
 
     private func loadGroups() {
-        // 从会话列表获取群频道
+        // 从会话列表获取群频道，按 channelId 去重（IM SDK 可能返回重复条目）
         let conversations = IMManager.shared.getConversationList()
+        var seenIDs = Set<String>()
         var list: [(groupId: String, name: String, memberCount: Int)] = []
         for conv in conversations {
             if conv.channel.channelType == 2 {
                 let gid = conv.channel.channelId ?? ""
-                // 优先用 SDK 已同步的频道名，避免把群号 hex 当昵称显示成“乱码”
+                guard !gid.isEmpty, !seenIDs.contains(gid) else { continue }
+                seenIDs.insert(gid)
                 var name = ""
                 if let info = IMManager.shared.getChannelInfo(channelId: gid, channelType: 2),
                    !info.name.isEmpty {
