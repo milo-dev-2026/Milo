@@ -121,6 +121,8 @@ enum APIRouter: URLRequestConvertible {
     case reportReaded(channelId: String, channelType: Int, messageIds: [String], messages: [[String: Any]])
     // 消息扩展同步（已读回执 / 撤回，与后端 /v1/message/extra/sync 对齐）
     case syncMessageExtra(channelId: String, channelType: Int, version: Int64)
+    // 清除会话未读（对齐安卓 MsgModel.clearUnread → TangSeng 路由 /v1/coversation/clearUnread，官方拼写即如此）
+    case clearUnread(channelId: String, channelType: Int, unread: Int)
 
     // MARK: - URLRequestConvertible
     func asURLRequest() throws -> URLRequest {
@@ -254,6 +256,12 @@ enum APIRouter: URLRequestConvertible {
                 URLQueryItem(name: "message_seq", value: String(messageSeq))
             ]
             request.url = comps?.url
+        case let .clearUnread(channelId, channelType, unread):
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "channel_id": channelId,
+                "channel_type": channelType,
+                "unread": unread
+            ])
         case let .uploadFile(fileName, data):
             request.setValue("multipart/form-data", forHTTPHeaderField: "Content-Type")
         case let .applyFriend(uid, remark, vercode):
@@ -530,6 +538,7 @@ enum APIRouter: URLRequestConvertible {
         case .revokeMessage: return "/v1/message/revoke"
         case .reportReaded: return "/v1/message/readed"
         case .syncMessageExtra: return "/v1/message/extra/sync"
+        case .clearUnread: return "/v1/coversation/clearUnread"
         case .updateGroupSetting(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         case .updateGroupSettingString(let groupId, _, _): return "/v1/groups/\(groupId)/mysetting"
         }
@@ -549,7 +558,8 @@ enum APIRouter: URLRequestConvertible {
              .setForbidAddFriend, .setForbidTempChat, .setForbidNewMemberViewHistory,
              .updateMyNicknameInGroup, .setMessageDisturb, .setChatTop,
              .saveToContacts, .setShowGroupNickname,
-             .updateGroupSetting, .updateGroupSettingString, .updateUserSetting, .updateUserSettingString, .updateFriendRemark:
+             .updateGroupSetting, .updateGroupSettingString, .updateUserSetting, .updateUserSettingString, .updateFriendRemark,
+             .clearUnread:
             return .put
         case .deleteFavorite, .deleteLockScreenPwd, .kickDevice,
              .dismissGroup, .deleteNote, .deleteNoteGroup, .deleteTag,

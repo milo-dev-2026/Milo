@@ -490,6 +490,9 @@ struct Message: Codable {
     var timestamp: Int64
     var status: Int
     var messageSeq: Int
+    /// SDK 发送时的 clientMsgNo（本地占位消息 messageID 为 UUID，靠它与 sendack 回执关联，撤回/已读都依赖该映射）
+    /// 不入 CodingKeys：旧缓存无此字段可正常解码，且只有本会话发送的消息需要它
+    var clientMsgNo: String = ""
 
     enum CodingKeys: String, CodingKey {
         case messageID = "message_id"
@@ -507,7 +510,7 @@ struct Message: Codable {
         return fromUID == UserDefaults.standard.string(forKey: "uid")
     }
 
-    init(messageID: String, channelID: String, channelType: Int, fromUID: String, content: String, type: MessageType, timestamp: Int64, status: Int, messageSeq: Int = 0) {
+    init(messageID: String, channelID: String, channelType: Int, fromUID: String, content: String, type: MessageType, timestamp: Int64, status: Int, messageSeq: Int = 0, clientMsgNo: String = "") {
         self.messageID = messageID
         self.channelID = channelID
         self.channelType = channelType
@@ -517,6 +520,7 @@ struct Message: Codable {
         self.timestamp = timestamp
         self.status = status
         self.messageSeq = messageSeq
+        self.clientMsgNo = clientMsgNo
     }
 
     init(from wk: WKMessageData) {
@@ -524,6 +528,7 @@ struct Message: Codable {
         self.channelID = wk.channel_id ?? ""
         self.channelType = wk.channel_type ?? 1
         self.fromUID = wk.from_uid ?? ""
+        self.clientMsgNo = wk.client_msg_no ?? ""
         let decoded = wk.decodedPayload
         self.content = decoded.content
         // 与安卓一致：contentType 1000~2000 为系统/群事件消息（邀请入群、退群等）

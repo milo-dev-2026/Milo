@@ -401,9 +401,9 @@ class IMManager: NSObject {
     }
 
     // MARK: - 发送文本消息
-    /// 返回是否成功交给 SDK 发送（nil 表示发送失败），供 UI 立即标记已发送状态
+    /// 返回 SDK 生成的 WKMessage（携带 clientMsgNo），供 UI 保存 本地UUID→clientMsgNo 映射（撤回/回执依赖）；nil 表示发送失败
     @discardableResult
-    func sendTextMessage(channelId: String, content: String, channelType: Int = 1) -> Bool {
+    func sendTextMessage(channelId: String, content: String, channelType: Int = 1) -> WKMessage? {
         if !isConnected {
             print("[IM] 发送时未连接，尝试重新连接")
             connect()
@@ -412,12 +412,12 @@ class IMManager: NSObject {
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         let textContent = WKTextContent(content: content)
-        let sent = WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
-        return sent != nil
+        return WKSDK.shared().chatManager.sendMessage(textContent, channel: channel)
     }
 
     // MARK: - 发送图片消息
-    func sendImageMessage(channelId: String, imageURL: String, width: CGFloat, height: CGFloat, channelType: Int = 1) {
+    @discardableResult
+    func sendImageMessage(channelId: String, imageURL: String, width: CGFloat, height: CGFloat, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -425,22 +425,24 @@ class IMManager: NSObject {
         imageContent.url = imageURL
         imageContent.width = width
         imageContent.height = height
-        _ = WKSDK.shared().chatManager.sendMessage(imageContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(imageContent, channel: channel)
     }
 
     // MARK: - 发送语音消息
-    func sendVoiceMessage(channelId: String, voiceURL: String, duration: Int, channelType: Int = 1) {
+    @discardableResult
+    func sendVoiceMessage(channelId: String, voiceURL: String, duration: Int, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         let voiceContent = WKVoiceMessageContent()
         voiceContent.url = voiceURL
         voiceContent.duration = duration
-        _ = WKSDK.shared().chatManager.sendMessage(voiceContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(voiceContent, channel: channel)
     }
 
     // MARK: - 发送视频消息
-    func sendVideoMessage(channelId: String, thumbURL: String, videoURL: String, duration: Int, channelType: Int = 1) {
+    @discardableResult
+    func sendVideoMessage(channelId: String, thumbURL: String, videoURL: String, duration: Int, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -448,11 +450,12 @@ class IMManager: NSObject {
         videoContent.thumbURL = thumbURL
         videoContent.videoURL = videoURL
         videoContent.duration = duration
-        _ = WKSDK.shared().chatManager.sendMessage(videoContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(videoContent, channel: channel)
     }
 
     // MARK: - 发送文件消息
-    func sendFileMessage(channelId: String, fileName: String, fileSize: Int64, fileURL: String, channelType: Int = 1) {
+    @discardableResult
+    func sendFileMessage(channelId: String, fileName: String, fileSize: Int64, fileURL: String, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -460,11 +463,12 @@ class IMManager: NSObject {
         fileContent.fileName = fileName
         fileContent.fileSize = fileSize
         fileContent.url = fileURL
-        _ = WKSDK.shared().chatManager.sendMessage(fileContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(fileContent, channel: channel)
     }
 
     // MARK: - 发送位置消息
-    func sendLocationMessage(channelId: String, name: String, address: String = "", latitude: Double, longitude: Double, channelType: Int = 1) {
+    @discardableResult
+    func sendLocationMessage(channelId: String, name: String, address: String = "", latitude: Double, longitude: Double, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -473,11 +477,12 @@ class IMManager: NSObject {
         locationContent.address = address
         locationContent.latitude = latitude
         locationContent.longitude = longitude
-        _ = WKSDK.shared().chatManager.sendMessage(locationContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(locationContent, channel: channel)
     }
 
     // MARK: - 发送名片消息
-    func sendCardMessage(channelId: String, uid: String, name: String, avatar: String, vercode: String, channelType: Int = 1) {
+    @discardableResult
+    func sendCardMessage(channelId: String, uid: String, name: String, avatar: String, vercode: String, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -486,12 +491,13 @@ class IMManager: NSObject {
         cardContent.name = name
         cardContent.avatar = avatar
         cardContent.vercode = vercode
-        _ = WKSDK.shared().chatManager.sendMessage(cardContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(cardContent, channel: channel)
     }
 
     // MARK: - 发送笔记消息
     /// 线缆格式与安卓 WKNoteContent 完全一致，保证双端互通（noteId/noteTitle/noteContent/noteGroup/noteTime/blockListJson/coverUrl/summary/containVideo/containLocation）
-    func sendNoteMessage(channelId: String, noteJSON: String, channelType: Int = 1) {
+    @discardableResult
+    func sendNoteMessage(channelId: String, noteJSON: String, channelType: Int = 1) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -562,7 +568,7 @@ class IMManager: NSObject {
             noteContent.containVideo = hasVideo ? 1 : 0
             noteContent.containLocation = hasLocation ? 1 : 0
         }
-        _ = WKSDK.shared().chatManager.sendMessage(noteContent, channel: channel)
+        return WKSDK.shared().chatManager.sendMessage(noteContent, channel: channel)
     }
 
     // MARK: - 发送语音通话信令（type 9996，与安卓 RTCSignalContent 一致）
@@ -867,7 +873,8 @@ extension IMManager: WKChatManagerDelegate {
             type: msgType,
             timestamp: Int64(wkMsg.timestamp * 1000),
             status: status,
-            messageSeq: Int(wkMsg.messageSeq)
+            messageSeq: Int(wkMsg.messageSeq),
+            clientMsgNo: wkMsg.clientMsgNo ?? ""
         )
     }
 }
@@ -1124,6 +1131,13 @@ extension IMManager {
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
         WKSDK.shared().conversationManager.clearConversationUnreadCount(channel)
+        // 同步服务端（对齐安卓 MsgModel.clearUnread：updateRedDot + PUT /v1/coversation/clearUnread）
+        // 修复"看过消息仍显示未读红角标"：本地清了但服务端会话表未清，下次同步会话又把未读数拉回来
+        Task {
+            _ = try? await APIClient.shared.requestRaw(.clearUnread(
+                channelId: channelId, channelType: channelType, unread: 0
+            ))
+        }
     }
 
     // MARK: 设置未读数
@@ -1309,6 +1323,16 @@ extension IMManager: WKCMDManagerDelegate {
             DataSyncManager.shared.syncFriends()
         } else if cmd.contains("frienddeleted") {
             DataSyncManager.shared.syncFriends()
+        } else if cmd == "revoke" {
+            // 对方撤回消息（后端 /v1/message/revoke 推送的实时 CMD）：
+            // 直接发通知，聊天页即时替换为"对方撤回了一条消息"，不用等 10s 扩展同步轮询
+            if let messageId = param["message_id"] as? String, !messageId.isEmpty {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("IMMessageRevoked"),
+                    object: nil,
+                    userInfo: ["messageId": messageId]
+                )
+            }
         }
     }
 }

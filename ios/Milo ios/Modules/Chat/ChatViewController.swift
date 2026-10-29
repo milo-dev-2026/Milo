@@ -115,6 +115,24 @@ class ChatViewController: UIViewController {
             name: IMManager.messageStatusUpdateNotification,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMessageRevokedNotification(_:)),
+            name: NSNotification.Name("IMMessageRevoked"),
+            object: nil
+        )
+    }
+
+    /// 对方撤回消息的实时 CMD：立即把对应气泡替换为"对方撤回了一条消息"
+    @objc private func handleMessageRevokedNotification(_ notification: Notification) {
+        guard let messageId = notification.userInfo?["messageId"] as? String,
+              let idx = messages.firstIndex(where: { $0.messageID == messageId }),
+              messages[idx].type != .system else { return }
+        messages[idx].type = .system
+        messages[idx].content = messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+        tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+        saveMessagesCacheDebounced()
     }
 
     @objc private func handleMessageNotification(_ notification: Notification) {
@@ -129,7 +147,23 @@ class ChatViewController: UIViewController {
 
     private func handleMessageStatusUpdate(_ msg: Message) {
         guard msg.channelID == channelId else { return }
-        // 更新消息状态（SDK返回的消息有正确的messageID，通过匹配来更新）
+        // sendack 回执：SDK 消息的 clientMsgNo 与发送时一致，messageID 为真实服务端 ID。
+        // 先按 clientMsgNo 找回本地占位消息，回写真实 messageID（撤回/已读/搜索都依赖服务端 ID）
+        if msg.isFromMe, !msg.clientMsgNo.isEmpty,
+           let idx = messages.firstIndex(where: { $0.clientMsgNo == msg.clientMsgNo }) {
+            let localID = messages[idx].messageID
+            if localID != msg.messageID {
+                confirmedLocalIDs.remove(localID)
+                pendingAppearIDs.remove(localID)
+                pendingAppearIDs.insert(msg.messageID)
+                messages[idx].messageID = msg.messageID
+            }
+            messages[idx].messageSeq = msg.messageSeq
+            if messages[idx].status != 2 { messages[idx].status = msg.status }
+            DispatchQueue.main.async { self.tableView.reloadData() }
+            return
+        }
+        // 非本端发送或已知服务端 ID 的消息：直接按 messageID 更新状态
         if let index = messages.firstIndex(where: { $0.messageID == msg.messageID }) {
             messages[index].status = msg.status
             DispatchQueue.main.async {
@@ -1323,22 +1357,30 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     private func recallMessage(_ message: Message) {
+        // 本地占位消息（UUID 且尚未收到 sendack 回写真实 messageID）服务端查不到，直接拦截
+        let isServerID = Int64(message.messageID) != nil
+        if !isServerID {
+            AppUtility.showToast("消息发送中，稍后重试")
+            return
+        }
         Task {
             do {
                 let response = try await APIClient.shared.requestRaw(.revokeMessage(
                     channelId: channelId,
                     channelType: channelType,
                     messageId: message.messageID,
-                    clientMsgNo: message.messageID,
+                    clientMsgNo: message.clientMsgNo.isEmpty ? message.messageID : message.clientMsgNo,
                     messageSeq: UInt32(max(0, message.messageSeq))
                 ))
                 if response["status"] as? Int == 200 {
                     DispatchQueue.main.async {
+                        // 对齐安卓/微信：撤回后替换为居中系统条
                         if let idx = self.messages.firstIndex(where: { $0.messageID == message.messageID }) {
-                            self.messages[idx].content = "此消息已撤回"
+                            self.messages[idx].type = .system
+                            self.messages[idx].content = "你撤回了一条消息"
                             self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
                         }
-                        AppUtility.showToast("已撤回")
+                        self.saveMessagesCacheDebounced()
                     }
                 } else {
                     let msg = (response["msg"] as? String) ?? "撤回失败"
@@ -1452,7 +1494,8 @@ extension ChatViewController: ChatInputBarDelegate {
             AppUtility.showToast("连接已断开，正在重连...")
         }
         // 立即判断发送结果：成功直接显示单勾，失败显示红色感叹号，不再停留在“发送中”转圈
-        let sentOK = IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
+        // SDK 返回的 WKMessage 携带 clientMsgNo，用于 sendack 回执把真实 messageID 回写到本条消息
+        let sentWK = IMManager.shared.sendTextMessage(channelId: channelId, content: text, channelType: channelType)
         let msg = Message(
             messageID: UUID().uuidString,
             channelID: channelId,
@@ -1461,7 +1504,8 @@ extension ChatViewController: ChatInputBarDelegate {
             content: text,
             type: .text,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: sentOK ? 1 : -1
+            status: sentWK != nil ? 1 : -1,
+            clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
         // 纳入回显匹配集：SDK 回显时替换本地气泡，避免重复
@@ -1611,12 +1655,16 @@ extension ChatViewController: ChatInputBarDelegate {
                         self.confirmedLocalIDs.insert(messageID)
                         self.tableView.reloadData()
                     }
-                    IMManager.shared.sendVoiceMessage(
+                    let sentWK = IMManager.shared.sendVoiceMessage(
                         channelId: self.channelId,
                         voiceURL: path,
                         duration: max(1, Int(duration)),
                         channelType: self.channelType
                     )
+                    if let cmno = sentWK?.clientMsgNo,
+                       let idx = self.messages.firstIndex(where: { $0.messageID == messageID }) {
+                        self.messages[idx].clientMsgNo = cmno
+                    }
                 }
             } catch {
                 print("语音上传失败: \(error.localizedDescription)")
@@ -1810,17 +1858,18 @@ extension ChatViewController: ChatInputBarDelegate {
 
     private func completeUpload(messageID: String, path: String, thumbPath: String, upload: PendingUpload) {
         guard let index = messages.firstIndex(where: { $0.messageID == messageID }) else { return }
+        var sentWK: WKMessage?
         switch upload.type {
         case .image:
             messages[index].content = path
-            IMManager.shared.sendImageMessage(
+            sentWK = IMManager.shared.sendImageMessage(
                 channelId: channelId, imageURL: path,
                 width: upload.width, height: upload.height, channelType: channelType
             )
         case .video:
             let content = "\(thumbPath)|\(path)"
             messages[index].content = content
-            IMManager.shared.sendVideoMessage(
+            sentWK = IMManager.shared.sendVideoMessage(
                 channelId: channelId, thumbURL: thumbPath, videoURL: path,
                 duration: upload.duration, channelType: channelType
             )
@@ -1828,6 +1877,7 @@ extension ChatViewController: ChatInputBarDelegate {
             return
         }
         messages[index].status = 1
+        messages[index].clientMsgNo = sentWK?.clientMsgNo ?? ""
         confirmedLocalIDs.insert(messageID)
         pendingMedia.removeValue(forKey: messageID)
         pendingUploads.removeValue(forKey: messageID)
@@ -1898,7 +1948,7 @@ extension ChatViewController: ChatInputBarDelegate {
 
                 // 对齐 Android：走服务器中转上传通道（长超时会话）
                 let path = try await self.uploadChatFile(data: fileData, fileName: fileName)
-                IMManager.shared.sendFileMessage(
+                let sentWK = IMManager.shared.sendFileMessage(
                     channelId: self.channelId,
                     fileName: fileName,
                     fileSize: fileSize,
@@ -1914,7 +1964,8 @@ extension ChatViewController: ChatInputBarDelegate {
                     content: content,
                     type: .file,
                     timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                    status: 0 // 发送中
+                    status: 0, // 发送中
+                    clientMsgNo: sentWK?.clientMsgNo ?? ""
                 )
                 self.messages.append(msg)
                 self.pendingAppearIDs.insert(msg.messageID)
@@ -1933,7 +1984,7 @@ extension ChatViewController: ChatInputBarDelegate {
 
     private func sendLocationMessage(_ location: PickedLocation) {
         // 通过SDK发送位置消息
-        IMManager.shared.sendLocationMessage(
+        let sentWK = IMManager.shared.sendLocationMessage(
             channelId: channelId,
             name: location.name,
             address: location.address,
@@ -1950,7 +2001,8 @@ extension ChatViewController: ChatInputBarDelegate {
             content: "[位置] \(displayName)|\(location.latitude),\(location.longitude)",
             type: .location,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0 // 发送中
+            status: 0, // 发送中
+            clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
         pendingAppearIDs.insert(msg.messageID)
@@ -1963,7 +2015,7 @@ extension ChatViewController: ChatInputBarDelegate {
     // MARK: - 发送名片消息
     private func sendCardMessage(uid: String, name: String, avatar: String, vercode: String) {
         // 通过SDK发送名片消息
-        IMManager.shared.sendCardMessage(
+        let sentWK = IMManager.shared.sendCardMessage(
             channelId: channelId,
             uid: uid,
             name: name,
@@ -1981,7 +2033,8 @@ extension ChatViewController: ChatInputBarDelegate {
             content: content,
             type: .card,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0 // 发送中
+            status: 0, // 发送中
+            clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
         pendingAppearIDs.insert(msg.messageID)
@@ -2000,7 +2053,7 @@ extension ChatViewController: ChatInputBarDelegate {
             return
         }
         // 通过SDK发送笔记消息
-        IMManager.shared.sendNoteMessage(
+        let sentWK = IMManager.shared.sendNoteMessage(
             channelId: channelId,
             noteJSON: noteString,
             channelType: channelType
@@ -2013,7 +2066,8 @@ extension ChatViewController: ChatInputBarDelegate {
             content: noteString,
             type: .note,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0 // 发送中
+            status: 0, // 发送中
+            clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
         pendingAppearIDs.insert(msg.messageID)
