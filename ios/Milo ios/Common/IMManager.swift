@@ -614,7 +614,7 @@ class IMManager: NSObject {
                 type: .call,
                 timestamp: Int64(Date().timeIntervalSince1970 * 1000),
                 status: 1,
-                clientMsgNo: sent.client_msg_no ?? ""
+                clientMsgNo: sent.clientMsgNo
             )
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: localMsg)
