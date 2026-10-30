@@ -260,7 +260,6 @@ class LocationPickerViewController: UIViewController {
         }
         request.offset = 30
         request.page = 1
-        request.requireExtension = true
         searchAPI?.aMapPOIKeywordsSearch(request)
     }
 
@@ -375,7 +374,9 @@ extension LocationPickerViewController: AMapSearchDelegate {
     }
 
     func onReGeocodeSearchDone(_ request: AMapReGeocodeSearchRequest!, response: AMapReGeocodeSearchResponse!) {
-        if let city = response.regeocode?.city, !city.isEmpty {
+        // 城市取自逆地理的地址组件（AMapReGeocode 本身没有 city 字段），用于限定关键词搜索范围
+        let city = response.regeocode?.addressComponent?.city ?? ""
+        if !city.isEmpty {
             currentCity = city
         }
         if let addr = response.regeocode?.formattedAddress, !addr.isEmpty {
