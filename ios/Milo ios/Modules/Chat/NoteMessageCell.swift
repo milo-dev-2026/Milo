@@ -1,4 +1,4 @@
-﻿import UIKit
+import UIKit
 import SnapKit
 
 // MARK: - 笔记消息Cell
@@ -89,19 +89,13 @@ class NoteMessageCell: UITableViewCell {
 
     // MARK: - 按压缩放效果
     private func setupPressGesture() {
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBubbleTap))
-        bubbleView.addGestureRecognizer(tapGesture)
-        bubbleView.isUserInteractionEnabled = true
-
+        // 注意：不要在 bubbleView 上加 UITapGestureRecognizer，
+        // 否则会拦截点击导致 tableView didSelectRowAt 不触发（笔记点不开）
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleBubbleLongPress))
         longPress.minimumPressDuration = 0
         longPress.cancelsTouchesInView = false
         longPress.delegate = self
         bubbleView.addGestureRecognizer(longPress)
-    }
-
-    @objc private func handleBubbleTap() {
-        // 点击事件由 tableView didSelectRowAt 处理
     }
 
     @objc private func handleBubbleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -132,19 +126,21 @@ class NoteMessageCell: UITableViewCell {
         let isFromMe = message.isFromMe
 
         // 解析笔记消息内容
+        // 注意顺序：NoteEntity 容错解码永不失败，必须先判安卓线缆格式（noteTitle/noteId/blockListJson），
+        // 否则安卓/回显笔记会被误判为空 NoteEntity 显示成"无标题笔记"
         if let data = message.content.data(using: .utf8),
-           let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
-            noteTitleLabel.text = note.title.isEmpty ? "无标题笔记" : note.title
-            notePreviewLabel.text = note.previewText
-        } else if let data = message.content.data(using: .utf8),
-                  let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                  dict["noteTitle"] != nil || dict["noteId"] != nil {
+           let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+           dict["noteTitle"] != nil || dict["noteId"] != nil || dict["blockListJson"] != nil {
             // 安卓 WKNoteContent 原生格式：noteTitle/summary/noteContent
             let title = dict["noteTitle"] as? String ?? ""
             noteTitleLabel.text = title.isEmpty ? "无标题笔记" : title
             let summary = dict["summary"] as? String ?? ""
             let noteContent = dict["noteContent"] as? String ?? ""
             notePreviewLabel.text = !summary.isEmpty ? summary : (noteContent.isEmpty ? "" : noteContent)
+        } else if let data = message.content.data(using: .utf8),
+                  let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
+            noteTitleLabel.text = note.title.isEmpty ? "无标题笔记" : note.title
+            notePreviewLabel.text = note.previewText
         } else {
             noteTitleLabel.text = "笔记"
             notePreviewLabel.text = message.content

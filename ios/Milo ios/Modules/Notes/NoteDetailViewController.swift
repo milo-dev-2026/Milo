@@ -156,15 +156,8 @@ class NoteDetailViewController: UIViewController {
             imgView.addGestureRecognizer(tap)
             
             if let urlStr = block.imageURL, !urlStr.isEmpty {
-                let url: URL?
-                if urlStr.hasPrefix("http") {
-                    url = URL(string: urlStr)
-                } else if urlStr.hasPrefix("/") {
-                    url = URL(string: APIConfig.apiBaseURL + urlStr)
-                } else {
-                    url = URL(string: APIConfig.apiBaseURL + "/" + urlStr)
-                }
-                if let url = url {
+                // 统一走 /v1/static/chat/ 前缀规则（相对路径 static/chat/xxx 需补 /v1 前缀）
+                if let url = APIConfig.chatMediaURL(urlStr) {
                     imgView.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))
                 }
             } else {
@@ -295,17 +288,7 @@ class NoteDetailViewController: UIViewController {
         guard index < note.blocks.count else { return }
         let block = note.blocks[index]
         guard let videoURLStr = block.videoURL, !videoURLStr.isEmpty else { return }
-        
-        let url: URL?
-        if videoURLStr.hasPrefix("http") {
-            url = URL(string: videoURLStr)
-        } else if videoURLStr.hasPrefix("/") {
-            url = URL(string: APIConfig.apiBaseURL + videoURLStr)
-        } else {
-            url = URL(string: APIConfig.apiBaseURL + "/" + videoURLStr)
-        }
-        
-        guard let url = url else { return }
+        guard let url = APIConfig.chatMediaURL(videoURLStr) else { return }
         let player = AVPlayer(url: url)
         let playerVC = AVPlayerViewController()
         playerVC.player = player

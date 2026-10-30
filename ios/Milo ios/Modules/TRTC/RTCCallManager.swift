@@ -86,9 +86,11 @@ final class RTCCallManager {
 
         switch Signal(rawValue: signalType) {
         case .invite:
-            // 忙线：直接回复忙线信令
+            // 忙线：回复忙线信令，并发送"忙线"通话结果消息（对齐微信：主叫侧显示"对方忙线中"）
             if isInCall {
                 sendSignal(.busy, to: fromUID, roomId: signalRoomId, callType: signalCallType)
+                IMManager.shared.sendRTCResultMessage(channelId: fromUID, channelType: 1,
+                                                      callType: signalCallType, resultType: 4, second: 0)
                 return
             }
             roomId = signalRoomId > 0 ? signalRoomId : Int(Date().timeIntervalSince1970)

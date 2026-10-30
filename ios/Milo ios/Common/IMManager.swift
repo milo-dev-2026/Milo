@@ -590,7 +590,9 @@ class IMManager: NSObject {
 
     /// 发送通话结果消息（type=9989，对齐安卓 RTCMsgContent：由结束方发送，双方会话可见）
     /// resultType: 0=取消 1=正常结束 2=未接听 3=拒绝 4=忙线
-    func sendRTCResultMessage(channelId: String, channelType: Int = 1, callType: Int = 0, resultType: Int, second: Int) {
+    /// 发送后立即本地插入气泡（对齐微信：不等待 SDK 回显），回显/同步靠 clientMsgNo/messageID 去重
+    @discardableResult
+    func sendRTCResultMessage(channelId: String, channelType: Int = 1, callType: Int = 0, resultType: Int, second: Int) -> WKMessage? {
         let channel = WKChannel()
         channel.channelId = channelId
         channel.channelType = UInt8(channelType)
@@ -598,7 +600,27 @@ class IMManager: NSObject {
         content.callType = callType
         content.resultType = resultType
         content.second = second
-        _ = WKSDK.shared().chatManager.sendMessage(content, channel: channel)
+        let sent = WKSDK.shared().chatManager.sendMessage(content, channel: channel)
+        // 本地立即插入通话气泡
+        let dict: [String: Any] = ["call_type": callType, "result_type": resultType, "second": second]
+        if let data = try? JSONSerialization.data(withJSONObject: dict),
+           let str = String(data: data, encoding: .utf8) {
+            let localMsg = Message(
+                messageID: sent.map { String($0.messageId) } ?? UUID().uuidString,
+                channelID: channelId,
+                channelType: channelType,
+                fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
+                content: str,
+                type: .call,
+                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                status: sent == nil ? -1 : 1,
+                clientMsgNo: sent?.clientMsgNo ?? ""
+            )
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: localMsg)
+            }
+        }
+        return sent
     }
 }
 

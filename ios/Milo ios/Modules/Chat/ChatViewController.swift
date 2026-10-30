@@ -189,6 +189,20 @@ class ChatViewController: UIViewController {
                let deleted = dict["is_deleted"] as? Int, deleted == 1 { return }
         }
         if messages.contains(where: { $0.messageID == msg.messageID }) { return }
+        // 自己消息的"回显/服务端同步"：发送占位气泡的内容是 NoteEntity JSON，
+        // 回显内容是安卓线缆格式（noteTitle/blockListJson），文本比对永远不等 → 必须用 clientMsgNo 去重
+        if msg.isFromMe && !msg.clientMsgNo.isEmpty,
+           let idx = messages.firstIndex(where: { $0.isFromMe && $0.clientMsgNo == msg.clientMsgNo }) {
+            // 回显比 sendack 先到时，占位消息还是临时 ID：回写真实 messageID，避免重复气泡
+            messages[idx].messageID = msg.messageID
+            messages[idx].messageSeq = msg.messageSeq
+            messages[idx].timestamp = msg.timestamp
+            if messages[idx].status != 2 { messages[idx].status = 1 }
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+            }
+            return
+        }
         // 自己发送成功的消息回显：替换本地占位气泡，避免重复
         if msg.isFromMe,
            let idx = messages.firstIndex(where: {
@@ -656,9 +670,9 @@ class ChatViewController: UIViewController {
                 navigationItem.rightBarButtonItems = [moreBtn, callBtn]
             }
         } else {
-            // 群聊：三横管理入口仅群主/管理员可见（角色异步返回后由 updateGroupRightBarButton 设置），
-            // 普通成员通过点标题进入群资料页
-            navigationItem.rightBarButtonItems = []
+            // 群聊：群标题右侧管理入口所有人可见；点进去后按角色分流
+            // 群主/管理员 → 群管理页（可编辑），普通成员 → 群资料页（只读）
+            navigationItem.rightBarButtonItems = [moreBtn]
             titleView.isUserInteractionEnabled = true
             titleView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapTitleView)))
         }
@@ -678,19 +692,23 @@ class ChatViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
 
-    /// 右上角"三个横杠"：单聊进入聊天信息页，群聊进入群设置页
+    /// 右上角"三个横杠"：单聊进入聊天信息页；群聊按角色分流（管理员→群管理页，普通成员→只读群资料页）
     @objc private func showMoreOptions() {
         if channelType == 2 {
-            openGroupDetail()
+            if isGroupAdmin {
+                openGroupDetail()
+            } else {
+                navigationController?.pushViewController(GroupInfoViewController(groupId: channelId), animated: true)
+            }
         } else {
             openChatPersonal()
         }
     }
 
-    /// 群聊：仅群主/管理员显示右上角"三横"管理入口（对齐安卓 ChatActivity.hideOrShowRightView）
+    /// 群聊：右上角"三横"入口所有人可见（权限差异在进入的页面内按角色控制）
     private func updateGroupRightBarButton() {
         guard channelType == 2 else { return }
-        if isGroupAdmin {
+        if navigationItem.rightBarButtonItems?.isEmpty ?? true {
             let moreBtn = UIBarButtonItem(
                 image: UIImage(systemName: "line.3.horizontal"),
                 style: .plain,
@@ -699,8 +717,6 @@ class ChatViewController: UIViewController {
             )
             moreBtn.tintColor = .label
             navigationItem.rightBarButtonItems = [moreBtn]
-        } else {
-            navigationItem.rightBarButtonItems = []
         }
     }
 
@@ -760,6 +776,16 @@ class ChatViewController: UIViewController {
         // 自己的头像 → 我的主页
         if tappedId == myUid {
             openChatPersonal()
+            return
+        }
+        // 系统账号头像 → 专属资料页（文件传输助手/系统通知，与会话列表头像一致）
+        let lowered = tappedId.lowercased()
+        if lowered == "filehelper" || lowered == "system_file_helper" {
+            navigationController?.pushViewController(SystemAccountProfileViewController(account: .fileHelper), animated: true)
+            return
+        }
+        if lowered == "u_10000" || lowered == "system_notice" || lowered == "system_team" {
+            navigationController?.pushViewController(SystemAccountProfileViewController(account: .systemNotice), animated: true)
             return
         }
         // 他人头像 → 个人主页（统一走联系人详情页）
@@ -1179,44 +1205,74 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     // MARK: - 历史消息分页
-    /// 向上翻页：按最早一条的 seq 继续拉取服务端历史
+    /// 翻页游标（时间秒 + seq）：独立于界面消息列表维护。
+    /// 若直接用界面最老消息当游标，遇到"整页都是已展示消息"时会误判没有更多历史
+    private var historyCursorTs: Int = 0
+    private var historyCursorSeq: Int = 0
+
+    /// 向上翻页：按游标拉取服务端历史，直至取完全部记录（单聊从加好友起、群聊从建群起）
     private func loadOlderMessages() {
         guard !isLoadingOlder, hasMoreHistory else { return }
-        // 取当前已加载消息里最早的一条（时间, seq）作为翻页游标：
-        // 历史数据存在 seq 冲突，只用 seq 分页会漏消息，所以同时传时间戳做组合游标
-        let oldest = messages
-            .filter { $0.messageSeq > 0 }
-            .min { lhs, rhs in
-                let lt = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
-                let rt = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
-                if lt != rt { return lt < rt }
-                return lhs.messageSeq < rhs.messageSeq
+        // 游标未初始化时，取当前已加载消息里最早的一条（时间, seq）作为起点
+        if historyCursorSeq <= 0 {
+            let oldest = messages
+                .filter { $0.messageSeq > 0 }
+                .min { lhs, rhs in
+                    let lt = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+                    let rt = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+                    if lt != rt { return lt < rt }
+                    return lhs.messageSeq < rhs.messageSeq
+                }
+            guard let oldestMsg = oldest else {
+                hasMoreHistory = false
+                return
             }
-        guard let oldestMsg = oldest, oldestMsg.messageSeq > 0 else {
-            hasMoreHistory = false
-            return
+            historyCursorSeq = oldestMsg.messageSeq
+            historyCursorTs = Int(max(0, oldestMsg.timestamp / 1000))
         }
-        let oldestSeq = oldestMsg.messageSeq
-        let oldestTs = Int(max(0, oldestMsg.timestamp / 1000))
+        let cursorSeq = historyCursorSeq
+        let cursorTs = historyCursorTs
         isLoadingOlder = true
         Task {
             do {
                 let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
                     .syncChannelMessages(channelId: channelId, channelType: channelType,
-                                         startMessageSeq: oldestSeq, limit: 30, startTimestamp: oldestTs)
+                                         startMessageSeq: cursorSeq, limit: 30, startTimestamp: cursorTs)
                 )
                 DispatchQueue.main.async {
                     self.isLoadingOlder = false
-                    let older = (response.messages ?? []).map { Message(from: $0) }
-                        .filter { o in !self.messages.contains(where: { $0.messageID == o.messageID }) }
+                    let fetched = (response.messages ?? []).map { Message(from: $0) }
                     let more = (response.more ?? 0) != 0
-                    guard !older.isEmpty else {
+                    // 无论是否重复，都用本页最老的一条推进游标
+                    var cursorAdvanced = false
+                    if let oldestFetched = fetched.filter({ $0.messageSeq > 0 }).min(by: { lhs, rhs in
+                        let lt = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+                        let rt = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+                        if lt != rt { return lt < rt }
+                        return lhs.messageSeq < rhs.messageSeq
+                    }) {
+                        let ts = Int(max(0, oldestFetched.timestamp / 1000))
+                        if ts < cursorTs || (ts == cursorTs && oldestFetched.messageSeq < cursorSeq) {
+                            self.historyCursorTs = ts
+                            self.historyCursorSeq = oldestFetched.messageSeq
+                            cursorAdvanced = true
+                        }
+                    }
+                    if !more || !cursorAdvanced {
                         self.hasMoreHistory = false
+                    }
+                    let older = fetched.filter { o in
+                        !self.messages.contains(where: { $0.messageID == o.messageID })
+                    }
+                    if older.isEmpty {
+                        // 整页重复但还有更早历史：立即继续向上翻，不中断
+                        if self.hasMoreHistory {
+                            self.loadOlderMessages()
+                        }
                         return
                     }
                     let oldHeight = self.tableView.contentSize.height
                     let oldOffset = self.tableView.contentOffset.y
-                    self.hasMoreHistory = more
                     self.messages = (older + self.messages).sorted { lhs, rhs in
                         let lTime = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
                         let rTime = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
@@ -1229,6 +1285,10 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     let newHeight = self.tableView.contentSize.height
                     self.tableView.contentOffset.y = max(0, oldOffset + (newHeight - oldHeight))
                     self.saveMessagesCacheDebounced()
+                    // 本页去重后很少但服务端标记还有更多：继续翻，避免"看起来没有历史"
+                    if older.count < 10, self.hasMoreHistory {
+                        self.loadOlderMessages()
+                    }
                 }
             } catch {
                 DispatchQueue.main.async { self.isLoadingOlder = false }
@@ -1715,6 +1775,7 @@ extension ChatViewController: ChatInputBarDelegate {
 
     func didTapLocationButton() {
         let vc = LocationPickerViewController()
+        vc.hidesBottomBarWhenPushed = true
         vc.onLocationSelected = { [weak self] location in
             self?.sendLocationMessage(location)
         }
@@ -2241,70 +2302,64 @@ extension ChatViewController: ChatInputBarDelegate {
     private func parseNoteMessage(_ content: String) -> NoteEntity? {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        // 1. 直接解码完整 JSON（安卓 note_json 或整体 JSON）
-        if let data = trimmed.data(using: .utf8) {
-            if let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
-                return note
+        guard let data = trimmed.data(using: .utf8) else { return nil }
+        let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        // 1. 安卓 WKNoteContent 原生线缆格式：noteId/noteTitle/noteContent/blockListJson(字符串)
+        //    必须最先判断——NoteEntity 容错解码永不失败，先 decode 会把安卓格式误判成空笔记
+        if let dict = dict, dict["noteTitle"] != nil || dict["blockListJson"] != nil || dict["noteId"] != nil {
+            var note = NoteEntity()
+            if let nid = dict["noteId"] as? String, !nid.isEmpty { note.id = nid }
+            note.title = dict["noteTitle"] as? String ?? ""
+            note.group = dict["noteGroup"] as? String ?? "普通笔记"
+            var blocks: [NoteBlock] = []
+            if let blJson = dict["blockListJson"] as? String, !blJson.isEmpty,
+               let bd = blJson.data(using: .utf8),
+               let arr = try? JSONSerialization.jsonObject(with: bd) as? [[String: Any]] {
+                for item in arr {
+                    let t = (item["type"] as? NSNumber)?.intValue ?? 2
+                    let content = item["content"] as? String ?? ""
+                    switch t {
+                    case 1:
+                        blocks.append(NoteBlock(type: .title, content: content))
+                    case 3:
+                        let img = item["imagePath"] as? String ?? ""
+                        blocks.append(NoteBlock(type: .image, imageURL: img.isEmpty ? nil : img))
+                    case 4:
+                        let video = item["videoPath"] as? String ?? ""
+                        blocks.append(NoteBlock(type: .video, videoURL: video.isEmpty ? nil : video))
+                    case 5:
+                        let lat = (item["latitude"] as? NSNumber)?.doubleValue ?? 0
+                        let lng = (item["longitude"] as? NSNumber)?.doubleValue ?? 0
+                        let locName = item["locationName"] as? String ?? ""
+                        let locAddr = item["locationAddress"] as? String ?? ""
+                        let addr = locAddr.isEmpty ? locName : "\(locName) \(locAddr)"
+                        blocks.append(NoteBlock(type: .location, content: locName,
+                                                location: NoteLocation(latitude: lat, longitude: lng, address: addr)))
+                    default:
+                        blocks.append(NoteBlock(type: .text, content: content))
+                    }
+                }
             }
-            // 2. 安卓可能把笔记包在 {"note_json": "..."} 或 {"note": {...}} 里
-            if let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-                if let nested = dict["note_json"] as? String, !nested.isEmpty,
-                   let nd = nested.data(using: .utf8),
-                   let note = try? JSONDecoder().decode(NoteEntity.self, from: nd) {
-                    return note
-                }
-                if let nestedDict = dict["note"] as? [String: Any],
-                   let nd = try? JSONSerialization.data(withJSONObject: nestedDict),
-                   let note = try? JSONDecoder().decode(NoteEntity.self, from: nd) {
-                    return note
-                }
-                // 2.5 安卓 WKNoteContent 原生格式：noteId/noteTitle/noteContent/blockListJson(字符串)
-                if dict["noteTitle"] != nil || dict["blockListJson"] != nil || dict["noteId"] != nil {
-                    var note = NoteEntity()
-                    if let nid = dict["noteId"] as? String, !nid.isEmpty { note.id = nid }
-                    note.title = dict["noteTitle"] as? String ?? ""
-                    note.group = dict["noteGroup"] as? String ?? "普通笔记"
-                    var blocks: [NoteBlock] = []
-                    if let blJson = dict["blockListJson"] as? String, !blJson.isEmpty,
-                       let bd = blJson.data(using: .utf8),
-                       let arr = try? JSONSerialization.jsonObject(with: bd) as? [[String: Any]] {
-                        for item in arr {
-                            let t = (item["type"] as? NSNumber)?.intValue ?? 2
-                            let content = item["content"] as? String ?? ""
-                            switch t {
-                            case 1:
-                                blocks.append(NoteBlock(type: .title, content: content))
-                            case 3:
-                                let img = item["imagePath"] as? String ?? ""
-                                blocks.append(NoteBlock(type: .image, imageURL: img.isEmpty ? nil : img))
-                            case 4:
-                                let video = item["videoPath"] as? String ?? ""
-                                blocks.append(NoteBlock(type: .video, videoURL: video.isEmpty ? nil : video))
-                            case 5:
-                                let lat = (item["latitude"] as? NSNumber)?.doubleValue ?? 0
-                                let lng = (item["longitude"] as? NSNumber)?.doubleValue ?? 0
-                                let locName = item["locationName"] as? String ?? ""
-                                let locAddr = item["locationAddress"] as? String ?? ""
-                                let addr = locAddr.isEmpty ? locName : "\(locName) \(locAddr)"
-                                blocks.append(NoteBlock(type: .location, content: locName,
-                                                        location: NoteLocation(latitude: lat, longitude: lng, address: addr)))
-                            default:
-                                blocks.append(NoteBlock(type: .text, content: content))
-                            }
-                        }
-                    }
-                    if blocks.isEmpty, let nc = dict["noteContent"] as? String, !nc.isEmpty {
-                        blocks = [NoteBlock(type: .text, content: nc)]
-                    }
-                    note.blocks = blocks
-                    return note
-                }
-                // 3. {"title":..., "content":...} 扁平结构（容错解码里已处理，再兜底一次）
-                if dict["title"] != nil || dict["content"] != nil || dict["blocks"] != nil {
-                    if let note = try? JSONDecoder().decode(NoteEntity.self, from: data) {
-                        return note
-                    }
-                }
+            if blocks.isEmpty, let nc = dict["noteContent"] as? String, !nc.isEmpty {
+                blocks = [NoteBlock(type: .text, content: nc)]
+            }
+            note.blocks = blocks
+            return note
+        }
+        // 2. iOS NoteEntity 整体 JSON
+        if let note = try? JSONDecoder().decode(NoteEntity.self, from: data),
+           !note.title.isEmpty || !note.blocks.isEmpty {
+            return note
+        }
+        // 3. 安卓可能把笔记包在 {"note_json": "..."} 或 {"note": {...}} 里
+        if let dict = dict {
+            if let nested = dict["note_json"] as? String, !nested.isEmpty {
+                return parseNoteMessage(nested)
+            }
+            if let nestedDict = dict["note"] as? [String: Any],
+               let nd = try? JSONSerialization.data(withJSONObject: nestedDict),
+               let ns = String(data: nd, encoding: .utf8) {
+                return parseNoteMessage(ns)
             }
         }
         return nil

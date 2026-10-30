@@ -55,6 +55,8 @@ class ConversationListViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
+        // 从聊天页/详情页返回时刷新一次，保证最后消息预览/时间与聊天内容一致
+        refreshFromLocal()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -626,15 +628,24 @@ class ConversationListViewController: UIViewController {
 
     private func setupIMObserver() {
         // 新消息：只从本地库刷新，不发网络请求（避免每条消息都触发一次服务端同步）
-        IMManager.shared.onMessageReceived = { [weak self] message in
-            guard let self = self else { return }
-            // 收到该会话的新消息时移出删除名单（对齐微信：有新消息会话重新出现）
-            if !message.isFromMe {
-                self.unmarkDeleted(channelId: message.channelID)
-            }
-            DispatchQueue.main.async {
-                self.refreshFromLocal()
-            }
+        // 注意：使用 NotificationCenter 而非 onMessageReceived 闭包——后者会被 ChatViewController 覆盖，
+        // 且聊天页销毁后 weak self 失效，导致会话列表不再刷新
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleIMMessageReceived(_:)),
+            name: IMManager.messageReceivedNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleIMMessageReceived(_ notification: Notification) {
+        guard let message = notification.object as? Message else { return }
+        // 收到该会话的新消息时移出删除名单（对齐微信：有新消息会话重新出现）
+        if !message.isFromMe {
+            unmarkDeleted(channelId: message.channelID)
+        }
+        DispatchQueue.main.async {
+            self.refreshFromLocal()
         }
     }
 
@@ -999,7 +1010,7 @@ class ConversationCell: UITableViewCell {
         return nil
     }
 
-    private static func makeIconAvatar(icon: String, bgHex: String, size: CGFloat = 96) -> UIImage {
+    static func makeIconAvatar(icon: String, bgHex: String, size: CGFloat = 96) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
         return renderer.image { ctx in
             UIColor.hex(bgHex).setFill()

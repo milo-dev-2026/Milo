@@ -87,9 +87,14 @@ final class SystemAccountProfileViewController: UIViewController {
         avatarImageView.layer.cornerRadius = 40
         avatarImageView.clipsToBounds = true
         avatarImageView.contentMode = .scaleAspectFill
-        avatarImageView.image = UIImage(systemName: account == .fileHelper ? "folder.fill" : "bell.fill")
-        avatarImageView.tintColor = .systemGray
-        avatarImageView.backgroundColor = .systemGray6
+        // 与会话列表头像保持一致：文件传输助手=绿色文件夹，系统通知=Milo Logo
+        switch account {
+        case .fileHelper:
+            avatarImageView.image = ConversationCell.makeIconAvatar(icon: "folder.fill", bgHex: "4CAF50")
+        case .systemNotice:
+            avatarImageView.image = UIImage(named: "LoginLogo")
+                ?? ConversationCell.makeIconAvatar(icon: "bell.fill", bgHex: "FFA940")
+        }
         headerCard.addSubview(avatarImageView)
         avatarImageView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(16)
