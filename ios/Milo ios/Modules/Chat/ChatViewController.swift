@@ -23,6 +23,10 @@ class ChatViewController: UIViewController {
     private var messages: [Message] = []
     /// 特殊群聊（西安修车大队/西安交流群等）：该群系统消息只显示"对方撤回了一条消息"等纯文案，不显示操作详情
     private var isSpecialGroup: Bool { SpecialUserUtils.isSpecialGroup(name: titleText) }
+    /// 特殊好友888（单聊）：昵称红色、徽章显示在在线状态行、只保留语音按钮
+    private var isSpecialSingleChat: Bool {
+        channelType == 1 && SpecialUserUtils.isSpecialUser(uid: channelId, shortNo: "", name: titleText)
+    }
     /// 历史消息分页状态（滑到顶部继续加载更早的记录）
     private var isLoadingOlder = false
     private var hasMoreHistory = true
@@ -540,7 +544,7 @@ class ChatViewController: UIViewController {
         onlineStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         // 特殊好友888：昵称红色，徽章放到"手机在线"那一行前面（安卓 subtitleView 中 specialBadgeLayout 在 subtitleTv 之前）
-        let isSpecialPeer = channelType == 1 && SpecialUserUtils.isSpecialUser(uid: channelId, shortNo: "", name: titleText)
+        let isSpecialPeer = isSpecialSingleChat
         if isSpecialPeer {
             navTitleLabel.textColor = SpecialUserUtils.specialUserNameColor
         }
@@ -626,7 +630,7 @@ class ChatViewController: UIViewController {
                 action: #selector(startVoiceCall)
             )
             callBtn.tintColor = .themePrimary
-            if isSpecialPeer {
+            if isSpecialSingleChat {
                 // 特殊好友888：昵称后的按钮只保留语音，删掉聊天信息页入口，确保长昵称完整显示
                 navigationItem.rightBarButtonItems = [callBtn]
             } else {
