@@ -94,12 +94,14 @@ class SearchAllViewController: UIViewController {
                             let content = m["content"] as? String ?? ""
                             let channel = m["channel"] as? [String: Any] ?? [:]
                             let channelId = channel["channel_id"] as? String ?? ""
+                            let channelType = channel["channel_type"] as? Int ?? 1
                             if !content.isEmpty {
                                 searchResults.append(SearchResultItem(
                                     type: .message,
                                     uid: channelId,
                                     name: channel["channel_name"] as? String,
-                                    content: content
+                                    content: content,
+                                    channelType: channelType
                                 ))
                             }
                         }
@@ -124,6 +126,7 @@ struct SearchResultItem {
     let uid: String
     let name: String?
     let content: String?
+    var channelType: Int = 1
 }
 
 extension SearchAllViewController: UITableViewDataSource, UITableViewDelegate {
@@ -164,10 +167,11 @@ extension SearchAllViewController: UITableViewDataSource, UITableViewDelegate {
             let detailVC = ContactDetailViewController(uid: item.uid)
 navigationController?.pushViewController(detailVC, animated: true)
         case .group:
-            let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "群聊")
+            // 群聊必须传 channelType=2，否则按单聊打开：群管理入口消失且消息同步不到记录
+            let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "群聊", channelType: 2)
 navigationController?.pushViewController(chatVC, animated: true)
         case .message:
-            let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "聊天")
+            let chatVC = ChatViewController(channelId: item.uid, title: item.name ?? "聊天", channelType: item.channelType)
 navigationController?.pushViewController(chatVC, animated: true)
         }
     }

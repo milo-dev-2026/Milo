@@ -220,7 +220,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
         if let channelId = userInfo["channel_id"] as? String {
             let title = (userInfo["channel_name"] as? String) ?? "聊天"
-            let chatVC = ChatViewController(channelId: channelId, title: title)
+            let channelType = (userInfo["channel_type"] as? Int) ?? 1
+            let chatVC = ChatViewController(channelId: channelId, title: title, channelType: channelType)
             if let nav = window?.rootViewController as? UINavigationController {
                 nav.pushViewController(chatVC, animated: true)
             } else if let tab = window?.rootViewController as? UITabBarController,
