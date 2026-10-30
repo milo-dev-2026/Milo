@@ -18,7 +18,7 @@ enum APIRouter: URLRequestConvertible {
     case searchGroupMembers(keyword: String, groupId: String)
     case searchUser(keyword: String, page: Int, pageSize: Int)
     case syncConversations
-    case syncChannelMessages(channelId: String, channelType: Int, startMessageSeq: Int, limit: Int)
+    case syncChannelMessages(channelId: String, channelType: Int, startMessageSeq: Int, limit: Int, startTimestamp: Int)
     case sendTextMessage(channelId: String, content: String, channelType: Int)
     case sendMessage(channelId: String, content: String, type: Int, channelType: Int)
     case deleteMessage(messageId: String)
@@ -168,9 +168,9 @@ enum APIRouter: URLRequestConvertible {
                 "version": 0,
                 "device_uuid": deviceUUID
             ])
-        case let .syncChannelMessages(channelId, channelType, startMessageSeq, limit):
+        case let .syncChannelMessages(channelId, channelType, startMessageSeq, limit, startTimestamp):
             let deviceUUID = UIDevice.current.identifierForVendor?.uuidString ?? ""
-            request.httpBody = try JSONSerialization.data(withJSONObject: [
+            var body: [String: Any] = [
                 "channel_id": channelId,
                 "channel_type": channelType,
                 "start_message_seq": startMessageSeq,
@@ -178,7 +178,12 @@ enum APIRouter: URLRequestConvertible {
                 "limit": limit,
                 "pull_mode": 0,
                 "device_uuid": deviceUUID
-            ])
+            ]
+            // 时间游标翻页：历史数据存在 message_seq 冲突，仅按 seq 分页会漏消息
+            if startTimestamp > 0 {
+                body["start_timestamp"] = startTimestamp
+            }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
         case let .sendTextMessage(channelId, content, channelType):
             let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
             let payloadJson = try JSONSerialization.data(withJSONObject: ["type": 1, "content": content])

@@ -31,6 +31,14 @@ class LocationPickerViewController: UIViewController {
     /// 当前定位是否已取得过真实位置
     private var hasLocated = false
 
+    // MARK: - 地址搜索（对齐安卓 SearchLocationActivity：顶部搜索框 + 关键词搜索结果列表）
+    private let searchBar = UISearchBar()
+    private var searchResults: [AMapPOI] = []
+    private var isSearching = false
+    /// 当前城市（用于限定关键词搜索范围，取自逆地理结果）
+    private var currentCity = ""
+    private var searchWorkItem: DispatchWorkItem?
+
     var onLocationSelected: ((PickedLocation) -> Void)?
 
     override func viewDidLoad() {
@@ -71,6 +79,23 @@ class LocationPickerViewController: UIViewController {
     private func setupUI() {
         title = "发送位置"
         view.backgroundColor = .systemBackground
+
+        // 顶部地址搜索框：可搜索其它地点并选点发送（之前缺失该入口，只能拖地图选周围位置）
+        searchBar.placeholder = "搜索地点"
+        searchBar.showsCancelButton = false
+        searchBar.delegate = self
+        searchBar.searchBarStyle = .minimal
+        searchBar.backgroundImage = UIImage()
+        searchBar.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        searchBar.layer.masksToBounds = true
+        searchBar.backgroundColor = .systemBackground
+        view.addSubview(searchBar)
+        searchBar.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide.snp.top).offset(ScreenAdapter.scaleH(6))
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(12))
+            make.height.equalTo(ScreenAdapter.scaleH(44))
+        }
 
         // 底部面板：POI列表 + 发送按钮
         let panel = UIView()
@@ -214,13 +239,58 @@ class LocationPickerViewController: UIViewController {
         searchAPI?.aMapReGoecodeSearch(request)
     }
 
+    /// 关键词搜索地点（对齐安卓 SearchLocationActivity 的 POI 关键字搜索）
+    private func searchPOIByKeyword(_ keyword: String) {
+        let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !kw.isEmpty else {
+            // 清空关键词：回到"周边推荐"列表
+            isSearching = false
+            searchResults = []
+            selectedIndex = 0
+            poiTableView.reloadData()
+            if let coord = currentCoord { searchNearbyPOI(coord: coord) }
+            return
+        }
+        isSearching = true
+        let request = AMapPOIKeywordsSearchRequest()
+        request.keywords = kw
+        if !currentCity.isEmpty {
+            request.city = currentCity
+            request.cityLimit = true
+        }
+        request.offset = 30
+        request.page = 1
+        request.requireExtension = true
+        searchAPI?.aMapPOIKeywordsSearch(request)
+    }
+
+    /// 退出搜索态，恢复周边列表
+    private func exitSearchMode() {
+        searchWorkItem?.cancel()
+        isSearching = false
+        searchResults = []
+        selectedIndex = 0
+        searchBar.text = ""
+        searchBar.resignFirstResponder()
+        poiTableView.reloadData()
+        if let coord = currentCoord { searchNearbyPOI(coord: coord) }
+    }
+
     // MARK: - 发送
     @objc private func sendLocation() {
         var name = myLocationTitle
         var address = myLocationAddress
         var coord = currentCoord
 
-        if selectedIndex > 0, pois.count > selectedIndex - 1 {
+        if isSearching {
+            // 搜索态：列表即搜索结果
+            if searchResults.count > selectedIndex, selectedIndex >= 0 {
+                let poi = searchResults[selectedIndex]
+                name = (poi.name?.isEmpty == false ? poi.name! : (poi.address ?? "所选位置"))
+                address = poi.address ?? ""
+                coord = CLLocationCoordinate2D(latitude: poi.location.latitude, longitude: poi.location.longitude)
+            }
+        } else if selectedIndex > 0, pois.count > selectedIndex - 1 {
             let poi = pois[selectedIndex - 1]
             name = (poi.name?.isEmpty == false ? poi.name! : (poi.address ?? "所选位置"))
             address = poi.address ?? ""
@@ -250,8 +320,8 @@ class LocationPickerViewController: UIViewController {
 extension LocationPickerViewController: MAMapViewDelegate {
 
     func mapView(_ mapView: MAMapView!, regionDidChangeAnimated animated: Bool) {
-        // 用户拖动地图后：以新中心点搜索周边POI（程序性移动不触发）
-        guard !isProgrammaticMove else { return }
+        // 用户拖动地图后：以新中心点搜索周边POI（程序性移动/搜索态下不触发）
+        guard !isProgrammaticMove, !isSearching else { return }
         let center = mapView.centerCoordinate
         // 过滤无效的初始坐标(0,0)
         guard abs(center.latitude) > 0.01 || abs(center.longitude) > 0.01 else { return }
@@ -285,6 +355,17 @@ extension LocationPickerViewController: AMapSearchDelegate {
 
     func onPOISearchDone(_ request: AMapPOISearchBaseRequest!, response: AMapPOISearchResponse!) {
         let result = response.pois ?? []
+        if request is AMapPOIKeywordsSearchRequest {
+            // 关键词搜索：列表展示搜索结果，默认选中第一条，用户可点选其它条目
+            searchResults = result
+            isSearching = true
+            selectedIndex = result.isEmpty ? -1 : 0
+            poiTableView.reloadData()
+            if result.isEmpty {
+                AppUtility.showToast("没有找到该地点，换个关键词试试")
+            }
+            return
+        }
         pois = result
         // 对齐安卓：搜索到结果后默认选中第一条（下标1，0为"我的位置"）
         if !result.isEmpty {
@@ -294,6 +375,9 @@ extension LocationPickerViewController: AMapSearchDelegate {
     }
 
     func onReGeocodeSearchDone(_ request: AMapReGeocodeSearchRequest!, response: AMapReGeocodeSearchResponse!) {
+        if let city = response.regeocode?.city, !city.isEmpty {
+            currentCity = city
+        }
         if let addr = response.regeocode?.formattedAddress, !addr.isEmpty {
             myLocationAddress = addr
             if myLocationTitle == "我的位置" || myLocationTitle.isEmpty {
@@ -313,14 +397,25 @@ extension LocationPickerViewController: AMapSearchDelegate {
 extension LocationPickerViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if isSearching {
+            return searchResults.count
+        }
         return pois.count + 1 // 第0行固定为"我的位置"
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "POICell", for: indexPath) as! LocationPOICell
+        if isSearching {
+            guard indexPath.row < searchResults.count else { return cell }
+            let poi = searchResults[indexPath.row]
+            let name = (poi.name?.isEmpty == false ? poi.name! : "未知位置")
+            cell.configure(name: name, address: poi.address ?? "", selected: selectedIndex == indexPath.row)
+            return cell
+        }
         if indexPath.row == 0 {
             cell.configure(name: myLocationTitle, address: myLocationAddress, selected: selectedIndex == 0)
         } else {
+            guard indexPath.row - 1 < pois.count else { return cell }
             let poi = pois[indexPath.row - 1]
             let name = (poi.name?.isEmpty == false ? poi.name! : "未知位置")
             cell.configure(name: name, address: poi.address ?? "", selected: selectedIndex == indexPath.row)
@@ -330,6 +425,24 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        if isSearching {
+            guard indexPath.row < searchResults.count else { return }
+            let poi = searchResults[indexPath.row]
+            selectedIndex = indexPath.row
+            let coord = CLLocationCoordinate2D(latitude: poi.location.latitude, longitude: poi.location.longitude)
+            currentCoord = coord
+            myLocationTitle = (poi.name?.isEmpty == false ? poi.name! : "所选位置")
+            myLocationAddress = poi.address ?? ""
+            searchBar.resignFirstResponder()
+            isProgrammaticMove = true
+            mapView.setCenter(coord, animated: true)
+            mapView.setZoomLevel(17, animated: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.isProgrammaticMove = false
+            }
+            tableView.reloadData()
+            return
+        }
         selectedIndex = indexPath.row
         tableView.reloadData()
         if indexPath.row > 0 {
@@ -348,6 +461,30 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
                 self?.isProgrammaticMove = false
             }
         }
+    }
+}
+
+// MARK: - UISearchBarDelegate（地址搜索）
+extension LocationPickerViewController: UISearchBarDelegate {
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        // 输入防抖 0.4 秒，避免每次按键都请求
+        searchWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.searchPOIByKeyword(searchText)
+        }
+        searchWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
+        searchWorkItem?.cancel()
+        searchPOIByKeyword(searchBar.text ?? "")
+    }
+
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        exitSearchMode()
     }
 }
 

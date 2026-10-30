@@ -158,11 +158,15 @@ class NoteMessageCell: UITableViewCell {
 
         let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
         bubbleView.backgroundColor = fillColor
+        // 气泡高度与笔记卡片一致（卡片 72 + 上下各 8 内边距），
+        // 之前未显式指定高度，卡片被压缩导致标题/摘要显示不全
+        let cardHeight = ScreenAdapter.scaleH(72)
         ChatBubbleLayout.install(
             bubble: bubbleView,
             tail: tailView,
             isFromMe: isFromMe,
             width: ScreenAdapter.screenWidth * 0.72,
+            height: cardHeight + 16,
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
             groupedBelow: groupedBelow,
@@ -171,10 +175,11 @@ class NoteMessageCell: UITableViewCell {
             status: message.isFromMe ? message.status : nil
         )
 
+        noteTitleLabel.lineBreakMode = .byTruncatingTail
         // 笔记容器布局
         noteContainer.snp.remakeConstraints { make in
             make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))
-            make.height.equalTo(ScreenAdapter.scaleH(72))
+            make.height.equalTo(cardHeight)
         }
     }
 }

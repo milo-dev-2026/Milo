@@ -12428,223 +12428,65 @@ def _send_msg_cmd(channel_id, channel_type, cmd_action, param_dict):
 
 
 def _insert_system_message(channel_id, from_uid, payload_dict):
-
-
-
-    """
-
-
-
-    直接向数据库插入一条系统消息，确保群成员能看到通知
-
-
-
+    """直接向数据库插入一条系统消息，确保群成员能看到通知
     payload_dict 应包含 type, content, extra, data 等字段
-
-
-
     """
-
-
-
     import json
-
-
-
     import time
-
-
-
     import pymysql
 
-
-
-
-
-
-
     conn = pymysql.connect(
-
-
-
         host=Config.MYSQL_HOST, port=Config.MYSQL_PORT,
-
-
-
         user=Config.MYSQL_USER, password=Config.MYSQL_PASSWORD,
-
-
-
         database=Config.MYSQL_DATABASE, charset='utf8mb4',
-
-
-
         cursorclass=pymysql.cursors.DictCursor
-
-
-
     )
-
-
-
     try:
-
-
-
         with conn.cursor() as cursor:
-
-
-
-            # 获取当前最大message_seq
-
-
-
-            cursor.execute(
-
-
-
-                "SELECT MAX(message_seq) as max_seq FROM message WHERE channel_id=%s AND channel_type=2",
-
-
-
-                (channel_id,)
-
-
-
-            )
-
-
-
-            row = cursor.fetchone()
-
-
-
-            max_seq = row['max_seq'] if row and row['max_seq'] else 0
-
-
-
+            # seq 必须取所有分表的最大值 +1：之前只取 message 单表，
+            # 与 WuKongIM 写入其它分表（message1~4）的消息 seq 冲突，
+            # 客户端按 seq 同步时同 seq 消息会被丢弃
+            max_seq = 0
+            for tbl in ('message', 'message1', 'message2', 'message3', 'message4'):
+                try:
+                    cursor.execute(
+                        "SELECT MAX(message_seq) AS m FROM `%s` WHERE channel_id=%%s AND channel_type=2" % tbl,
+                        (channel_id,)
+                    )
+                    row = cursor.fetchone()
+                    if row and row.get('m'):
+                        max_seq = max(max_seq, int(row['m']))
+                except Exception:
+                    continue
             new_seq = max_seq + 1
 
-
-
-
-
-
-
-            # 生成message_id (时间戳+序号形式)
-
-
-
+            # 时间戳使用秒级，与 IM 消息保持一致（毫秒值会让客户端时间显示与排序错乱）
             timestamp = int(time.time())
-
-
-
-            message_id = f"{int(time.time() * 1000)}{new_seq:03d}"
-
-
-
-
-
-
+            message_id = "%d%03d" % (int(time.time() * 1000), new_seq)
 
             payload_json = json.dumps(payload_dict, ensure_ascii=False)
 
-
-
-
-
-
-
-            # 插入消息（signal/setting/timestamp 是 MySQL 保留字，需用反引号）
-
-
-
+            # signal/setting/timestamp 是 MySQL 保留字，需用反引号
             cursor.execute(
-
-
-
                 "INSERT INTO message (message_id, message_seq, client_msg_no, header, `setting`, `signal`, "
-
-
-
                 "from_uid, channel_id, channel_type, `timestamp`, payload, is_deleted, voice_status) "
-
-
-
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0)",
-
-
-
                 (message_id, new_seq, '', '', 0, 0,
-
-
-
                  from_uid, channel_id, 2, timestamp, payload_json)
-
-
-
             )
-
-
-
             conn.commit()
 
-
-
-
-
-
-
-            # 更新channel_offset
-
-
-
+            # 更新频道读游标（保持原有行为）
             cursor.execute(
-
-
-
-                "INSERT INTO channel_offset (channel_id, channel_type, message_seq) VALUES (%s, 2, %s) "
-
-
-
+                "INSERT INTO channel_offset (uid, channel_id, channel_type, message_seq) VALUES ('', %s, 2, %s) "
                 "ON DUPLICATE KEY UPDATE message_seq = GREATEST(message_seq, %s)",
-
-
-
                 (channel_id, new_seq, new_seq)
-
-
-
             )
-
-
-
             conn.commit()
-
-
-
-
-
-
 
             return message_id
-
-
-
     finally:
-
-
-
         conn.close()
-
-
-
-
-
-
-
-
-
 
 
 @app.route('/v1/groups/<group_no>/disband', methods=['POST'])
@@ -16053,6 +15895,17 @@ def proxy_channel_info(channel_id, channel_type):
 
             data = resp.json()
 
+            # 群主/管理员角色：TangSeng 只在 extra 里返回 role，客户端读顶层 role 会拿不到，顶层补一份
+            try:
+                _extra = data.get('extra')
+                if isinstance(_extra, str) and _extra:
+                    _extra = json.loads(_extra)
+                    data['extra'] = _extra
+                if isinstance(_extra, dict) and _extra.get('role') is not None and data.get('role') is None:
+                    data['role'] = _extra.get('role')
+            except Exception:
+                pass
+
 
 
             uid = get_current_uid()
@@ -18699,7 +18552,7 @@ def gen_trtc_user_sig(sdk_app_id, secret_key, user_id, expire=86400):
 
 
 
-        f"TLS.appid:{sdk_app_id}\n"
+        f"TLS.sdkappid:{sdk_app_id}\n"
 
 
 
@@ -20056,10 +19909,7 @@ def message_extra_sync():
 
 @app.route('/v1/message/channel/sync', methods=['POST'])
 def message_channel_sync():
-    """
-    频道消息同步接口
-    拉取指定频道的历史消息（遍历所有分表，确保消息完整）
-    """
+    """频道消息同步接口（遍历全部分表拉取历史消息，保证记录完整）"""
     uid = get_current_uid()
     if not uid:
         return make_error("登录已过期，请重新登录", 401)
@@ -20072,7 +19922,6 @@ def message_channel_sync():
         end_message_seq = data.get("end_message_seq", 0)
         limit = data.get("limit", 50)
         pull_mode = data.get("pull_mode", 0)
-        device_uuid = data.get("device_uuid", "")
 
         if not channel_id:
             return jsonify({
@@ -20083,7 +19932,6 @@ def message_channel_sync():
                 "messages": []
             })
 
-        # 限制最大数量
         try:
             limit = int(limit)
         except (ValueError, TypeError):
@@ -20097,6 +19945,17 @@ def message_channel_sync():
         except (ValueError, TypeError):
             start_message_seq = 0
 
+        # 可选：以时间戳游标翻页（客户端向上翻历史时传入）。
+        # 由于历史数据里存在 message_seq 冲突（群系统消息与 IM 消息同 seq），
+        # 仅靠 seq 分页会漏消息，用 (时间, seq) 组合游标可以逐条不漏地往前翻
+        start_timestamp = data.get("start_timestamp", 0)
+        try:
+            start_timestamp = int(start_timestamp)
+        except (ValueError, TypeError):
+            start_timestamp = 0
+        if start_timestamp > 100000000000:
+            start_timestamp = start_timestamp // 1000
+
         try:
             channel_type = int(channel_type)
         except (ValueError, TypeError):
@@ -20109,20 +19968,16 @@ def message_channel_sync():
             cursorclass=pymysql.cursors.DictCursor
         )
 
+        tables = ['message', 'message1', 'message2', 'message3', 'message4']
+        all_messages = []
+        # start_message_seq <= 0 表示客户端首次加载，返回最新消息
+        from_latest = start_message_seq <= 0
+
         try:
-            all_messages = []
-
-            # 查询所有分表
-            tables = ['message', 'message1', 'message2', 'message3', 'message4']
-
-            # start_message_seq <= 0 表示客户端首次加载，需要返回最新的消息
-            from_latest = start_message_seq <= 0
-
             for table in tables:
                 try:
                     with conn.cursor() as cursor:
                         if from_latest:
-                            # 首次加载：取该表最新的 limit+1 条消息
                             sql = """
                                 SELECT message_id, message_seq, client_msg_no, from_uid,
                                        channel_id, channel_type, timestamp, payload,
@@ -20133,9 +19988,30 @@ def message_channel_sync():
                                 ORDER BY message_seq DESC
                                 LIMIT %%s
                             """ % table
-                            cursor.execute(sql, (channel_id, channel_type, limit + 1))
+                            cursor.execute(sql, (channel_id, channel_type, limit + 2))
+                        elif start_timestamp > 0 and pull_mode != 1:
+                            # 时间游标翻页（更新方向仍用 seq）：取比游标更早的消息
+                            sql = """
+                                SELECT message_id, message_seq, client_msg_no, from_uid,
+                                       channel_id, channel_type, timestamp, payload,
+                                       header, setting, voice_status,
+                                       (CASE WHEN `timestamp` > 100000000000
+                                             THEN `timestamp` / 1000 ELSE `timestamp` END) AS ts_sec
+                                FROM %s
+                                WHERE channel_id = %%s AND channel_type = %%s
+                                  AND is_deleted = 0
+                                  AND ((CASE WHEN `timestamp` > 100000000000
+                                             THEN `timestamp` / 1000 ELSE `timestamp` END) < %%s
+                                       OR ((CASE WHEN `timestamp` > 100000000000
+                                             THEN `timestamp` / 1000 ELSE `timestamp` END) = %%s
+                                           AND message_seq < %%s))
+                                ORDER BY ts_sec DESC, message_seq DESC
+                                LIMIT %%s
+                            """ % table
+                            cursor.execute(sql, (channel_id, channel_type,
+                                                 start_timestamp, start_timestamp,
+                                                 start_message_seq, limit + 2))
                         elif pull_mode == 1:
-                            # 向上拉取：获取比 start_message_seq 大的消息（更新的消息）
                             sql = """
                                 SELECT message_id, message_seq, client_msg_no, from_uid,
                                        channel_id, channel_type, timestamp, payload,
@@ -20147,9 +20023,8 @@ def message_channel_sync():
                                 ORDER BY message_seq ASC
                                 LIMIT %%s
                             """ % table
-                            cursor.execute(sql, (channel_id, channel_type, start_message_seq, limit + 1))
+                            cursor.execute(sql, (channel_id, channel_type, start_message_seq, limit + 2))
                         else:
-                            # 向下拉取：获取比 start_message_seq 小的消息（更早的消息）
                             sql = """
                                 SELECT message_id, message_seq, client_msg_no, from_uid,
                                        channel_id, channel_type, timestamp, payload,
@@ -20161,7 +20036,7 @@ def message_channel_sync():
                                 ORDER BY message_seq DESC
                                 LIMIT %%s
                             """ % table
-                            cursor.execute(sql, (channel_id, channel_type, start_message_seq, limit + 1))
+                            cursor.execute(sql, (channel_id, channel_type, start_message_seq, limit + 2))
 
                         rows = cursor.fetchall()
                         if rows:
@@ -20170,54 +20045,71 @@ def message_channel_sync():
                     # 表不存在或查询失败，跳过
                     continue
 
-            # 合并去重（按message_seq）
+            def _ts_seconds(value):
+                """历史数据存在秒/毫秒混用，统一归一到秒级时间戳"""
+                try:
+                    v = int(value)
+                except (TypeError, ValueError):
+                    return 0
+                if v > 100000000000:
+                    v = v // 1000
+                return v
+
+            # 关键修复：去重键必须用 message_id。
+            # 之前按 message_seq 去重，而群系统消息与 IM 消息会产生相同 seq，
+            # 结果是同 seq 的消息被直接丢弃（客户端表现为"聊天记录缺失/顺序错乱"）
             msg_map = {}
             for msg in all_messages:
-                seq = msg['message_seq']
-                if seq not in msg_map:
-                    msg_map[seq] = msg
+                mid = str(msg.get('message_id') or '')
+                key = mid if mid else "%s|%s|%s" % (
+                    msg.get('from_uid'), msg.get('timestamp'), msg.get('message_seq'))
+                if key in msg_map:
+                    continue
+                msg['_ts'] = _ts_seconds(msg.get('timestamp'))
+                msg_map[key] = msg
 
-            sorted_msgs = sorted(msg_map.values(), key=lambda x: x['message_seq'])
+            sorted_msgs = sorted(msg_map.values(), key=lambda x: (x['_ts'], x['message_seq']))
 
-            more_rows = len(sorted_msgs) > limit
-
-            # 根据pull_mode截取
             if pull_mode == 1 and not from_latest:
-                # 向上拉取（更新的消息）：按升序，取前limit条
                 result_msgs = sorted_msgs[:limit]
             else:
-                # 向下拉取（更早的消息）/ 首次加载：按升序，取最后limit条（最大的那些，即最新的）
-                if len(sorted_msgs) > limit:
-                    result_msgs = sorted_msgs[-limit:]
-                else:
-                    result_msgs = sorted_msgs
+                result_msgs = sorted_msgs[-limit:] if len(sorted_msgs) > limit else sorted_msgs
 
-            # 判断是否还有更多：按拉取方向探测是否还存在更早/更新的消息
-            has_more = more_rows
+            # 是否还有更多：按拉取方向探测
+            has_more = len(sorted_msgs) > limit
             if not has_more and result_msgs:
-                if pull_mode == 1 and not from_latest:
+                use_time_cursor = (start_timestamp > 0 and pull_mode != 1 and not from_latest)
+                if use_time_cursor:
+                    probe_ts = result_msgs[0]['_ts']
+                    probe_seq = result_msgs[0]['message_seq']
+                    probe_sql = ("SELECT 1 FROM %s WHERE channel_id = %%s AND channel_type = %%s "
+                                 "AND is_deleted = 0 AND ((CASE WHEN `timestamp` > 100000000000 "
+                                 "THEN `timestamp` / 1000 ELSE `timestamp` END) < %%s OR "
+                                 "(CASE WHEN `timestamp` > 100000000000 THEN `timestamp` / 1000 "
+                                 "ELSE `timestamp` END) = %%s AND message_seq < %%s) LIMIT 1")
+                    probe_args_base = (channel_id, channel_type, probe_ts, probe_ts, probe_seq)
+                elif pull_mode == 1 and not from_latest:
                     probe_seq = result_msgs[-1]['message_seq']
-                    probe_op = '>'
+                    probe_sql = ("SELECT 1 FROM %s WHERE channel_id = %%s AND channel_type = %%s "
+                                 "AND is_deleted = 0 AND message_seq > %%s LIMIT 1")
+                    probe_args_base = (channel_id, channel_type, probe_seq)
                 else:
                     probe_seq = result_msgs[0]['message_seq']
-                    probe_op = '<'
+                    probe_sql = ("SELECT 1 FROM %s WHERE channel_id = %%s AND channel_type = %%s "
+                                 "AND is_deleted = 0 AND message_seq < %%s LIMIT 1")
+                    probe_args_base = (channel_id, channel_type, probe_seq)
                 for table in tables:
                     try:
                         with conn.cursor() as cursor:
-                            cursor.execute(
-                                "SELECT 1 FROM %s WHERE channel_id = %%s AND channel_type = %%s "
-                                "AND is_deleted = 0 AND message_seq %s %%s LIMIT 1" % (table, probe_op),
-                                (channel_id, channel_type, probe_seq))
+                            cursor.execute(probe_sql % table, probe_args_base)
                             if cursor.fetchone():
                                 has_more = True
                                 break
                     except Exception:
                         continue
 
-            # 转换为SDK期望的格式
             formatted_msgs = []
             for msg in result_msgs:
-                # 处理payload (blob -> dict)
                 payload = msg.get('payload')
                 if payload:
                     if isinstance(payload, bytes):
@@ -20231,7 +20123,6 @@ def message_channel_sync():
                 else:
                     payload_obj = {}
 
-                # 处理header
                 header_str = msg.get('header', '')
                 if header_str:
                     try:
@@ -20244,7 +20135,7 @@ def message_channel_sync():
                 msg_id = msg.get('message_id', 0)
                 msg_id_str = str(msg_id) if msg_id else ""
 
-                formatted_msg = {
+                formatted_msgs.append({
                     "header": header_obj,
                     "setting": msg.get('setting', 0),
                     "message_id": msg_id,
@@ -20254,16 +20145,13 @@ def message_channel_sync():
                     "from_uid": msg.get('from_uid', ''),
                     "channel_id": msg.get('channel_id', ''),
                     "channel_type": msg.get('channel_type', 0),
-                    "timestamp": msg.get('timestamp', 0),
+                    # 统一输出秒级时间戳，避免客户端毫秒/秒混算出排序与时间显示异常
+                    "timestamp": msg.get('_ts', 0),
                     "payload": payload_obj,
                     "voice_status": msg.get('voice_status', 0)
-                }
-                formatted_msgs.append(formatted_msg)
+                })
 
-            # 如果是向下拉取，SDK期望消息按seq升序排列（旧的在前）
-            # 我们的result_msgs已经是升序了
-
-            result = {
+            return jsonify({
                 "start_message_seq": start_message_seq,
                 "end_message_seq": end_message_seq,
                 "min_message_seq": formatted_msgs[0]["message_seq"] if formatted_msgs else 0,
@@ -20271,9 +20159,7 @@ def message_channel_sync():
                 "pull_mode": pull_mode,
                 "more": 1 if has_more else 0,
                 "messages": formatted_msgs
-            }
-
-            return jsonify(result)
+            })
 
         finally:
             conn.close()
@@ -20282,6 +20168,8 @@ def message_channel_sync():
         import traceback
         traceback.print_exc()
         return make_error(f"同步消息失败: {str(e)}", 500)
+
+
 @app.route('/v1/messages/search', methods=['POST'])
 
 

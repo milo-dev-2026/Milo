@@ -601,7 +601,17 @@ class ChatViewController: UIViewController {
                     )
                     // 群聊：根据角色控制右上角"三横"管理入口（仅群主/管理员可见）
                     if self.channelType == 2 {
-                        self.myGroupRole = channelInfo.role ?? 0
+                        // 线上 /v1/channels/{id}/2 不返回顶层 role，角色放在 extra 里（extra.role=1 群主/2 管理员）
+                        // 之前只读顶层 role 恒为 nil，导致群主永远看不到管理入口
+                        var role = channelInfo.role ?? 0
+                        if role == 0, let extra = channelInfo.extra?["role"]?.value {
+                            if let intRole = extra as? Int {
+                                role = intRole
+                            } else if let strRole = extra as? String, let parsed = Int(strRole) {
+                                role = parsed
+                            }
+                        }
+                        self.myGroupRole = role
                         self.updateGroupRightBarButton()
                         // 频道信息未返回 role 时（部分群频道响应不带该字段），
                         // 回退到群成员列表查当前用户角色，避免群主/管理员看不到管理入口
@@ -944,11 +954,13 @@ class ChatViewController: UIViewController {
         }
         let base = merge ? messages : []
         for local in base {
-            // 同方向同类型同内容 60 秒内视为同一条（本地 ID 与服务端 ID 不同）
+            // 本地消息 ID 与服务端 ID 相同时视为同一条；发送中的占位消息 ID 为 UUID，
+            // 用"同方向同类型同内容 5 秒内"兜底去重（窗口过大会把用户真实重复发送的消息吞掉）
             let duplicated = result.contains { r in
                 r.messageID == local.messageID ||
+                (r.messageID.isEmpty && local.messageID.isEmpty) ||
                 (r.isFromMe == local.isFromMe && r.type == local.type &&
-                 r.content == local.content && abs(r.timestamp - local.timestamp) < 60_000)
+                 r.content == local.content && abs(r.timestamp - local.timestamp) < 5_000)
             }
             if !duplicated { result.append(local) }
         }
@@ -957,11 +969,15 @@ class ChatViewController: UIViewController {
                 result.append(local)
             }
         }
+        // 以时间为主要排序键：服务端历史中存在 message_seq 重复（后端的系统消息与 IM 消息 seq 冲突），
+        // 仅按 seq 排序会让顺序错乱；seq 只作为同一秒内的稳定次序
         result.sort { lhs, rhs in
+            let lTime = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+            let rTime = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+            if lTime != rTime { return lTime < rTime }
             let lSeq = lhs.messageSeq == 0 ? Int.max : lhs.messageSeq
             let rSeq = rhs.messageSeq == 0 ? Int.max : rhs.messageSeq
-            if lSeq != rSeq { return lSeq < rSeq }
-            return lhs.timestamp < rhs.timestamp
+            return lSeq < rSeq
         }
         messages = result
         tableView.reloadData()
@@ -978,7 +994,7 @@ class ChatViewController: UIViewController {
         Task {
             do {
                 let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
-                    .syncChannelMessages(channelId: channelId, channelType: self.channelType, startMessageSeq: 0, limit: 50)
+                    .syncChannelMessages(channelId: channelId, channelType: self.channelType, startMessageSeq: 0, limit: 50, startTimestamp: 0)
                 )
                 DispatchQueue.main.async {
                     if let msgs = response.messages {
@@ -1166,32 +1182,48 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     /// 向上翻页：按最早一条的 seq 继续拉取服务端历史
     private func loadOlderMessages() {
         guard !isLoadingOlder, hasMoreHistory else { return }
-        guard let oldestSeq = messages.first(where: { $0.messageSeq > 1 })?.messageSeq else {
+        // 取当前已加载消息里最早的一条（时间, seq）作为翻页游标：
+        // 历史数据存在 seq 冲突，只用 seq 分页会漏消息，所以同时传时间戳做组合游标
+        let oldest = messages
+            .filter { $0.messageSeq > 0 }
+            .min { lhs, rhs in
+                let lt = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+                let rt = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+                if lt != rt { return lt < rt }
+                return lhs.messageSeq < rhs.messageSeq
+            }
+        guard let oldestMsg = oldest, oldestMsg.messageSeq > 0 else {
             hasMoreHistory = false
             return
         }
+        let oldestSeq = oldestMsg.messageSeq
+        let oldestTs = Int(max(0, oldestMsg.timestamp / 1000))
         isLoadingOlder = true
         Task {
             do {
                 let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
                     .syncChannelMessages(channelId: channelId, channelType: channelType,
-                                         startMessageSeq: oldestSeq, limit: 30)
+                                         startMessageSeq: oldestSeq, limit: 30, startTimestamp: oldestTs)
                 )
                 DispatchQueue.main.async {
                     self.isLoadingOlder = false
                     let older = (response.messages ?? []).map { Message(from: $0) }
                         .filter { o in !self.messages.contains(where: { $0.messageID == o.messageID }) }
+                    let more = (response.more ?? 0) != 0
                     guard !older.isEmpty else {
                         self.hasMoreHistory = false
                         return
                     }
                     let oldHeight = self.tableView.contentSize.height
                     let oldOffset = self.tableView.contentOffset.y
+                    self.hasMoreHistory = more
                     self.messages = (older + self.messages).sorted { lhs, rhs in
+                        let lTime = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+                        let rTime = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+                        if lTime != rTime { return lTime < rTime }
                         let lSeq = lhs.messageSeq == 0 ? Int.max : lhs.messageSeq
                         let rSeq = rhs.messageSeq == 0 ? Int.max : rhs.messageSeq
-                        if lSeq != rSeq { return lSeq < rSeq }
-                        return lhs.timestamp < rhs.timestamp
+                        return lSeq < rSeq
                     }
                     self.tableView.reloadData()
                     let newHeight = self.tableView.contentSize.height
@@ -2180,17 +2212,23 @@ extension ChatViewController: ChatInputBarDelegate {
             noteJSON: noteString,
             channelType: channelType
         )
+        // 发送结果立即回写状态：之前固定为"发送中"(0)，SDK 回执又无法按 UUID 匹配，
+        // 导致笔记气泡一直转圈、看起来"发不出去"
+        let sdkMessageID = sentWK.map { String($0.messageId) } ?? ""
         let msg = Message(
-            messageID: UUID().uuidString,
+            messageID: sdkMessageID.isEmpty ? UUID().uuidString : sdkMessageID,
             channelID: channelId,
             channelType: self.channelType,
             fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
             content: noteString,
             type: .note,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0, // 发送中
+            status: sentWK == nil ? -1 : 1,
             clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
+        if sentWK == nil {
+            AppUtility.showToast("笔记发送失败")
+        }
         messages.append(msg)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {

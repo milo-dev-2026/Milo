@@ -80,6 +80,9 @@ enum UserSigGenerator {
     }
 
     /// zlib 格式压缩（与 Java Deflater 默认输出一致）
+    /// 注意：Apple Compression 的 COMPRESSION_ZLIB 输出的是 raw deflate（无 zlib 头、无 Adler-32），
+    /// 腾讯服务端用 zlib 解压会失败导致 UserSig 校验失败（进房 -100018）。
+    /// 这里手工补 zlib 头（0x78 0x9C）与 Adler-32 校验尾，得到标准 zlib 流。
     private static func zlibCompress(_ data: Data) -> Data? {
         guard !data.isEmpty else { return nil }
         let dstSize = max(data.count * 2 + 64, 256)
@@ -94,6 +97,29 @@ enum UserSigGenerator {
             }
         }
         guard written > 0 else { return nil }
-        return dst.prefix(written)
+
+        var result = Data()
+        // zlib 头：CMF=0x78（32K 窗口 + deflate），FLG=0x9C（默认压缩级别，校验通过）
+        result.append(contentsOf: [0x78, 0x9C])
+        result.append(dst.prefix(written))
+        // Adler-32 校验和（对未压缩原始数据计算，Java Deflater 的 zlib 流同样带此校验尾）
+        result.append(adler32(data))
+        return result
+    }
+
+    /// 计算 Adler-32 校验和（zlib 规范）
+    private static func adler32(_ data: Data) -> Data {
+        var a: UInt32 = 1
+        var b: UInt32 = 0
+        let mod: UInt32 = 65521
+        for byte in data {
+            a = (a + UInt32(byte)) % mod
+            b = (b + a) % mod
+        }
+        let checksum = (b << 16) | a
+        return Data([UInt8((checksum >> 24) & 0xFF),
+                     UInt8((checksum >> 16) & 0xFF),
+                     UInt8((checksum >> 8) & 0xFF),
+                     UInt8(checksum & 0xFF)])
     }
 }

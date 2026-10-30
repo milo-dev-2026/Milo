@@ -539,7 +539,10 @@ struct Message: Codable {
         } else {
             self.type = MessageType(rawValue: decoded.type) ?? .text
         }
-        self.timestamp = (wk.timestamp ?? 0) * 1000
+        // 时间戳归一化为毫秒：服务端历史消息存在秒/毫秒混用（旧系统消息写入的是毫秒），
+        // 之前无条件 ×1000 会把毫秒数据放大成天文数字，导致排序错乱与时间显示异常
+        let rawTs = wk.timestamp ?? 0
+        self.timestamp = rawTs > 100_000_000_000 ? rawTs : rawTs * 1000
         self.status = 1
         self.messageSeq = wk.message_seq ?? 0
     }
@@ -852,6 +855,37 @@ struct GroupMember: Codable {
         case joinTime = "join_time"
         case isMuted = "is_muted"
         case isDeleted = "is_deleted"
+    }
+
+    /// 容错解码：membersync 返回的成员存在 name 为 null 的情况，
+    /// 之前 name 为非可选字段会导致整个成员数组解码失败（群主角色识别因此失效）
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        uid = (try? c.decodeIfPresent(String.self, forKey: .uid)) ?? ""
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+        avatar = try? c.decodeIfPresent(String.self, forKey: .avatar)
+        role = (try? c.decodeIfPresent(Int.self, forKey: .role))
+            ?? Int((try? c.decodeIfPresent(String.self, forKey: .role)) ?? "")
+        nickname = try? c.decodeIfPresent(String.self, forKey: .nickname)
+        let joinInt64 = try? c.decodeIfPresent(Int64.self, forKey: .joinTime)
+        let joinInt = try? c.decodeIfPresent(Int.self, forKey: .joinTime)
+        joinTime = joinInt64 ?? joinInt.map { Int64($0) }
+        isMuted = try? c.decodeIfPresent(Bool.self, forKey: .isMuted)
+        isDeleted = (try? c.decodeIfPresent(Int.self, forKey: .isDeleted))
+            ?? Int((try? c.decodeIfPresent(String.self, forKey: .isDeleted)) ?? "")
+    }
+
+    init(uid: String, name: String, avatar: String? = nil, role: Int? = nil,
+         nickname: String? = nil, joinTime: Int64? = nil, isMuted: Bool? = nil,
+         isDeleted: Int? = nil) {
+        self.uid = uid
+        self.name = name
+        self.avatar = avatar
+        self.role = role
+        self.nickname = nickname
+        self.joinTime = joinTime
+        self.isMuted = isMuted
+        self.isDeleted = isDeleted
     }
 
     var roleText: String {

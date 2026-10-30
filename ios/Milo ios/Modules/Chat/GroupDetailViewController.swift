@@ -361,7 +361,17 @@ navigationController?.pushViewController(vc, animated: true)
                 if let owner = (payload["creator"] as? String) ?? (payload["owner_uid"] as? String) {
                     dict["owner_uid"] = owner
                 }
-                if let role = payload["role"] as? Int { dict["my_role"] = role }
+                // 线上频道信息把当前用户角色放在 extra.role（顶层无 role 字段），
+                // 之前只读顶层 role，导致群主/管理员永远看不到"群管理"入口
+                if let role = payload["role"] as? Int {
+                    dict["my_role"] = role
+                } else if let extra = payload["extra"] as? [String: Any] {
+                    if let role = extra["role"] as? Int {
+                        dict["my_role"] = role
+                    } else if let roleStr = extra["role"] as? String, let role = Int(roleStr) {
+                        dict["my_role"] = role
+                    }
+                }
                 let jsonData = try JSONSerialization.data(withJSONObject: dict)
                 var loaded = try JSONDecoder().decode(Group.self, from: jsonData)
 
@@ -373,6 +383,14 @@ navigationController?.pushViewController(vc, animated: true)
                     let active = decoded.filter { ($0.isDeleted ?? 0) == 0 }
                     loaded.members = active
                     if loaded.memberCount == nil { loaded.memberCount = active.count }
+                    // 兜底：频道信息未给出角色时，用成员列表里的 role/群主判定
+                    let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+                    if loaded.myRole == nil, let me = active.first(where: { $0.uid == myUid }) {
+                        loaded.myRole = me.role
+                    }
+                    if loaded.ownerUid == nil, let owner = active.first(where: { $0.role == 1 }) {
+                        loaded.ownerUid = owner.uid
+                    }
                 }
 
                 let result = loaded
