@@ -538,7 +538,21 @@ class ChatViewController: UIViewController {
         onlineStatusLabel.textColor = .secondaryLabel
         onlineStatusLabel.isHidden = true
         onlineStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        titleView.addSubview(onlineStatusLabel)
+
+        // 特殊好友888：昵称红色，徽章放到"手机在线"那一行前面（安卓 subtitleView 中 specialBadgeLayout 在 subtitleTv 之前）
+        let isSpecialPeer = channelType == 1 && SpecialUserUtils.isSpecialUser(uid: channelId, shortNo: "", name: titleText)
+        if isSpecialPeer {
+            navTitleLabel.textColor = SpecialUserUtils.specialUserNameColor
+        }
+        let subtitleStack = UIStackView()
+        subtitleStack.axis = .horizontal
+        subtitleStack.spacing = ScreenAdapter.scaleW(4)
+        subtitleStack.alignment = .center
+        if isSpecialPeer {
+            subtitleStack.addArrangedSubview(SpecialUserUtils.makeBadgesView(fontSize: 9))
+        }
+        subtitleStack.addArrangedSubview(onlineStatusLabel)
+        titleView.addSubview(subtitleStack)
 
         let hasStatus = channelType == 1
         if hasStatus {
@@ -548,7 +562,7 @@ class ChatViewController: UIViewController {
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalTo(navAvatar.snp.top).offset(-ScreenAdapter.scaleH(2))
             }
-            onlineStatusLabel.snp.makeConstraints { make in
+            subtitleStack.snp.makeConstraints { make in
                 make.leading.equalTo(navTitleLabel)
                 make.trailing.lessThanOrEqualToSuperview()
                 make.top.equalTo(navTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(1))
@@ -571,6 +585,10 @@ class ChatViewController: UIViewController {
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     navTitleLabel.text = channelInfo.displayName
+                    // 昵称拉到后再次判定特殊好友（名称兜底），标红
+                    if self.channelType == 1 && SpecialUserUtils.isSpecialUser(uid: self.channelId, shortNo: "", name: channelInfo.displayName) {
+                        navTitleLabel.textColor = SpecialUserUtils.specialUserNameColor
+                    }
                     // 用真实昵称刷新标题头像占位图
                     AppUtility.loadChannelAvatar(channelId: self.channelId, channelType: self.channelType, name: channelInfo.displayName, into: navAvatar)
                     self.updateOnlineStatus(
@@ -608,7 +626,12 @@ class ChatViewController: UIViewController {
                 action: #selector(startVoiceCall)
             )
             callBtn.tintColor = .themePrimary
-            navigationItem.rightBarButtonItems = [moreBtn, callBtn]
+            if isSpecialPeer {
+                // 特殊好友888：昵称后的按钮只保留语音，删掉聊天信息页入口，确保长昵称完整显示
+                navigationItem.rightBarButtonItems = [callBtn]
+            } else {
+                navigationItem.rightBarButtonItems = [moreBtn, callBtn]
+            }
         } else {
             // 群聊：三横管理入口仅群主/管理员可见（角色异步返回后由 updateGroupRightBarButton 设置），
             // 普通成员通过点标题进入群资料页
@@ -712,7 +735,7 @@ class ChatViewController: UIViewController {
             return
         }
         if online {
-            lastOnlineStatusText = "在线"
+            lastOnlineStatusText = "手机在线" // 对齐安卓：device(手机)+在线
         } else if let lastOffline = lastOffline, lastOffline > 0 {
             lastOnlineStatusText = ChatViewController.offlineText(seconds: lastOffline)
         } else {
@@ -1732,6 +1755,13 @@ extension ChatViewController: ChatInputBarDelegate {
     }
 
     private func presentCamera(mode: UIImagePickerController.CameraCaptureMode) {
+        // 录制视频需要麦克风：若音频会话当前处于 .playback（播放语音/提示音后遗留），
+        // 相机启动录制会因类别不兼容抛异常导致 App 闪退，先切到可录音类别
+        if mode == .video {
+            let session = AVAudioSession.sharedInstance()
+            _ = try? session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
+            _ = try? session.setActive(true)
+        }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.cameraCaptureMode = mode
@@ -1744,7 +1774,16 @@ extension ChatViewController: ChatInputBarDelegate {
         }
         picker.delegate = self
         imagePicker = picker
-        present(picker, animated: true)
+        // 等 actionSheet 完全消失后再 present，避免 present 冲突
+        DispatchQueue.main.async { [weak self] in
+            self?.present(picker, animated: true)
+        }
+    }
+
+    /// 相机页面关闭后恢复音频会话（避免影响后续语音播放）
+    private func restoreAudioSessionIfNeeded() {
+        _ = try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        _ = try? AVAudioSession.sharedInstance().setActive(true)
     }
 
     // MARK: - 图片发送（压缩 → 本地占位 → 上传 → 发送）
@@ -2236,12 +2275,16 @@ extension ChatViewController: UIImagePickerControllerDelegate, UINavigationContr
                 }
             }
         }
+        let wasVideo = imagePicker?.cameraCaptureMode == .video
         imagePicker = nil
+        if wasVideo { restoreAudioSessionIfNeeded() }
     }
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
+        let wasVideo = imagePicker?.cameraCaptureMode == .video
         imagePicker = nil
+        if wasVideo { restoreAudioSessionIfNeeded() }
     }
 }
 

@@ -175,13 +175,15 @@ navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showFileHelper() {
-        let vc = FileHelperViewController(mode: .fileHelper)
-navigationController?.pushViewController(vc, animated: true)
+        let vc = SystemAccountProfileViewController(account: .fileHelper)
+        vc.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     @objc private func showSystemNotice() {
-        let vc = FileHelperViewController(mode: .systemNotice)
-navigationController?.pushViewController(vc, animated: true)
+        let vc = SystemAccountProfileViewController(account: .systemNotice)
+        vc.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     /// 通讯录本地缓存（先渲染缓存再拉网络，对齐安卓本地优先）

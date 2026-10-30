@@ -29,6 +29,8 @@ class IMManager: NSObject {
     private(set) var isConnected = false
     /// 当前连接状态原始值（WKConnectStatus.rawValue：0未连接 1连接中 2收取中 3已连接 4断开）
     private(set) var connectStatusRaw: Int = 0
+    /// 是否正在处理被踢下线（防止重复弹窗）
+    private var isHandlingKick = false
     /// 当前连接状态文案（"" 表示已连接，无需展示）
     var connectStatusText: String {
         switch connectStatusRaw {
@@ -929,7 +931,53 @@ extension IMManager: WKConnectionManagerDelegate {
                 object: NSNumber(value: false),
                 userInfo: ["status": 4]
             )
+            // 对齐微信/安卓：其他设备登录后强制下线，提示并回到登录页
+            self.handleKickedOffline()
         }
+    }
+
+    /// 被踢下线：提示"账号已在其他设备登录"，确认后清空登录态回登录页
+    private func handleKickedOffline() {
+        guard !isHandlingKick else { return }
+        isHandlingKick = true
+        let presentKickAlert = {
+            guard let window = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .flatMap({ $0.windows })
+                .first(where: { $0.isKeyWindow }),
+                  let root = window.rootViewController else {
+                self.isHandlingKick = false
+                return
+            }
+            // 闪退避免重复弹窗：已有弹窗则直接返回登录页
+            let alert = UIAlertController(
+                title: "下线通知",
+                message: "你的账号已在其他设备上登录，当前设备已下线",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+                self.forceLogoutToLogin(window: window)
+            })
+            var presenter: UIViewController = root
+            while let presented = presenter.presentedViewController { presenter = presented }
+            presenter.present(alert, animated: true)
+        }
+        if Thread.isMainThread { presentKickAlert() } else { DispatchQueue.main.async(execute: presentKickAlert) }
+    }
+
+    /// 清空本地登录态并跳转登录页
+    private func forceLogoutToLogin(window: UIWindow) {
+        disconnect()
+        LocalStore.shared.clearAll()
+        let defaults = UserDefaults.standard
+        ["token", "uid", "short_no", "sex", "sign", "bind_phone", "bind_email", "email"].forEach {
+            defaults.removeObject(forKey: $0)
+        }
+        let loginVC = LoginViewController(account: "", isEmail: false)
+        let nav = BaseNavigationController(rootViewController: loginVC)
+        window.rootViewController = nav
+        window.makeKeyAndVisible()
+        isHandlingKick = false
     }
 }
 

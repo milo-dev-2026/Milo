@@ -3,6 +3,7 @@ import UserNotifications
 import IQKeyboardManagerSwift
 import MAMapKit
 import AMapLocationKit
+import AMapSearchKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -27,6 +28,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let mainWindow = UIWindow(frame: UIScreen.main.bounds)
         mainWindow.backgroundColor = .themeBackground
         self.window = mainWindow
+        // 启动即应用主题（默认浅色，对齐安卓），防止系统深色模式下页面发黑
+        ThemeManager.shared.applyTheme(animated: false)
+        // 兜底：直接给主窗口设置界面风格，覆盖 connectedScenes 尚未就绪的时机问题
+        if ThemeManager.shared.currentMode == .light {
+            mainWindow.overrideUserInterfaceStyle = .light
+        } else if ThemeManager.shared.currentMode == .dark {
+            mainWindow.overrideUserInterfaceStyle = .dark
+        }
         CrashLogger.shared.log("Step 2: done")
 
         // 3. 设置根控制器
@@ -119,6 +128,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         MAMapView.updatePrivacyAgree(.didAgree)
         AMapLocationManager.updatePrivacyShow(.didShow, privacyInfo: .didContain)
         AMapLocationManager.updatePrivacyAgree(.didAgree)
+        // 搜索SDK（POI/逆地理）同样需要隐私合规声明，否则搜索请求静默失败、POI列表为空
+        AMapSearchAPI.updatePrivacyShow(.didShow, privacyInfo: .didContain)
+        AMapSearchAPI.updatePrivacyAgree(.didAgree)
         AMapServices.shared().enableHTTPS = true
         AMapServices.shared().apiKey = APIConfig.amapKey
     }

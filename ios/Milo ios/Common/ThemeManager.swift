@@ -42,9 +42,10 @@ class ThemeManager {
                 return ThemeMode(rawValue: rawValue) ?? .system
             } else if defaults.object(forKey: "appearance_mode") != nil {
                 let rawValue = defaults.integer(forKey: "appearance_mode")
-                return ThemeMode(rawValue: rawValue) ?? .system
+                return ThemeMode(rawValue: rawValue) ?? .light
             }
-            return .system
+            // 安卓端为纯浅色界面，iOS 默认强制浅色，避免系统深色模式下页面整体发黑（"黑色覆盖层"）
+            return .light
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "theme_mode")

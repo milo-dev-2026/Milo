@@ -30,6 +30,10 @@ class MainTabBarController: UITabBarController {
         if #available(iOS 15.0, *) {
             tabBar.scrollEdgeAppearance = appearance
         }
+        // 关闭半透明，避免 push 隐藏动画期间透出黑底
+        tabBar.isTranslucent = false
+        // 根视图背景置为浅色，push/pop 切换时 tabbar 区域不再露出黑色
+        view.backgroundColor = .themeBg
 
         // iPad上TabBar字体调大
         if ScreenAdapter.isPad {

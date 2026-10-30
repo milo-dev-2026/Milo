@@ -29,6 +29,13 @@ class ContactDetailViewController: UIViewController {
     private let nameLabel = UILabel()
     private let idLabel = UILabel()
     private let remarkLabel = UILabel()
+    /// 特殊好友888：徽章行 + 蓝色提示行
+    private var badgesStack: UIStackView?
+    private let blueTipLabel = UILabel()
+    private var remarkBottomConstraint: Constraint?
+    private var blueTipTopConstraint: Constraint?
+    private var blueTipBottomConstraint: Constraint?
+    private var isSpecialUser888 = false
 
     // MARK: - 信息区
     private let infoCard = UIView()
@@ -61,6 +68,12 @@ class ContactDetailViewController: UIViewController {
               let cached = try? JSONDecoder().decode([User].self, from: data),
               let user = cached.first(where: { $0.uid == uid }) else { return }
         nameLabel.text = user.name
+        if SpecialUserUtils.isSpecialUser(uid: uid) {
+            isSpecialUser888 = true
+            nameLabel.textColor = SpecialUserUtils.specialUserNameColor
+            nameLabel.text = user.name.replacingOccurrences(of: "（", with: "\n（")
+            showSpecialRows()
+        }
         AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: user.name, into: avatarImageView)
     }
 
@@ -126,10 +139,11 @@ class ContactDetailViewController: UIViewController {
             make.bottom.greaterThanOrEqualTo(avatarImageView.snp.bottom).offset(20)
         }
 
-        // 名字
+        // 名字（特殊好友：红色 + 括号部分换行，最多两行）
         nameLabel.font = ScreenAdapter.boldFont(20)
         nameLabel.textColor = .label
         nameLabel.text = "加载中..."
+        nameLabel.numberOfLines = 2
         headerCard.addSubview(nameLabel)
         nameLabel.snp.makeConstraints { make in
             make.leading.equalTo(avatarImageView.snp.trailing).offset(16)
@@ -158,11 +172,36 @@ class ContactDetailViewController: UIViewController {
             remarkTopToIdConstraint = make.top.equalTo(idLabel.snp.bottom).offset(4).constraint
             remarkTopToNameConstraint = make.top.equalTo(nameLabel.snp.bottom).offset(6).constraint
             make.trailing.equalToSuperview().offset(-16)
-            make.bottom.equalToSuperview().offset(-20)
+            remarkBottomConstraint = make.bottom.equalToSuperview().offset(-20).constraint
         }
         // 默认无 Milo 号时，备注直接跟在昵称下方
         remarkTopToNameConstraint?.isActive = true
         remarkTopToIdConstraint?.isActive = false
+
+        // 特殊好友888专属：徽章行 + 蓝色提示行（均默认隐藏，识别后展示）
+        let badges = SpecialUserUtils.makeBadgesView(fontSize: 11)
+        badges.isHidden = true
+        headerCard.addSubview(badges)
+        badges.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel)
+            make.top.equalTo(idLabel.snp.bottom).offset(6)
+            make.trailing.lessThanOrEqualToSuperview().offset(-16)
+        }
+        badgesStack = badges
+
+        blueTipLabel.font = ScreenAdapter.font(13)
+        blueTipLabel.textColor = .systemBlue
+        blueTipLabel.numberOfLines = 0
+        blueTipLabel.text = "如超10分钟没回消息请拨打语音"
+        blueTipLabel.isHidden = true
+        headerCard.addSubview(blueTipLabel)
+        blueTipLabel.snp.makeConstraints { make in
+            make.leading.equalTo(nameLabel)
+            make.trailing.equalToSuperview().offset(-16)
+            blueTipTopConstraint = make.top.equalTo(badges.snp.bottom).offset(6).constraint
+            blueTipBottomConstraint = make.bottom.equalToSuperview().offset(-20).constraint
+        }
+        blueTipBottomConstraint?.isActive = false
 
         // MARK: - 信息区（设置备注等）
         infoCard.backgroundColor = .white
@@ -331,7 +370,17 @@ class ContactDetailViewController: UIViewController {
                 )
                 self.userInfo = info
                 DispatchQueue.main.async {
-                    self.nameLabel.text = info.displayName
+                    let isSpecial = SpecialUserUtils.isSpecialUser(uid: self.uid, shortNo: "", name: info.displayName)
+                    self.isSpecialUser888 = isSpecial
+                    if isSpecial {
+                        // 特殊好友888：昵称红色，括号部分（营业时间）换到下一行
+                        self.nameLabel.textColor = SpecialUserUtils.specialUserNameColor
+                        self.nameLabel.text = info.displayName.replacingOccurrences(of: "（", with: "\n（")
+                        self.remarkLabel.isHidden = true
+                        self.showSpecialRows()
+                    } else {
+                        self.nameLabel.text = info.displayName
+                    }
                     AppUtility.loadChannelAvatar(channelId: self.uid, channelType: 1, name: info.displayName, into: self.avatarImageView)
                     if let remark = info.remark, !remark.isEmpty {
                         self.remarkLabel.text = "备注：\(remark)"
@@ -382,8 +431,29 @@ class ContactDetailViewController: UIViewController {
         let hasMiloNo = !shortNo.isEmpty
         idLabel.isHidden = !hasMiloNo
         idLabel.text = hasMiloNo ? "Milo号：\(shortNo)" : nil
+        if isSpecialUser888 || !shortNo.isEmpty && SpecialUserUtils.isSpecialUser(shortNo: shortNo) {
+            isSpecialUser888 = true
+            showSpecialRows()
+            return
+        }
         remarkTopToIdConstraint?.isActive = hasMiloNo
         remarkTopToNameConstraint?.isActive = !hasMiloNo
+    }
+
+    /// 特殊好友888：显示徽章行 + 蓝色提示行，隐藏备注行
+    private func showSpecialRows() {
+        guard isSpecialUser888 else { return }
+        badgesStack?.isHidden = false
+        blueTipLabel.isHidden = false
+        remarkLabel.isHidden = true
+        nameLabel.textColor = SpecialUserUtils.specialUserNameColor
+        // 备注行让位给蓝色提示行（避免底部重复约束冲突）
+        remarkBottomConstraint?.isActive = false
+        blueTipBottomConstraint?.isActive = true
+        if idLabel.isHidden {
+            idLabel.isHidden = false
+            idLabel.text = "Milo号：\(SpecialUserUtils.specialShortNo)"
+        }
     }
 
     // MARK: - 按钮操作

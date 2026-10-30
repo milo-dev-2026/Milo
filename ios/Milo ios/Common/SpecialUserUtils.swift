@@ -73,4 +73,47 @@ enum SpecialUserUtils {
         appendBadge("押金商家", borderColor: UIColor(red: 76.0 / 255.0, green: 175.0 / 255.0, blue: 80.0 / 255.0, alpha: 1.0))
         return result
     }
+
+    /// 徽章颜色（与安卓 BorderSpan 一致）
+    static let badgeXianColor = UIColor(red: 255.0 / 255.0, green: 193.0 / 255.0, blue: 7.0 / 255.0, alpha: 1.0)
+    static let badgeDepositColor = UIColor(red: 76.0 / 255.0, green: 175.0 / 255.0, blue: 80.0 / 255.0, alpha: 1.0)
+
+    /// 生成独立边框徽章 Label（对齐安卓 createBadgeTextView：圆角边框+同色文字）
+    static func makeBadgeLabel(text: String, borderColor: UIColor, fontSize: CGFloat = 10) -> UILabel {
+        let label = InsetLabel()
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        label.textColor = borderColor
+        label.textAlignment = .center
+        label.textInsets = UIEdgeInsets(top: 1, left: 4, bottom: 1, right: 4)
+        label.layer.borderColor = borderColor.cgColor
+        label.layer.borderWidth = 1
+        label.layer.cornerRadius = 3
+        label.layer.masksToBounds = true
+        return label
+    }
+
+    /// 两个徽章组成的水平视图（西安 + 押金商家）
+    static func makeBadgesView(fontSize: CGFloat = 10) -> UIStackView {
+        let b1 = makeBadgeLabel(text: "西安", borderColor: badgeXianColor, fontSize: fontSize)
+        let b2 = makeBadgeLabel(text: "押金商家", borderColor: badgeDepositColor, fontSize: fontSize)
+        let stack = UIStackView(arrangedSubviews: [b1, b2])
+        stack.axis = .horizontal
+        stack.spacing = 3
+        stack.alignment = .center
+        return stack
+    }
+}
+
+/// 带内边距的 Label（徽章用）
+class InsetLabel: UILabel {
+    var textInsets = UIEdgeInsets.zero
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: textInsets))
+    }
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + textInsets.left + textInsets.right,
+                      height: size.height + textInsets.top + textInsets.bottom)
+    }
 }
