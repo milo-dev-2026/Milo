@@ -840,6 +840,8 @@ struct GroupMember: Codable {
     var nickname: String?
     var joinTime: Int64?
     var isMuted: Bool?
+    /// membersync 返回的删除标记（1=已退出/被移除），展示时需过滤
+    var isDeleted: Int?
 
     enum CodingKeys: String, CodingKey {
         case uid
@@ -849,6 +851,7 @@ struct GroupMember: Codable {
         case nickname
         case joinTime = "join_time"
         case isMuted = "is_muted"
+        case isDeleted = "is_deleted"
     }
 
     var roleText: String {

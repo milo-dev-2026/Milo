@@ -88,10 +88,10 @@ class SearchWithMemberViewController: UIViewController {
             Task { [weak self] in
                 guard let self = self else { return }
                 do {
-                    let response: APIResponse<GroupMembersResponse> = try await APIClient.shared.request(
-                        .getGroupMembers(groupId: self.channelId, page: 1, size: 200, keyword: nil)
+                    let decoded: [GroupMember] = try await APIClient.shared.requestFlexible(
+                        .getGroupMembers(groupId: self.channelId, page: 1, size: 1000, keyword: nil)
                     )
-                    let list = response.data?.list ?? []
+                    let list = decoded.filter { ($0.isDeleted ?? 0) == 0 }
                     DispatchQueue.main.async {
                         self.activityIndicator.stopAnimating()
                         self.members = list.map { member in

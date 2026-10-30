@@ -365,17 +365,14 @@ navigationController?.pushViewController(vc, animated: true)
                 let jsonData = try JSONSerialization.data(withJSONObject: dict)
                 var loaded = try JSONDecoder().decode(Group.self, from: jsonData)
 
-                // 群成员单独拉取（最多 200 人，桌面网格展示用）
-                if let rawMembers = try? await APIClient.shared.requestRaw(
+                // 群成员单独拉取（membersync 返回裸数组，最多 200 人，桌面网格展示用）
+                let memberList: [GroupMember]? = try? await APIClient.shared.requestFlexible(
                     .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
-                ) {
-                    let list = (rawMembers["list"] as? [[String: Any]])
-                        ?? (rawMembers["data"] as? [[String: Any]]) ?? []
-                    if let listData = try? JSONSerialization.data(withJSONObject: list),
-                       let decoded = try? JSONDecoder().decode([GroupMember].self, from: listData) {
-                        loaded.members = decoded
-                        if loaded.memberCount == nil { loaded.memberCount = decoded.count }
-                    }
+                )
+                if let decoded = memberList {
+                    let active = decoded.filter { ($0.isDeleted ?? 0) == 0 }
+                    loaded.members = active
+                    if loaded.memberCount == nil { loaded.memberCount = active.count }
                 }
 
                 let result = loaded

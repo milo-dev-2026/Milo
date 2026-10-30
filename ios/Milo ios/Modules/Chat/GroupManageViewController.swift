@@ -418,17 +418,15 @@ class TransferOwnerViewController: UIViewController, UITableViewDataSource, UITa
     private func loadMembers() {
         Task {
             do {
-                let response: APIResponse<GroupMembersResponse> = try await APIClient.shared.request(
-                    .getGroupMembers(groupId: groupId, page: 1, size: 100, keyword: nil)
+                let decoded: [GroupMember] = try await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: groupId, page: 1, size: 1000, keyword: nil)
                 )
-                if let data = response.data {
-                    let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
-                    let list = data.list.filter { $0.uid != myUid }
-                    DispatchQueue.main.async {
-                        self.members = list
-                        self.filteredMembers = list
-                        self.tableView.reloadData()
-                    }
+                let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+                let list = decoded.filter { $0.uid != myUid && ($0.isDeleted ?? 0) == 0 }
+                DispatchQueue.main.async {
+                    self.members = list
+                    self.filteredMembers = list
+                    self.tableView.reloadData()
                 }
             } catch {
                 DispatchQueue.main.async {

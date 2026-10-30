@@ -162,30 +162,26 @@ navigationController?.pushViewController(vc, animated: true)
 
         Task {
             do {
-                let response: APIResponse<GroupMembersResponse> = try await APIClient.shared.request(
-                    .getGroupMembers(groupId: groupId, page: currentPage, size: pageSize, keyword: kw)
+                // membersync 返回裸数组且无分页/搜索参数，全量拉取后客户端过滤
+                let decoded: [GroupMember] = try await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: groupId, page: 1, size: 1000, keyword: nil)
                 )
-                if let data = response.data {
-                    DispatchQueue.main.async {
-                        if refresh {
-                            self.members = data.list
-                        } else {
-                            self.members.append(contentsOf: data.list)
-                        }
-                        self.filteredMembers = self.members
-                        self.total = data.total
-                        self.hasMore = self.members.count < data.total
-                        self.currentPage += 1
-                        self.tableView.reloadData()
-                        self.tableView.mj_header?.endRefreshing()
-                        self.tableView.mj_footer?.endRefreshing()
-                        if !self.hasMore {
-                            self.tableView.mj_footer?.endRefreshingWithNoMoreData()
-                        }
+                var list = decoded.filter { ($0.isDeleted ?? 0) == 0 }
+                if let kw = kw {
+                    list = list.filter { $0.name.localizedCaseInsensitiveContains(kw) || ($0.nickname ?? "").localizedCaseInsensitiveContains(kw) }
+                }
+                DispatchQueue.main.async {
+                    self.members = list
+                    self.filteredMembers = list
+                    self.total = list.count
+                    self.hasMore = false
+                    self.tableView.reloadData()
+                    self.tableView.mj_header?.endRefreshing()
+                    self.tableView.mj_footer?.endRefreshing()
+                    self.tableView.mj_footer?.endRefreshingWithNoMoreData()
 
-                        // 更新标题
-                        self.title = "全部成员 (\(data.total))"
-                    }
+                    // 更新标题
+                    self.title = "全部成员 (\(list.count))"
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -523,18 +519,16 @@ class RemoveGroupMembersViewController: UIViewController, UITableViewDataSource,
     private func loadMembers() {
         Task {
             do {
-                let response: APIResponse<GroupMembersResponse> = try await APIClient.shared.request(
-                    .getGroupMembers(groupId: groupId, page: 1, size: 100, keyword: nil)
+                let decoded: [GroupMember] = try await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: groupId, page: 1, size: 1000, keyword: nil)
                 )
-                if let data = response.data {
-                    let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
-                    // 过滤掉群主和自己
-                    let list = data.list.filter { $0.uid != myUid && $0.role != 1 }
-                    DispatchQueue.main.async {
-                        self.members = list
-                        self.filteredMembers = list
-                        self.tableView.reloadData()
-                    }
+                let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+                // 过滤掉群主、自己和已退群成员
+                let list = decoded.filter { $0.uid != myUid && $0.role != 1 && ($0.isDeleted ?? 0) == 0 }
+                DispatchQueue.main.async {
+                    self.members = list
+                    self.filteredMembers = list
+                    self.tableView.reloadData()
                 }
             } catch {
                 DispatchQueue.main.async {

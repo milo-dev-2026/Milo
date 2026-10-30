@@ -701,13 +701,14 @@ class ChatViewController: UIViewController {
         guard !myUid.isEmpty else { return }
         Task {
             do {
-                let members: GroupMembersResponse = try await APIClient.shared.requestFlexible(
-                    .getGroupMembers(groupId: channelId, page: 1, size: 200, keyword: nil)
+                let members: [GroupMember] = try await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: channelId, page: 1, size: 1000, keyword: nil)
                 )
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
-                    if let me = members.list.first(where: { $0.uid == myUid }) {
+                    if let me = members.first(where: { $0.uid == myUid && ($0.isDeleted ?? 0) == 0 }) {
                         let role = me.role ?? 0
+                        print("[Chat] 群成员兜底查到我的角色: \(role)")
                         if role > 0, role != self.myGroupRole {
                             self.myGroupRole = role
                             self.updateGroupRightBarButton()
@@ -1174,7 +1175,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             do {
                 let response: WKMessageSyncResponse = try await APIClient.shared.requestFlexible(
                     .syncChannelMessages(channelId: channelId, channelType: channelType,
-                                         startMessageSeq: oldestSeq - 1, limit: 30)
+                                         startMessageSeq: oldestSeq, limit: 30)
                 )
                 DispatchQueue.main.async {
                     self.isLoadingOlder = false

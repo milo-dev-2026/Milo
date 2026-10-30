@@ -299,9 +299,9 @@ enum APIRouter: URLRequestConvertible {
             ])
         case let .updateGroupAnnouncement(groupId, notice):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["notice": notice])
-        case let .getGroupMembers(groupId, page, size, keyword):
-            var params: [String: Any] = ["group_id": groupId, "page": page, "size": size]
-            if let kw = keyword { params["keyword"] = kw }
+        case let .getGroupMembers(groupId, _, size, _):
+            // 后端无 /v1/groups/members，改用 membersync 全量拉取（version=0 返回全部成员）
+            let params: [String: Any] = ["limit": size, "version": 0]
             request = try URLEncoding.default.encode(request, with: params)
         case let .createGroup(name, members, memberNames):
             request.httpBody = try JSONSerialization.data(withJSONObject: [
@@ -473,7 +473,8 @@ enum APIRouter: URLRequestConvertible {
         case .reactMessage: return "/v1/messages/react"
         case .getGroupAnnouncement(let groupId): return "/v1/groups/\(groupId)/announcement"
         case .updateGroupAnnouncement(let groupId, _): return "/v1/groups/\(groupId)/announcement"
-        case .getGroupMembers: return "/v1/groups/members"
+        case let .getGroupMembers(groupId, _, _, _):
+            return "/v1/groups/\(groupId)/membersync"
         case .createGroup: return "/v1/group/create"
         case .addGroupMembers: return "/v1/groups/members/add"
         case .removeGroupMembers: return "/v1/groups/members/remove"
@@ -638,6 +639,13 @@ class APIClient {
         if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
             let wrappedData = try JSONSerialization.data(withJSONObject: ["conversations": jsonArray])
             if let result = try? JSONDecoder().decode(T.self, from: wrappedData) {
+                return result
+            }
+            // membersync 等接口返回裸数组，兼容 {list: [...]} 结构
+            let listWrapped = try JSONSerialization.data(withJSONObject: [
+                "list": jsonArray, "total": jsonArray.count, "page": 1, "size": jsonArray.count
+            ])
+            if let result = try? JSONDecoder().decode(T.self, from: listWrapped) {
                 return result
             }
         }
