@@ -203,7 +203,6 @@ class LocationPickerViewController: UIViewController {
         request.radius = 3000
         request.offset = 30
         request.page = 1
-        request.requireExtension = true
         searchAPI?.aMapPOIAroundSearch(request)
     }
 
