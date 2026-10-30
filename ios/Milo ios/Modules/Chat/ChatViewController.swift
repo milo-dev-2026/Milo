@@ -603,11 +603,20 @@ class ChatViewController: UIViewController {
                     if self.channelType == 2 {
                         self.myGroupRole = channelInfo.role ?? 0
                         self.updateGroupRightBarButton()
+                        // 频道信息未返回 role 时（部分群频道响应不带该字段），
+                        // 回退到群成员列表查当前用户角色，避免群主/管理员看不到管理入口
+                        if self.myGroupRole == 0 {
+                            self.loadMyGroupRoleFromMembers()
+                        }
                     }
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
                     self?.refreshCachedOnlineStatus()
+                    // 频道信息请求失败时也要兜底查询群角色，否则管理入口永远不显示
+                    if self?.channelType == 2 {
+                        self?.loadMyGroupRoleFromMembers()
+                    }
                 }
             }
         }
@@ -682,6 +691,32 @@ class ChatViewController: UIViewController {
             navigationItem.rightBarButtonItems = [moreBtn]
         } else {
             navigationItem.rightBarButtonItems = []
+        }
+    }
+
+    /// 从群成员列表查询当前用户角色（频道信息接口不返回 role 时的兜底，对齐安卓本地成员表）
+    private func loadMyGroupRoleFromMembers() {
+        guard channelType == 2 else { return }
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        guard !myUid.isEmpty else { return }
+        Task {
+            do {
+                let members: GroupMembersResponse = try await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: channelId, page: 1, size: 200, keyword: nil)
+                )
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if let me = members.list.first(where: { $0.uid == myUid }) {
+                        let role = me.role ?? 0
+                        if role > 0, role != self.myGroupRole {
+                            self.myGroupRole = role
+                            self.updateGroupRightBarButton()
+                        }
+                    }
+                }
+            } catch {
+                print("[Chat] 群成员角色兜底查询失败: \(error)")
+            }
         }
     }
 
