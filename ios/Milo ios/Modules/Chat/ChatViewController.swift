@@ -30,6 +30,10 @@ class ChatViewController: UIViewController {
     /// 历史消息分页状态（滑到顶部继续加载更早的记录）
     private var isLoadingOlder = false
     private var hasMoreHistory = true
+    /// 翻页游标（时间秒 + seq）：独立于界面消息列表维护。
+    /// 若直接用界面最老消息当游标，遇到"整页都是已展示消息"时会误判没有更多历史
+    private var historyCursorTs: Int = 0
+    private var historyCursorSeq: Int = 0
     private var imagePicker: UIImagePickerController?
     /// 消息扩展（已读回执/撤回）同步版本号与轮询定时器
     private var extraVersion: Int64 = 0
@@ -1205,11 +1209,6 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     // MARK: - 历史消息分页
-    /// 翻页游标（时间秒 + seq）：独立于界面消息列表维护。
-    /// 若直接用界面最老消息当游标，遇到"整页都是已展示消息"时会误判没有更多历史
-    private var historyCursorTs: Int = 0
-    private var historyCursorSeq: Int = 0
-
     /// 向上翻页：按游标拉取服务端历史，直至取完全部记录（单聊从加好友起、群聊从建群起）
     private func loadOlderMessages() {
         guard !isLoadingOlder, hasMoreHistory else { return }

@@ -606,15 +606,15 @@ class IMManager: NSObject {
         if let data = try? JSONSerialization.data(withJSONObject: dict),
            let str = String(data: data, encoding: .utf8) {
             let localMsg = Message(
-                messageID: sent.map { String($0.messageId) } ?? UUID().uuidString,
+                messageID: String(sent.messageId),
                 channelID: channelId,
                 channelType: channelType,
                 fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
                 content: str,
                 type: .call,
                 timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-                status: sent == nil ? -1 : 1,
-                clientMsgNo: sent?.clientMsgNo ?? ""
+                status: 1,
+                clientMsgNo: sent.client_msg_no ?? ""
             )
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: localMsg)
