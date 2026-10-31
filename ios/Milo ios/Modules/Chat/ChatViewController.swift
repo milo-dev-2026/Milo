@@ -59,6 +59,9 @@ class ChatViewController: UIViewController {
     private var avatarTapAt: Date?
     /// 最近一次在线状态文案，供「正在输入」切换后还原
     private var lastOnlineStatusText: String?
+    /// 防止定位在短时间内被重复触发（导航栏连续点击/页面未及时 pop）导致一次选点发出多条
+    private var lastLocationSendTime: TimeInterval = 0
+    private var lastLocationSendSignature: String = ""
     /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），控制群管理入口可见性（对齐安卓 hideOrShowRightView）
     private var myGroupRole: Int = 0
     private var isGroupAdmin: Bool { myGroupRole == 1 || myGroupRole == 2 }
@@ -2406,10 +2409,6 @@ extension ChatViewController: ChatInputBarDelegate {
             }
         }
     }
-
-    /// 防止定位在短时间内被重复触发（导航栏连续点击/页面未及时 pop）导致一次选点发出多条
-    private var lastLocationSendTime: TimeInterval = 0
-    private var lastLocationSendSignature: String = ""
 
     private func sendLocationMessage(_ location: PickedLocation) {
         // 同一次选点只允许发送一条：2 秒内相同坐标的重复调用直接忽略
