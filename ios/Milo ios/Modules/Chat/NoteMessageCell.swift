@@ -193,14 +193,15 @@ class NoteMessageCell: UITableViewCell {
         if let url = imageURL {
             noteImageView.isHidden = false
             noteImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))
-            noteImageView.snp.remakeConstraints { make in
-                make.top.leading.trailing.equalToSuperview()
-                make.height.equalTo(imageHeight)
-            }
+            // 文字区在上，首图在下
             noteTextRow.snp.remakeConstraints { make in
-                make.top.equalTo(noteImageView.snp.bottom).offset(ScreenAdapter.scaleH(8))
-                make.leading.trailing.bottom.equalToSuperview()
+                make.top.leading.trailing.equalToSuperview()
                 make.height.equalTo(textRowHeight)
+            }
+            noteImageView.snp.remakeConstraints { make in
+                make.top.equalTo(noteTextRow.snp.bottom).offset(ScreenAdapter.scaleH(8))
+                make.leading.trailing.bottom.equalToSuperview()
+                make.height.equalTo(imageHeight)
             }
         } else {
             noteImageView.isHidden = true
