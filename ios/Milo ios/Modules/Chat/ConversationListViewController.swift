@@ -742,22 +742,26 @@ class ConversationListViewController: UIViewController {
         saveCacheDebounced()
     }
 
-    /// 本地库/服务端返回的旧预览用待覆盖值补齐（仅当新消息时间更晚时）
+    /// 本地库/服务端返回的旧预览用待覆盖值补齐
     /// 顺序：内存覆盖（本进程刚收发）→ 持久缓存（上次进程最后一条，解决冷启动预览滞后）
+    /// 注意：SDK 会话库/服务端返回的 last_message 可能滞后于 timestamp（位置、笔记等自定义消息
+    /// 不进 recents 列表），因此时间相近（±10 秒）时也以本地记录的内容为准
     private func applyPreviewOverrides(_ list: [Conversation]) -> [Conversation] {
         return list.map { conv in
             var c = conv
             let key = previewKey(channelID: conv.channelID, channelType: conv.channelType)
-            if let ov = previewOverrides[key], (c.lastMessageTimestamp ?? 0) < ov.timestamp {
+            let currentTs = c.lastMessageTimestamp ?? 0
+            if let ov = previewOverrides[key],
+               ov.timestamp >= currentTs || abs(ov.timestamp - currentTs) <= 10_000 {
                 c.lastMessage = ov.content
                 c.lastMessageType = ov.type
-                c.lastMessageTimestamp = ov.timestamp
+                c.lastMessageTimestamp = max(currentTs, ov.timestamp)
             }
             if let cached = IMManager.shared.cachedLastPreview(channelId: conv.channelID, channelType: conv.channelType),
-               (c.lastMessageTimestamp ?? 0) < cached.timestamp {
+               cached.timestamp >= currentTs || abs(cached.timestamp - currentTs) <= 10_000 {
                 c.lastMessage = cached.content
                 c.lastMessageType = cached.type
-                c.lastMessageTimestamp = cached.timestamp
+                c.lastMessageTimestamp = max(currentTs, cached.timestamp)
             }
             return c
         }

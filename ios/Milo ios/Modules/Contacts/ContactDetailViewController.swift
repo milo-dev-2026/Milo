@@ -62,7 +62,23 @@ class ContactDetailViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         prefillFromLocalCache()
+        // 特殊好友 888（本群客服）：先用本地已知信息渲染红色昵称/徽章/提示，不等接口返回，
+        // 避免接口失败时资料页空白、与安卓展示不一致
+        if SpecialUserUtils.isSpecialUser(uid: uid) {
+            applySpecialUserAppearance()
+        }
         loadUserInfo()
+    }
+
+    /// 特殊好友 888 兜底外观（昵称红色 + 徽章 + 蓝色提示 + Milo号 888）
+    private func applySpecialUserAppearance() {
+        guard !isSpecialUser888 else { return }
+        isSpecialUser888 = true
+        if nameLabel.text == nil || nameLabel.text == "加载中..." {
+            nameLabel.text = SpecialUserUtils.specialName
+        }
+        nameLabel.textColor = SpecialUserUtils.specialUserNameColor
+        showSpecialRows()
     }
 
     /// 先用通讯录本地缓存秒显昵称与头像，再异步拉取频道信息刷新

@@ -56,6 +56,9 @@ class LocationPickerViewController: UIViewController {
     /// 当前城市（用于限定关键词搜索范围，取自逆地理结果）
     private var currentCity = ""
 
+    /// 防止"发送"按钮被连续点击（页面 pop 动画期间仍可点击）导致重复发送多条位置消息
+    private var didSend = false
+
     var onLocationSelected: ((PickedLocation) -> Void)?
 
     override func viewDidLoad() {
@@ -359,6 +362,7 @@ class LocationPickerViewController: UIViewController {
 
     // MARK: - 发送
     @objc private func sendLocation() {
+        guard !didSend else { return }
         var name = myLocationTitle
         var address = myLocationAddress
         var coord = currentCoord
@@ -389,6 +393,7 @@ class LocationPickerViewController: UIViewController {
             return
         }
         if name.isEmpty { name = "我的位置" }
+        didSend = true
         let picked = PickedLocation(name: name, address: address, latitude: finalCoord.latitude, longitude: finalCoord.longitude)
         onLocationSelected?(picked)
         navigationController?.popViewController(animated: true)

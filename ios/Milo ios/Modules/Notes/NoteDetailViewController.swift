@@ -188,10 +188,33 @@ class NoteDetailViewController: UIViewController {
                 imgView.tintColor = .systemGray3
             }
             
+            // 按原始宽高比展示（大图优先，非正方形）
+            let imageWidth = ScreenAdapter.screenWidth - ScreenAdapter.scaleW(32) - 16
+            var imageHeight = imageWidth * 4.0 / 3.0
+            if let urlStr = block.imageURL, let url = APIConfig.chatMediaURL(urlStr),
+               let size = ChatImageSizeCache.shared.size(for: url) {
+                imageHeight = imageWidth * size.height / max(size.width, 1)
+            }
+            imageHeight = min(max(imageHeight, ScreenAdapter.scaleH(120)), ScreenAdapter.scaleH(360))
+            
             container.addSubview(imgView)
             imgView.snp.makeConstraints { make in
                 make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))
-                make.height.equalTo(ScreenAdapter.scaleH(220))
+                make.height.equalTo(imageHeight)
+            }
+            
+            // 首次打开时尺寸未知：解析完成后按真实比例调整高度
+            if let urlStr = block.imageURL, let url = APIConfig.chatMediaURL(urlStr),
+               ChatImageSizeCache.shared.size(for: url) == nil {
+                ChatImageSizeCache.shared.resolve(url: url) { [weak self, weak imgView] size in
+                    guard let self = self, let imgView = imgView else { return }
+                    let ratioHeight = min(max(imageWidth * size.height / max(size.width, 1),
+                                             ScreenAdapter.scaleH(120)), ScreenAdapter.scaleH(360))
+                    imgView.snp.updateConstraints { make in
+                        make.height.equalTo(ratioHeight)
+                    }
+                    UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
+                }
             }
             
         case .video:

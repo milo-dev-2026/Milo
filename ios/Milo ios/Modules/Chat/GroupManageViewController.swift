@@ -50,6 +50,7 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
 
     private func loadGroupInfo() {
         Task {
+            var loaded: Group?
             do {
                 // GET /v1/groups/{group_no} 走 TangSeng，返回 invite/forbidden/mute 等 int 字段，需手动解析
                 let raw = try await APIClient.shared.requestRaw(.getGroupInfo(groupId: groupId))
@@ -57,17 +58,49 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                 if payload["group_id"] == nil && payload["group_no"] == nil {
                     payload["group_id"] = groupId
                 }
-                if let jsonData = try? JSONSerialization.data(withJSONObject: payload),
-                   var loaded = try? JSONDecoder().decode(Group.self, from: jsonData) {
-                    // 角色兜底：/v1/groups/{id} 不返回本人角色时，用群详情页传入的角色
-                    if loaded.myRole == nil { loaded.myRole = self.myRole }
-                    group = loaded
-                    DispatchQueue.main.async {
-                        self.tableView.reloadData()
+                // TangSeng 群信息用 creator 字段记录群主，与 owner_uid 对齐
+                if payload["owner_uid"] == nil {
+                    if let creator = payload["creator"] as? String {
+                        payload["owner_uid"] = creator
+                    } else if let extra = payload["extra"] as? [String: Any],
+                              let creator = extra["creator"] as? String {
+                        payload["owner_uid"] = creator
                     }
                 }
+                if let jsonData = try? JSONSerialization.data(withJSONObject: payload) {
+                    // 字段类型不一致时整体解码会失败，改用最小模型兜底，保证角色判定不受影响
+                    loaded = (try? JSONDecoder().decode(Group.self, from: jsonData)) ?? Group(groupID: groupId)
+                }
             } catch {
-                AppUtility.showToast("加载失败")
+                // 接口异常时同样用最小模型兜底：仍有 pass-in 角色可判定，避免整页开关全部禁用
+                loaded = Group(groupID: groupId)
+            }
+
+            // 角色判定（对齐安卓）：接口 my_role → 群成员列表中的本人角色 → 群详情页传入角色 → creator 本人
+            var role = loaded?.myRole ?? myRole
+            if let list: [GroupMember] = try? await APIClient.shared.requestFlexible(
+                .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
+            ) {
+                let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+                let active = list.filter { ($0.isDeleted ?? 0) == 0 && !$0.uid.isEmpty }
+                if let me = active.first(where: { $0.uid == myUid }), let r = me.role {
+                    role = r
+                }
+                if loaded?.ownerUid == nil, let owner = active.first(where: { $0.role == 1 }) {
+                    loaded?.ownerUid = owner.uid
+                }
+                if role == nil, loaded?.ownerUid == myUid {
+                    role = 1
+                }
+            }
+            if role == nil, loaded?.ownerUid == (UserDefaults.standard.string(forKey: "uid") ?? "") {
+                role = 1
+            }
+            loaded?.myRole = role
+            let result = loaded ?? Group(groupID: groupId, myRole: role)
+            DispatchQueue.main.async {
+                self.group = result
+                self.tableView.reloadData()
             }
         }
     }

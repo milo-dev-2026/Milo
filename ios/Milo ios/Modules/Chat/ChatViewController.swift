@@ -253,6 +253,16 @@ class ChatViewController: UIViewController {
             }
             return
         }
+        // 兜底：同一位置/媒体消息以占位、回显、历史同步三种来源到达时合并，避免出现多个气泡
+        if let idx = messages.firstIndex(where: { isSameMessage($0, msg) }) {
+            messages[idx] = mergedMessage(messages[idx], msg)
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                self.scrollToBottom()
+            }
+            saveMessagesCacheDebounced()
+            return
+        }
         messages.append(msg)
         if msg.isFromMe {
             pendingAppearIDs.insert(msg.messageID)
@@ -1045,6 +1055,75 @@ class ChatViewController: UIViewController {
         return String(content.dropFirst(5))
     }
 
+    /// 解析位置内容中的经纬度（兼容 JSON、name|lat,lng、[位置] name|lat,lng 三种格式）
+    private func locationCoordinate(from content: String) -> (Double, Double)? {
+        let raw = normalizeForCompare(content)
+        if raw.hasPrefix("{"),
+           let data = raw.data(using: .utf8),
+           let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            let lat = (dict["lat"] as? NSNumber)?.doubleValue ?? (dict["latitude"] as? NSNumber)?.doubleValue
+            let lng = (dict["longitude"] as? NSNumber)?.doubleValue ?? (dict["lng"] as? NSNumber)?.doubleValue
+            if let lat = lat, let lng = lng { return (lat, lng) }
+        }
+        if let barIndex = raw.lastIndex(of: "|") {
+            let coordPart = String(raw[raw.index(after: barIndex)...])
+            let nums = coordPart.components(separatedBy: ",")
+            if nums.count >= 2, let lat = Double(nums[0].trimmingCharacters(in: .whitespaces)),
+               let lng = Double(nums[1].trimmingCharacters(in: .whitespaces)) {
+                return (lat, lng)
+            }
+        }
+        return nil
+    }
+
+    /// 判断两条消息是否为同一条（用于位置/媒体消息的占位、回显、历史同步去重）
+    private func isSameMessage(_ a: Message, _ b: Message) -> Bool {
+        if !a.messageID.isEmpty && !b.messageID.isEmpty && a.messageID == b.messageID { return true }
+        if !a.clientMsgNo.isEmpty && !b.clientMsgNo.isEmpty && a.clientMsgNo == b.clientMsgNo { return true }
+        guard a.isFromMe == b.isFromMe, a.type == b.type else { return false }
+        switch a.type {
+        case .location:
+            // 同一次发送的占位/回显/历史同步内容格式可能不同（"[位置] 名|经纬度" vs JSON），
+            // 因此优先比较经纬度，取不到坐标时再退回文本比较
+            if let c1 = locationCoordinate(from: a.content), let c2 = locationCoordinate(from: b.content),
+               abs(c1.0 - c2.0) < 0.0001, abs(c1.1 - c2.1) < 0.0001 {
+                return abs(a.timestamp - b.timestamp) < 20_000
+            }
+            return normalizeForCompare(a.content) == normalizeForCompare(b.content)
+                && abs(a.timestamp - b.timestamp) < 15_000
+        case .image, .voice, .video, .file, .card, .note:
+            return a.content == b.content && abs(a.timestamp - b.timestamp) < 5_000
+        default:
+            return false
+        }
+    }
+
+    /// 合并重复消息：保留最新状态与真实服务端 ID
+    private func mergedMessage(_ a: Message, _ b: Message) -> Message {
+        var result = a
+        if b.messageSeq > 0 {
+            result.messageID = b.messageID
+            result.messageSeq = b.messageSeq
+        }
+        result.timestamp = max(a.timestamp, b.timestamp)
+        result.status = max(a.status, b.status)
+        if result.content.isEmpty { result.content = b.content }
+        return result
+    }
+
+    /// 全量去重（防止同一位置消息以占位/回显/历史同步三种来源重复出现）
+    private func dedupeForDisplay(_ list: [Message]) -> [Message] {
+        var kept: [Message] = []
+        for msg in list {
+            if let idx = kept.firstIndex(where: { isSameMessage($0, msg) }) {
+                kept[idx] = mergedMessage(kept[idx], msg)
+            } else {
+                kept.append(msg)
+            }
+        }
+        return kept
+    }
+
     /// 合并服务端消息与本地消息（保留发送中/失败占位），按 seq + 时间排序
     /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
@@ -1100,7 +1179,7 @@ class ChatViewController: UIViewController {
             let rSeq = rhs.messageSeq == 0 ? Int.max : rhs.messageSeq
             return lSeq < rSeq
         }
-        messages = result
+        messages = dedupeForDisplay(result)
         tableView.reloadData()
         if finish || !messages.isEmpty {
             finishLoading()
@@ -1835,6 +1914,8 @@ extension ChatViewController: ChatInputBarDelegate {
             clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
+        // 会话列表预览同步为自己发出的最新一条（SDK 会话库对自定义消息更新滞后）
+        IMManager.shared.recordLastPreview(msg)
         // 纳入回显匹配集：SDK 回显时替换本地气泡，避免重复
         confirmedLocalIDs.insert(msg.messageID)
         pendingAppearIDs.insert(msg.messageID)
@@ -2326,7 +2407,18 @@ extension ChatViewController: ChatInputBarDelegate {
         }
     }
 
+    /// 防止定位在短时间内被重复触发（导航栏连续点击/页面未及时 pop）导致一次选点发出多条
+    private var lastLocationSendTime: TimeInterval = 0
+    private var lastLocationSendSignature: String = ""
+
     private func sendLocationMessage(_ location: PickedLocation) {
+        // 同一次选点只允许发送一条：2 秒内相同坐标的重复调用直接忽略
+        let signature = "\(location.name)|\(location.address)|\(location.latitude),\(location.longitude)"
+        let now = Date().timeIntervalSince1970
+        if signature == lastLocationSendSignature, now - lastLocationSendTime < 2 { return }
+        lastLocationSendSignature = signature
+        lastLocationSendTime = now
+
         // 通过SDK发送位置消息
         let sentWK = IMManager.shared.sendLocationMessage(
             channelId: channelId,
@@ -2337,18 +2429,28 @@ extension ChatViewController: ChatInputBarDelegate {
             channelType: channelType
         )
         let displayName = location.address.isEmpty ? location.name : "\(location.name)\n\(location.address)"
+        let sdkMessageID = sentWK.map { String($0.messageId) } ?? ""
+        // 发送结果直接回写状态（对齐其他消息类型），避免占位气泡一直停留在"发送中"
         let msg = Message(
-            messageID: UUID().uuidString,
+            messageID: sdkMessageID.isEmpty ? UUID().uuidString : sdkMessageID,
             channelID: channelId,
             channelType: self.channelType,
             fromUID: UserDefaults.standard.string(forKey: "uid") ?? "",
             content: "[位置] \(displayName)|\(location.latitude),\(location.longitude)",
             type: .location,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0, // 发送中
+            status: sentWK == nil ? -1 : 1,
             clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
-        messages.append(msg)
+        if sentWK == nil {
+            AppUtility.showToast("位置发送失败")
+        }
+        if let idx = messages.lastIndex(where: { isSameMessage($0, msg) }) {
+            messages[idx] = mergedMessage(messages[idx], msg)
+        } else {
+            messages.append(msg)
+        }
+        IMManager.shared.recordLastPreview(msg)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
@@ -2377,10 +2479,11 @@ extension ChatViewController: ChatInputBarDelegate {
             content: content,
             type: .card,
             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            status: 0, // 发送中
+            status: sentWK == nil ? -1 : 1,
             clientMsgNo: sentWK?.clientMsgNo ?? ""
         )
         messages.append(msg)
+        IMManager.shared.recordLastPreview(msg)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()
@@ -2420,6 +2523,7 @@ extension ChatViewController: ChatInputBarDelegate {
             AppUtility.showToast("笔记发送失败")
         }
         messages.append(msg)
+        IMManager.shared.recordLastPreview(msg)
         pendingAppearIDs.insert(msg.messageID)
         DispatchQueue.main.async {
             self.tableView.reloadData()

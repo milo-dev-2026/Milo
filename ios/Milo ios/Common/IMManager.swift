@@ -1255,6 +1255,12 @@ extension IMManager {
 
     func recordLastPreview(_ msg: Message) {
         guard !msg.channelID.isEmpty, !msg.content.isEmpty else { return }
+        // 系统/群事件消息不作为会话预览（特殊群聊不允许出现"邀请入群/改群名"等系统提示）
+        if msg.type == .system { return }
+        if msg.content.hasPrefix("{"),
+           let data = msg.content.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           dict["is_deleted"] as? Int == 1 { return }
         let key = "\(msg.channelType)_\(msg.channelID)"
         var store = (UserDefaults.standard.dictionary(forKey: Self.lastPreviewCacheKey) ?? [:])
         if let old = store[key] as? [String: Any],
