@@ -1025,8 +1025,14 @@ extension WKMessage {
             }
             type = .note
         default:
-            if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
-            type = .text
+            // 群系统/事件消息（contentType 1000~2000）：统一按系统消息处理，特殊群过滤可正确拦截
+            if (1000...2000).contains(Int(content.realContentType)) {
+                if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+                type = .system
+            } else {
+                if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+                type = .text
+            }
         }
 
         let sendStatus: Int
