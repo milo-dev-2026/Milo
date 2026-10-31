@@ -715,12 +715,14 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
     private let groupId: String
     private var groupName: String = ""
     private var memberCount: Int = 0
+    private var groupNotice: String = ""
     /// 本人在群里的角色（1=群主 2=管理员 0=普通成员），用于群管理页权限判定
     private var myRole: Int?
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private weak var headerAvatar: UIImageView?
     private weak var headerNameLabel: UILabel?
     private weak var headerCountLabel: UILabel?
+    private weak var headerNoticeLabel: UILabel?
 
     private var isSpecialGroup: Bool { SpecialUserUtils.isSpecialGroup(name: groupName) }
 
@@ -746,9 +748,9 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         loadInfo()
     }
 
-    // MARK: - 头部（头像 + 群名 + 成员数，仿个人信息页左对齐布局）
+    // MARK: - 头部（头像 + 群名 + 成员数 + 群公告）
     private func createHeader() -> UIView {
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: ScreenAdapter.screenWidth, height: ScreenAdapter.scaleH(110)))
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: ScreenAdapter.screenWidth, height: ScreenAdapter.scaleH(150)))
 
         let card = UIView()
         card.backgroundColor = .systemBackground
@@ -779,10 +781,16 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         count.font = ScreenAdapter.font(13)
         count.textColor = .secondaryLabel
 
-        card.addSubviews(avatar, name, count)
+        let notice = UILabel()
+        notice.font = ScreenAdapter.font(13)
+        notice.textColor = .secondaryLabel
+        notice.numberOfLines = 2
+        notice.isHidden = true
+
+        card.addSubviews(avatar, name, count, notice)
         avatar.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
-            make.centerY.equalToSuperview()
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
             make.width.height.equalTo(ScreenAdapter.scaleW(56))
         }
         name.snp.makeConstraints { make in
@@ -794,10 +802,16 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
             make.leading.equalTo(name)
             make.top.equalTo(name.snp.bottom).offset(ScreenAdapter.scaleH(4))
         }
+        notice.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
+            make.trailing.equalToSuperview().offset(-ScreenAdapter.scaleW(16))
+            make.top.equalTo(avatar.snp.bottom).offset(ScreenAdapter.scaleH(12))
+        }
 
         headerAvatar = avatar
         headerNameLabel = name
         headerCountLabel = count
+        headerNoticeLabel = notice
         return header
     }
 
@@ -810,6 +824,11 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
                 var count = (payload["member_count"] as? Int)
                     ?? ((payload["extra"] as? [String: Any])?["member_count"] as? Int)
                     ?? 0
+                // 群公告（notice / announcement / extra.notice）
+                let notice = (payload["notice"] as? String)
+                    ?? (payload["announcement"] as? String)
+                    ?? ((payload["extra"] as? [String: Any])?["notice"] as? String)
+                    ?? ""
                 if let role = payload["role"] as? Int {
                     self.myRole = role
                 } else if let extra = payload["extra"] as? [String: Any] {
@@ -838,10 +857,18 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
                     guard let self = self else { return }
                     self.groupName = name
                     self.memberCount = finalCount
+                    self.groupNotice = notice
                     self.headerNameLabel?.text = name
                     // 特殊群（西安修车大队/西安交流群等）群名使用红棕色
                     self.headerNameLabel?.textColor = self.isSpecialGroup ? SpecialUserUtils.specialGroupNameColor : .label
                     self.headerCountLabel?.text = "共 \(finalCount) 人"
+                    // 群公告：有内容则展示"群公告：xxx"，否则隐藏
+                    if !notice.isEmpty {
+                        self.headerNoticeLabel?.text = "群公告：\(notice)"
+                        self.headerNoticeLabel?.isHidden = false
+                    } else {
+                        self.headerNoticeLabel?.isHidden = true
+                    }
                     if let avatar = self.headerAvatar {
                         AppUtility.loadChannelAvatar(channelId: self.groupId, channelType: 2, name: name, into: avatar)
                     }

@@ -172,6 +172,49 @@ struct NoteEntity: Codable {
     var firstImageURL: String? {
         return blocks.first { $0.type == .image && $0.imageURL != nil }?.imageURL
     }
+
+    /// 从笔记消息原文解析首张图片 URL（兼容 iOS NoteEntity JSON 与安卓 WKNoteContent 的 coverUrl/blockListJson）
+    static func firstImageURL(inMessageContent content: String) -> String? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return nil
+        }
+        // 0. 安卓 WKNoteContent 直接带封面图 coverUrl（兼容 utalk 的 resource 字段），优先使用
+        if let cover = (dict["coverUrl"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !cover.isEmpty {
+            return cover
+        }
+        if let resource = (dict["resource"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !resource.isEmpty {
+            return resource
+        }
+        // 1. 安卓线缆格式：blockListJson 字符串里的 type=3 块，图片地址在 imagePath
+        if let blJson = dict["blockListJson"] as? String, !blJson.isEmpty,
+           let bd = blJson.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: bd) as? [[String: Any]] {
+            for item in arr {
+                let type = (item["type"] as? NSNumber)?.intValue ?? 2
+                guard type == 3 else { continue }
+                if let path = item["imagePath"] as? String, !path.isEmpty { return path }
+                if let url = item["url"] as? String, !url.isEmpty { return url }
+            }
+        }
+        // 2. iOS NoteEntity JSON：取 blocks 里第一张有地址的图片
+        if let note = try? JSONDecoder().decode(NoteEntity.self, from: data), let url = note.firstImageURL {
+            return url
+        }
+        // 3. 嵌套包裹 {"note_json": "..."} / {"note": {...}}
+        if let nested = dict["note_json"] as? String, !nested.isEmpty {
+            return firstImageURL(inMessageContent: nested)
+        }
+        if let nestedDict = dict["note"] as? [String: Any],
+           let nd = try? JSONSerialization.data(withJSONObject: nestedDict),
+           let ns = String(data: nd, encoding: .utf8) {
+            return firstImageURL(inMessageContent: ns)
+        }
+        return nil
+    }
     
     /// 格式化时间
     var timeString: String {

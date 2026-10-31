@@ -65,6 +65,8 @@ class ChatViewController: UIViewController {
     /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），控制群管理入口可见性（对齐安卓 hideOrShowRightView）
     private var myGroupRole: Int = 0
     private var isGroupAdmin: Bool { myGroupRole == 1 || myGroupRole == 2 }
+    /// 群全员禁言标记（来自频道信息 forbidden 字段）
+    private var groupAllMuted: Bool = false
 
     /// 聊天文件上传专用会话（默认 30/60 秒对原图/视频不够）
     private let uploadSession: URLSession = {
@@ -145,9 +147,15 @@ class ChatViewController: UIViewController {
         guard let messageId = notification.userInfo?["messageId"] as? String,
               let idx = messages.firstIndex(where: { $0.messageID == messageId }),
               messages[idx].type != .system else { return }
-        messages[idx].type = .system
-        messages[idx].content = messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
-        tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+        if isSpecialGroup {
+            // 特殊群聊：不展示撤回通知，直接移除消息
+            messages.remove(at: idx)
+            tableView.deleteRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+        } else {
+            messages[idx].type = .system
+            messages[idx].content = messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+            tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+        }
         saveMessagesCacheDebounced()
     }
 
@@ -385,6 +393,8 @@ class ChatViewController: UIViewController {
         NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
         markMessagesAsRead()
         startExtraSync()
+        // 从群管理页返回时刷新全员禁言状态（群主/管理员可能刚切换了开关）
+        applyGroupMuteState()
         // 通话结束返回等场景：服务端生成的消息可能未实时推送，从本地库补齐一次
         refreshMessagesFromLocalStore()
     }
@@ -707,6 +717,8 @@ class ChatViewController: UIViewController {
                         }
                         self.myGroupRole = role
                         self.updateGroupRightBarButton()
+                        // 群全员禁言：仅群主/管理员可发言，普通成员输入框置灰显示「禁言中」
+                        self.applyGroupMuteState(channelInfo)
                         // 频道信息未返回 role 时（部分群频道响应不带该字段），
                         // 回退到群成员列表查当前用户角色，避免群主/管理员看不到管理入口
                         if self.myGroupRole == 0 {
@@ -818,6 +830,8 @@ class ChatViewController: UIViewController {
                         if role > 0, role != self.myGroupRole {
                             self.myGroupRole = role
                             self.updateGroupRightBarButton()
+                            // 角色变更后重新判定禁言状态（群主/管理员解禁）
+                            self.applyGroupMuteState()
                         }
                     }
                 }
@@ -825,6 +839,19 @@ class ChatViewController: UIViewController {
                 print("[Chat] 群成员角色兜底查询失败: \(error)")
             }
         }
+    }
+
+    /// 根据频道信息设置群全员禁言标记并刷新输入栏
+    private func applyGroupMuteState(_ channelInfo: ChannelInfo) {
+        groupAllMuted = channelInfo.isAllMuted
+        applyGroupMuteState()
+    }
+
+    /// 按「全员禁言 且 本人非群主/管理员」判定输入栏是否置灰禁言
+    private func applyGroupMuteState() {
+        guard channelType == 2 else { return }
+        let shouldMute = groupAllMuted && !isGroupAdmin
+        inputBar.setMuted(shouldMute)
     }
 
     /// 点击群聊标题：所有成员统一进群详情页（含群成员、群二维码、群管理面板；修改权限由角色控制）
@@ -1724,6 +1751,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             guard !items.isEmpty else { return }
             DispatchQueue.main.async {
                 var changedRows: [IndexPath] = []
+                var didRemove = false
                 for item in items {
                     if let ver = (item["version"] as? NSNumber)?.int64Value,
                        ver > self.extraVersion { self.extraVersion = ver }
@@ -1736,9 +1764,15 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     let revoked = (item["revoke"] as? NSNumber)?.intValue ?? 0
                     if revoked == 1 {
                         if self.messages[idx].type != .system {
-                            self.messages[idx].type = .system
-                            self.messages[idx].content = self.messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
-                            changedRows.append(IndexPath(row: idx, section: 0))
+                            if self.isSpecialGroup {
+                                // 特殊群聊：撤回消息直接移除，不展示灰色通知
+                                self.messages.remove(at: idx)
+                                didRemove = true
+                            } else {
+                                self.messages[idx].type = .system
+                                self.messages[idx].content = self.messages[idx].isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+                                changedRows.append(IndexPath(row: idx, section: 0))
+                            }
                         }
                     } else if self.messages[idx].isFromMe, readed == 1 || readedCount > 0,
                               self.messages[idx].status != 2 {
@@ -1747,8 +1781,13 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                         changedRows.append(IndexPath(row: idx, section: 0))
                     }
                 }
-                guard !changedRows.isEmpty else { return }
-                self.tableView.reloadRows(at: changedRows, with: .none)
+                if didRemove {
+                    // 有移除操作时索引已变化，整体刷新更安全
+                    self.tableView.reloadData()
+                } else if !changedRows.isEmpty {
+                    self.tableView.reloadRows(at: changedRows, with: .none)
+                }
+                self.saveMessagesCacheDebounced()
             }
         }
     }
@@ -1773,10 +1812,15 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     private func recallMessage(_ message: Message) {
-        // 本地占位消息（UUID 且尚未收到 sendack 回写真实 messageID）服务端查不到，直接拦截
+        // 本地占位消息（UUID 且尚未收到 sendack 回写真实 messageID）服务端查不到，
+        // 直接从本地移除即可（发送中/失败的消息都还没真正到达服务端，无需走撤回接口）
         let isServerID = Int64(message.messageID) != nil
         if !isServerID {
-            AppUtility.showToast("消息发送中，稍后重试")
+            if let idx = messages.firstIndex(where: { $0.messageID == message.messageID }) {
+                messages.remove(at: idx)
+                tableView.deleteRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+                saveMessagesCacheDebounced()
+            }
             return
         }
         Task {
@@ -1794,11 +1838,17 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     || response.isEmpty
                 if revoked {
                     DispatchQueue.main.async {
-                        // 对齐安卓/微信：撤回后替换为居中系统条
                         if let idx = self.messages.firstIndex(where: { $0.messageID == message.messageID }) {
-                            self.messages[idx].type = .system
-                            self.messages[idx].content = "你撤回了一条消息"
-                            self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+                            if self.isSpecialGroup {
+                                // 特殊群聊：不展示任何灰色通知，撤回后直接移除（时间分隔由相邻消息承担）
+                                self.messages.remove(at: idx)
+                                self.tableView.deleteRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+                            } else {
+                                // 对齐安卓/微信：撤回后替换为居中系统条
+                                self.messages[idx].type = .system
+                                self.messages[idx].content = "你撤回了一条消息"
+                                self.tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
+                            }
                         }
                         self.saveMessagesCacheDebounced()
                     }

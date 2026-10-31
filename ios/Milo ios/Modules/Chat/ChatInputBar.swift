@@ -33,6 +33,8 @@ class ChatInputBar: UIView {
     weak var delegate: ChatInputBarDelegate?
     /// 是否群聊（群聊才显示 @ 入口，与安卓一致）
     var isGroupChat: Bool = false
+    /// 群全员禁言且本人非群主/管理员：输入框置灰只读并显示「禁言中」
+    private(set) var isMuted = false
 
     /// 输入行胶囊玻璃容器（包含语音/输入框/发送/+）
     private let pillContainer = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
@@ -252,8 +254,21 @@ class ChatInputBar: UIView {
 
     /// 左侧常驻语音/键盘切换；右侧按钮在「＋ / 发送」间切换，并同步占位文案
     private func updateInputControls() {
+        if isMuted {
+            // 禁言中：只读占位「禁言中」，隐藏语音/发送/＋，确保普通成员无法发消息
+            sendButton.isHidden = true
+            moreButton.isHidden = true
+            voiceButton.isHidden = true
+            holdToTalkButton.isHidden = true
+            placeholderLabel.text = "禁言中"
+            placeholderLabel.textColor = .tertiaryLabel
+            placeholderLabel.isHidden = false
+            return
+        }
         let hasText = !(textView.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         voiceButton.isHidden = false
+        placeholderLabel.text = "消息"
+        placeholderLabel.textColor = .tertiaryLabel
         if isVoiceMode {
             sendButton.isHidden = true
             moreButton.isHidden = false
@@ -264,6 +279,33 @@ class ChatInputBar: UIView {
             moreButton.isHidden = hasText
             voiceButton.setImage(UIImage(systemName: "mic"), for: .normal)
             placeholderLabel.isHidden = hasText
+        }
+    }
+
+    /// 设置禁言状态（群全员禁言且本人非群主/管理员）
+    func setMuted(_ muted: Bool) {
+        guard isMuted != muted else { return }
+        isMuted = muted
+        textView.isEditable = !muted
+        textView.isSelectable = !muted
+        if muted {
+            textView.resignFirstResponder()
+            closePanels()
+        }
+        updateInputControls()
+    }
+
+    /// 收起表情/更多面板
+    private func closePanels() {
+        guard isMoreVisible || isEmojiVisible else { return }
+        emojiPanel?.isHidden = true
+        morePanel?.isHidden = true
+        isEmojiVisible = false
+        isMoreVisible = false
+        superview?.layoutIfNeeded()
+        UIView.animate(withDuration: 0.2) {
+            self.panelContainerHeight?.update(offset: 0)
+            self.superview?.layoutIfNeeded()
         }
     }
 

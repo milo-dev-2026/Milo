@@ -1,5 +1,6 @@
 ﻿import UIKit
 import SnapKit
+import Kingfisher
 
 // MARK: - 笔记消息Cell
 class NoteMessageCell: UITableViewCell {
@@ -9,6 +10,9 @@ class NoteMessageCell: UITableViewCell {
 
     // 笔记内容
     private let noteContainer = UIView()
+    /// 笔记首图（对齐安卓：气泡顶部展示笔记中的第一张图片）
+    private let noteImageView = UIImageView()
+    private let noteTextRow = UIView()
     private let noteIconView = UIImageView()
     private let noteTitleLabel = UILabel()
     private let notePreviewLabel = UILabel()
@@ -36,6 +40,14 @@ class NoteMessageCell: UITableViewCell {
         // 笔记卡片容器
         noteContainer.backgroundColor = .white
         noteContainer.layer.cornerRadius = ScreenAdapter.scaleW(10)
+        noteContainer.clipsToBounds = true
+
+        // 笔记首图
+        noteImageView.contentMode = .scaleAspectFill
+        noteImageView.clipsToBounds = true
+        noteImageView.layer.cornerRadius = ScreenAdapter.scaleW(8)
+        noteImageView.backgroundColor = .systemGray6
+        noteImageView.isHidden = true
 
         // 笔记图标
         noteIconView.image = UIImage(systemName: "note.text")
@@ -46,6 +58,7 @@ class NoteMessageCell: UITableViewCell {
         noteTitleLabel.font = ScreenAdapter.mediumFont(15)
         noteTitleLabel.textColor = .label
         noteTitleLabel.numberOfLines = 1
+        noteTitleLabel.lineBreakMode = .byTruncatingTail
 
         // 笔记预览
         notePreviewLabel.font = ScreenAdapter.font(12)
@@ -57,26 +70,27 @@ class NoteMessageCell: UITableViewCell {
         noteArrowView.tintColor = .systemGray3
         noteArrowView.contentMode = .scaleAspectFit
 
-        noteContainer.addSubviews(noteIconView, noteTitleLabel, notePreviewLabel, noteArrowView)
+        noteTextRow.addSubviews(noteIconView, noteTitleLabel, notePreviewLabel, noteArrowView)
+        noteContainer.addSubviews(noteImageView, noteTextRow)
         bubbleView.addSubview(noteContainer)
         contentView.addSubviews(tailView, bubbleView)
 
-        // 笔记内部布局
+        // 笔记内部布局（图片是否展示在 configure 里动态调整）
         noteIconView.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(12))
-            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(10))
+            make.centerY.equalToSuperview()
             make.width.height.equalTo(ScreenAdapter.scaleW(20))
         }
 
         noteTitleLabel.snp.makeConstraints { make in
             make.leading.equalTo(noteIconView.snp.trailing).offset(ScreenAdapter.scaleW(8))
-            make.top.equalTo(noteIconView)
+            make.top.equalToSuperview().offset(ScreenAdapter.scaleH(9))
             make.trailing.lessThanOrEqualTo(noteArrowView.snp.leading).offset(-ScreenAdapter.scaleW(8))
         }
 
         notePreviewLabel.snp.makeConstraints { make in
             make.leading.equalTo(noteTitleLabel)
-            make.top.equalTo(noteTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(4))
+            make.top.equalTo(noteTitleLabel.snp.bottom).offset(ScreenAdapter.scaleH(3))
             make.trailing.lessThanOrEqualTo(noteArrowView.snp.leading).offset(-ScreenAdapter.scaleW(8))
         }
 
@@ -154,14 +168,57 @@ class NoteMessageCell: UITableViewCell {
 
         let fillColor: UIColor = isFromMe ? .themeBubbleSend : .themeBubbleReceive
         bubbleView.backgroundColor = fillColor
-        // 气泡高度与笔记卡片一致（卡片 72 + 上下各 8 内边距），
-        // 之前未显式指定高度，卡片被压缩导致标题/摘要显示不全
-        let cardHeight = ScreenAdapter.scaleH(72)
+
+        // 气泡宽度固定，首图按原始比例展示（高度有上限）
+        let bubbleWidth = ScreenAdapter.screenWidth * 0.72
+        let imageWidth = bubbleWidth - ScreenAdapter.scaleW(16)
+        var imageHeight: CGFloat = 0
+        var imageURL: URL?
+        if let urlStr = NoteEntity.firstImageURL(inMessageContent: message.content),
+           let url = APIConfig.chatMediaURL(urlStr) {
+            imageURL = url
+            let ratio: CGFloat
+            if let size = ChatImageSizeCache.shared.size(for: url) {
+                ratio = size.height / max(size.width, 1)
+            } else {
+                ratio = 3.0 / 4.0
+            }
+            imageHeight = min(max(imageWidth * ratio, ScreenAdapter.scaleH(80)), ScreenAdapter.scaleH(180))
+        }
+
+        // 文字区固定高度，图片区按比例叠加
+        let textRowHeight = ScreenAdapter.scaleH(60)
+        let cardHeight = textRowHeight + (imageURL != nil ? imageHeight + ScreenAdapter.scaleH(8) : 0)
+
+        if let url = imageURL {
+            noteImageView.isHidden = false
+            noteImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "photo"))
+            noteImageView.snp.remakeConstraints { make in
+                make.top.leading.trailing.equalToSuperview()
+                make.height.equalTo(imageHeight)
+            }
+            noteTextRow.snp.remakeConstraints { make in
+                make.top.equalTo(noteImageView.snp.bottom).offset(ScreenAdapter.scaleH(8))
+                make.leading.trailing.bottom.equalToSuperview()
+                make.height.equalTo(textRowHeight)
+            }
+        } else {
+            noteImageView.isHidden = true
+            noteImageView.snp.remakeConstraints { make in
+                make.top.leading.trailing.equalToSuperview()
+                make.height.equalTo(0)
+            }
+            noteTextRow.snp.remakeConstraints { make in
+                make.edges.equalToSuperview()
+                make.height.equalTo(textRowHeight)
+            }
+        }
+
         ChatBubbleLayout.install(
             bubble: bubbleView,
             tail: tailView,
             isFromMe: isFromMe,
-            width: ScreenAdapter.screenWidth * 0.72,
+            width: bubbleWidth,
             height: cardHeight + 16,
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,
@@ -171,7 +228,6 @@ class NoteMessageCell: UITableViewCell {
             status: message.isFromMe ? message.status : nil
         )
 
-        noteTitleLabel.lineBreakMode = .byTruncatingTail
         // 笔记容器布局
         noteContainer.snp.remakeConstraints { make in
             make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))

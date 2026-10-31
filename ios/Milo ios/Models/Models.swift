@@ -47,7 +47,17 @@ struct ChannelInfo: Codable {
     var follow: Int?
     /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），仅群频道返回
     var role: Int?
+    /// 群全员禁言标记（1=全员禁言，0/无=正常），对齐安卓 channel.forbidden
+    var forbidden: Int?
     var extra: [String: AnyCodable]?
+
+    /// 是否处于全员禁言状态（群主/管理员不受限）
+    var isAllMuted: Bool {
+        if let f = forbidden, f == 1 { return true }
+        if let extra = extra, let v = extra["forbidden"]?.value as? Int, v == 1 { return true }
+        if let extra = extra, let v = extra["forbidden"]?.value as? String, v == "1" { return true }
+        return false
+    }
 
     var displayName: String {
         return remark?.isEmpty == false ? remark! : (name ?? "")
