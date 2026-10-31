@@ -111,20 +111,20 @@ final class RingtonePlayer {
 
         var data = Data()
         data.append(contentsOf: [0x52, 0x49, 0x46, 0x46]) // RIFF
-        data.append(littleEndian(UInt32(36 + dataSize)))
+        data.append(contentsOf: littleEndian(UInt32(36 + dataSize)))
         data.append(contentsOf: [0x57, 0x41, 0x56, 0x45]) // WAVE
         data.append(contentsOf: [0x66, 0x6D, 0x74, 0x20]) // fmt 
-        data.append(littleEndian(UInt32(16)))
-        data.append(littleEndian(UInt16(1)))               // PCM
-        data.append(littleEndian(channels))
-        data.append(littleEndian(UInt32(sampleRate)))
-        data.append(littleEndian(byteRate))
-        data.append(littleEndian(blockAlign))
-        data.append(littleEndian(bits))
+        data.append(contentsOf: littleEndian(UInt32(16)))
+        data.append(contentsOf: littleEndian(UInt16(1)))   // PCM
+        data.append(contentsOf: littleEndian(channels))
+        data.append(contentsOf: littleEndian(UInt32(sampleRate)))
+        data.append(contentsOf: littleEndian(byteRate))
+        data.append(contentsOf: littleEndian(blockAlign))
+        data.append(contentsOf: littleEndian(bits))
         data.append(contentsOf: [0x64, 0x61, 0x74, 0x61]) // data
-        data.append(littleEndian(dataSize))
+        data.append(contentsOf: littleEndian(dataSize))
         for s in samples {
-            data.append(littleEndian(s))
+            data.append(contentsOf: littleEndian(s))
         }
         return data
     }
