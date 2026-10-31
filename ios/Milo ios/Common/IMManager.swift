@@ -927,6 +927,10 @@ extension IMManager: WKChatManagerDelegate {
                    j["_sys"] as? Bool == true {
                     content = text
                     msgType = .system
+                } else if (1000...2000).contains(contentType) {
+                    // 群系统/事件消息（contentType 1000~2000，如改群名/禁言等）：统一按系统消息处理
+                    content = text
+                    msgType = .system
                 } else {
                     content = text
                 }
