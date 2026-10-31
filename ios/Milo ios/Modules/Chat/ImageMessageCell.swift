@@ -114,15 +114,24 @@ class ImageMessageCell: UITableViewCell {
             imageView_.image = UIImage(systemName: "photo")
         }
 
-        // 按原始宽高比取展示尺寸（对齐安卓/微信：大图优先，非正方形）
-        let targetWidth = min(ScreenAdapter.scaleW(230), ScreenAdapter.screenWidth * 0.62)
+        // 按原始宽高比完整显示（对齐安卓/微信）：宽高超限按比例缩放，不裁剪
+        // 横图限宽算高；竖图高超上限则限高反推宽，保证整图可见
+        let maxWidth = min(ScreenAdapter.scaleW(230), ScreenAdapter.screenWidth * 0.62)
+        let maxHeight = ScreenAdapter.scaleH(320)
+        let minHeight = ScreenAdapter.scaleH(90)
         var ratio: CGFloat = 4.0 / 3.0
         if let url = imgURL, let size = ChatImageSizeCache.shared.size(for: url) {
             ratio = size.height / max(size.width, 1)
         }
-        let maxHeight = ScreenAdapter.scaleH(320)
-        let minHeight = ScreenAdapter.scaleH(90)
-        let displayHeight = min(max(targetWidth * ratio, minHeight), maxHeight)
+        var displayWidth = maxWidth
+        var displayHeight = displayWidth * ratio
+        if displayHeight > maxHeight {
+            displayHeight = maxHeight
+            displayWidth = displayHeight / max(ratio, 0.01)
+        } else if displayHeight < minHeight {
+            displayHeight = minHeight
+            displayWidth = min(displayHeight / max(ratio, 0.01), maxWidth)
+        }
         currentHeight = displayHeight
 
         // 尺寸未知时异步解析（取自图片原始像素），解析成功后刷新该行
@@ -140,7 +149,7 @@ class ImageMessageCell: UITableViewCell {
             bubble: bubbleView,
             tail: tailView,
             isFromMe: isFromMe,
-            width: targetWidth,
+            width: displayWidth,
             height: displayHeight,
             timeHeader: timeHeader,
             groupedAbove: groupedAbove,

@@ -175,13 +175,20 @@ class ChatViewController: UIViewController {
                 messages[idx].messageID = msg.messageID
             }
             messages[idx].messageSeq = msg.messageSeq
-            if messages[idx].status != 2 { messages[idx].status = msg.status }
+            // 状态只前进不后退：发送中(0)不得覆盖已成功(1)；撤回(2)为终态不可覆盖
+            let oldStatus = messages[idx].status
+            if oldStatus != 2 && !(oldStatus == 1 && msg.status == 0) {
+                messages[idx].status = msg.status
+            }
             DispatchQueue.main.async { self.tableView.reloadData() }
             return
         }
         // 非本端发送或已知服务端 ID 的消息：直接按 messageID 更新状态
         if let index = messages.firstIndex(where: { $0.messageID == msg.messageID }) {
-            messages[index].status = msg.status
+            let oldStatus = messages[index].status
+            if oldStatus != 2 && !(oldStatus == 1 && msg.status == 0) {
+                messages[index].status = msg.status
+            }
             DispatchQueue.main.async {
                 self.tableView.reloadData()
             }
@@ -1781,7 +1788,11 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     clientMsgNo: message.clientMsgNo.isEmpty ? message.messageID : message.clientMsgNo,
                     messageSeq: UInt32(max(0, message.messageSeq))
                 ))
-                if response["status"] as? Int == 200 {
+                // TangSeng 撤回成功返回 {"message_id":"...","revoke":1}，无 status 字段，需兼容判定
+                let revoked = (response["revoke"] as? Int == 1)
+                    || (response["status"] as? Int == 200)
+                    || response.isEmpty
+                if revoked {
                     DispatchQueue.main.async {
                         // 对齐安卓/微信：撤回后替换为居中系统条
                         if let idx = self.messages.firstIndex(where: { $0.messageID == message.messageID }) {
@@ -2110,7 +2121,8 @@ extension ChatViewController: ChatInputBarDelegate {
         }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.cameraCaptureMode = mode
+        // 必须先设 mediaTypes 再设 cameraCaptureMode：默认 mediaTypes 仅图片，
+        // 先切 video 模式会与默认类型冲突抛 NSInvalidArgumentException 导致闪退
         if mode == .video {
             picker.mediaTypes = [UTType.movie.identifier]
             picker.videoQuality = .typeMedium
@@ -2118,6 +2130,7 @@ extension ChatViewController: ChatInputBarDelegate {
         } else {
             picker.mediaTypes = [UTType.image.identifier]
         }
+        picker.cameraCaptureMode = mode
         picker.delegate = self
         imagePicker = picker
         // 等 actionSheet 完全消失后再 present，避免 present 冲突

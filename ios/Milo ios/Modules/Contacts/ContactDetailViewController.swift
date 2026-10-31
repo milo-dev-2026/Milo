@@ -75,9 +75,11 @@ class ContactDetailViewController: UIViewController {
         guard !isSpecialUser888 else { return }
         isSpecialUser888 = true
         if nameLabel.text == nil || nameLabel.text == "加载中..." {
-            nameLabel.text = SpecialUserUtils.specialName
+            nameLabel.text = SpecialUserUtils.specialFullName
         }
         nameLabel.textColor = SpecialUserUtils.specialUserNameColor
+        // 本地红字「西安」头像，不依赖服务器（服务器无头像时会回退为彩色首字符，与安卓不一致）
+        avatarImageView.image = SpecialUserUtils.makeSpecialAvatar(size: 96)
         showSpecialRows()
     }
 
@@ -91,10 +93,12 @@ class ContactDetailViewController: UIViewController {
         if SpecialUserUtils.isSpecialUser(uid: uid) {
             isSpecialUser888 = true
             nameLabel.textColor = SpecialUserUtils.specialUserNameColor
-            nameLabel.text = user.name.replacingOccurrences(of: "（", with: "\n（")
+            nameLabel.text = SpecialUserUtils.formattedProfileName(user.name)
+            avatarImageView.image = SpecialUserUtils.makeSpecialAvatar(size: 96)
             showSpecialRows()
+        } else {
+            AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: user.name, into: avatarImageView)
         }
-        AppUtility.loadChannelAvatar(channelId: uid, channelType: 1, name: user.name, into: avatarImageView)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -393,15 +397,16 @@ class ContactDetailViewController: UIViewController {
                     let isSpecial = SpecialUserUtils.isSpecialUser(uid: self.uid, shortNo: "", name: info.displayName)
                     self.isSpecialUser888 = isSpecial
                     if isSpecial {
-                        // 特殊好友888：昵称红色，括号部分（营业时间）换到下一行
+                        // 特殊好友888：昵称红色，括号部分（营业时间）换到下一行，缺营业时间时补齐
                         self.nameLabel.textColor = SpecialUserUtils.specialUserNameColor
-                        self.nameLabel.text = info.displayName.replacingOccurrences(of: "（", with: "\n（")
+                        self.nameLabel.text = SpecialUserUtils.formattedProfileName(info.displayName)
                         self.remarkLabel.isHidden = true
+                        self.avatarImageView.image = SpecialUserUtils.makeSpecialAvatar(size: 96)
                         self.showSpecialRows()
                     } else {
                         self.nameLabel.text = info.displayName
+                        AppUtility.loadChannelAvatar(channelId: self.uid, channelType: 1, name: info.displayName, into: self.avatarImageView)
                     }
-                    AppUtility.loadChannelAvatar(channelId: self.uid, channelType: 1, name: info.displayName, into: self.avatarImageView)
                     if let remark = info.remark, !remark.isEmpty {
                         self.remarkLabel.text = "备注：\(remark)"
                     } else {

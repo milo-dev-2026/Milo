@@ -78,22 +78,21 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
 
             // 角色判定（对齐安卓）：接口 my_role → 群成员列表中的本人角色 → 群详情页传入角色 → creator 本人
             var role = loaded?.myRole ?? myRole
+            let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
             if let list: [GroupMember] = try? await APIClient.shared.requestFlexible(
                 .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
             ) {
-                let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
-                let active = list.filter { ($0.isDeleted ?? 0) == 0 && !$0.uid.isEmpty }
-                if let me = active.first(where: { $0.uid == myUid }), let r = me.role {
+                // 本人角色在全量记录中查找：is_deleted 标记不可靠（群主记录也可能被标记 is_deleted=1），
+                // 过滤后会查不到本人导致群管理开关全部禁用
+                if let me = list.first(where: { $0.uid == myUid }), let r = me.role {
                     role = r
                 }
-                if loaded?.ownerUid == nil, let owner = active.first(where: { $0.role == 1 }) {
+                if loaded?.ownerUid == nil, let owner = list.first(where: { $0.role == 1 }) {
                     loaded?.ownerUid = owner.uid
                 }
-                if role == nil, loaded?.ownerUid == myUid {
-                    role = 1
-                }
             }
-            if role == nil, loaded?.ownerUid == (UserDefaults.standard.string(forKey: "uid") ?? "") {
+            // 群主身份最高优先级：本人是 creator/owner 时无视其他来源的错误角色值
+            if !myUid.isEmpty, loaded?.ownerUid == myUid {
                 role = 1
             }
             loaded?.myRole = role

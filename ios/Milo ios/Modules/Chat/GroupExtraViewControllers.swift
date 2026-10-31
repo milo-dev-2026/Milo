@@ -827,7 +827,8 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
                     }
                     if !active.isEmpty { count = active.count }
                     let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
-                    if let me = active.first(where: { $0.uid == myUid }) {
+                    // 本人角色在全量记录中查找：is_deleted 标记不可靠（群主记录也可能被标记删除）
+                    if let me = list.first(where: { $0.uid == myUid }) {
                         myRole = me.role
                     }
                 }

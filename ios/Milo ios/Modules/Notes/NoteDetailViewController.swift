@@ -188,14 +188,15 @@ class NoteDetailViewController: UIViewController {
                 imgView.tintColor = .systemGray3
             }
             
-            // 按原始宽高比展示（大图优先，非正方形）
+            // 按原始宽高比展示（大图优先，非正方形）；笔记页可滚动，高度上限放宽保证整图可见
             let imageWidth = ScreenAdapter.screenWidth - ScreenAdapter.scaleW(32) - 16
+            let noteImageMaxHeight = ScreenAdapter.screenHeight * 2
             var imageHeight = imageWidth * 4.0 / 3.0
             if let urlStr = block.imageURL, let url = APIConfig.chatMediaURL(urlStr),
                let size = ChatImageSizeCache.shared.size(for: url) {
                 imageHeight = imageWidth * size.height / max(size.width, 1)
             }
-            imageHeight = min(max(imageHeight, ScreenAdapter.scaleH(120)), ScreenAdapter.scaleH(360))
+            imageHeight = min(max(imageHeight, ScreenAdapter.scaleH(120)), noteImageMaxHeight)
             
             container.addSubview(imgView)
             imgView.snp.makeConstraints { make in
@@ -209,7 +210,7 @@ class NoteDetailViewController: UIViewController {
                 ChatImageSizeCache.shared.resolve(url: url) { [weak self, weak imgView] size in
                     guard let self = self, let imgView = imgView else { return }
                     let ratioHeight = min(max(imageWidth * size.height / max(size.width, 1),
-                                             ScreenAdapter.scaleH(120)), ScreenAdapter.scaleH(360))
+                                             ScreenAdapter.scaleH(120)), noteImageMaxHeight)
                     imgView.snp.updateConstraints { make in
                         make.height.equalTo(ratioHeight)
                     }

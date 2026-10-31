@@ -9,6 +9,37 @@ enum SpecialUserUtils {
     static let specialShortNo = "888"
     /// 特殊用户昵称
     static let specialName = "西安雷虎虎"
+    /// 资料页完整昵称（含营业时间，括号换行展示，对齐安卓客服资料页）
+    static let specialFullName = "西安雷虎虎\n（上午9点-凌晨2点）"
+
+    /// 资料页昵称格式化：服务器/缓存昵称缺少营业时间时补齐，括号部分换行
+    static func formattedProfileName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("（") {
+            return trimmed.replacingOccurrences(of: "（", with: "\n（")
+        }
+        return specialFullName
+    }
+
+    /// 特殊用户头像：白底红字「西安」（服务器无头像时本地兜底，对齐安卓客服资料页）
+    static func makeSpecialAvatar(size: CGFloat) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            let font = UIFont.boldSystemFont(ofSize: size * 0.34)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: UIColor.red
+            ]
+            let text = "西安" as NSString
+            let textSize = text.size(withAttributes: attrs)
+            text.draw(in: CGRect(x: (size - textSize.width) / 2,
+                                 y: (size - textSize.height) / 2,
+                                 width: textSize.width,
+                                 height: textSize.height), withAttributes: attrs)
+        }
+    }
 
     /// 特殊群聊名称（安卓：西安修车车友交流2群 / 西安修车大队），额外补充「骗人出门让车撞」「西安交流群」
     static let specialGroupNames = ["西安修车车友交流2群", "西安修车大队", "骗人出门让车撞", "西安交流群"]
