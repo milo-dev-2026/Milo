@@ -715,6 +715,8 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
     private let groupId: String
     private var groupName: String = ""
     private var memberCount: Int = 0
+    /// 本人在群里的角色（1=群主 2=管理员 0=普通成员），用于群管理页权限判定
+    private var myRole: Int?
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private weak var headerAvatar: UIImageView?
     private weak var headerNameLabel: UILabel?
@@ -805,15 +807,40 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
                 let raw = try await APIClient.shared.requestRaw(.getChannelInfo(channelId: groupId, channelType: 2))
                 let payload = (raw["data"] as? [String: Any]) ?? raw
                 let name = (payload["name"] as? String) ?? ""
-                let count = (payload["member_count"] as? Int) ?? 0
+                var count = (payload["member_count"] as? Int)
+                    ?? ((payload["extra"] as? [String: Any])?["member_count"] as? Int)
+                    ?? 0
+                if let role = payload["role"] as? Int {
+                    self.myRole = role
+                } else if let extra = payload["extra"] as? [String: Any] {
+                    self.myRole = (extra["role"] as? Int) ?? (extra["role"] as? String).flatMap { Int($0) }
+                }
+
+                // 人数以 membersync 实际有效成员为准（频道 member_count 会把已退群成员算进去）
+                let memberList: [GroupMember]? = try? await APIClient.shared.requestFlexible(
+                    .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
+                )
+                if let list = memberList {
+                    var seen = Set<String>()
+                    let active = list.filter {
+                        ($0.isDeleted ?? 0) == 0 && !$0.uid.isEmpty && seen.insert($0.uid).inserted
+                    }
+                    if !active.isEmpty { count = active.count }
+                    let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+                    if let me = active.first(where: { $0.uid == myUid }) {
+                        myRole = me.role
+                    }
+                }
+
+                let finalCount = count
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     self.groupName = name
-                    self.memberCount = count
+                    self.memberCount = finalCount
                     self.headerNameLabel?.text = name
                     // 特殊群（西安修车大队/西安交流群等）群名使用红棕色
                     self.headerNameLabel?.textColor = self.isSpecialGroup ? SpecialUserUtils.specialGroupNameColor : .label
-                    self.headerCountLabel?.text = "共 \(count) 人"
+                    self.headerCountLabel?.text = "共 \(finalCount) 人"
                     if let avatar = self.headerAvatar {
                         AppUtility.loadChannelAvatar(channelId: self.groupId, channelType: 2, name: name, into: avatar)
                     }
@@ -827,23 +854,36 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
     func numberOfSections(in tableView: UITableView) -> Int { 1 }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        // 特殊群多显示一个"客服"入口
-        return isSpecialGroup ? 1 : 0
+        // 群管理入口对齐安卓/微信：所有人可见（进入后按角色限制可改项）+ 特殊群多一个客服入口
+        return 1 + (isSpecialGroup ? 1 : 0)
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath)
-        cell.textLabel?.text = "客服"
         cell.textLabel?.font = ScreenAdapter.font(16)
-        cell.imageView?.image = UIImage(systemName: "headset")
         cell.imageView?.tintColor = .themePrimary
         cell.accessoryType = .disclosureIndicator
+        if indexPath.row == 0 {
+            cell.textLabel?.text = "群管理"
+            cell.imageView?.image = UIImage(systemName: "gearshape")
+        } else {
+            cell.textLabel?.text = "客服"
+            cell.imageView?.image = UIImage(systemName: "headset")
+        }
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        // 客服 → 特殊好友 888 个人信息页
-        navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
+        if indexPath.row == 0 {
+            navigationController?.pushViewController(
+                GroupManageViewController(groupId: groupId, myRole: myRole), animated: true
+            )
+        } else {
+            // 客服 → 本群客服个人信息页（标题对齐安卓：本群客服）
+            navigationController?.pushViewController(
+                ContactDetailViewController(uid: SpecialUserUtils.specialUid, titleOverride: "本群客服"), animated: true
+            )
+        }
     }
 }

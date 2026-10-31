@@ -44,6 +44,7 @@ class WaitingAnswerViewController: UIViewController {
     deinit {
         ringTimer?.invalidate()
         timeoutWorkItem?.cancel()
+        RingtonePlayer.shared.stop()
     }
 
     /// 邀请信令里可能只有 uid：昵称/头像异步解析完成后刷新页面
@@ -147,17 +148,17 @@ class WaitingAnswerViewController: UIViewController {
 
     private func startRinging() {
         AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-        // 播放铃声（对齐安卓：来电时播放铃声）
-        AudioServicesPlaySystemSound(1005) // 系统铃声
+        // 来电铃声（对齐微信：循环响铃，不用系统提示音避免被静音开关吞掉）
+        RingtonePlayer.shared.startIncoming()
         ringTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-            AudioServicesPlaySystemSound(1005)
         }
         // 45 秒无人接听自动结束（对齐安卓 WaitingAnswerActivity：超时走 onTimeout 发送"未接听"）
         let work = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             self.timeoutWorkItem?.cancel()
             self.ringTimer?.invalidate()
+            RingtonePlayer.shared.stop()
             self.dismiss(animated: true) {
                 self.onTimeout?()
             }
@@ -169,6 +170,7 @@ class WaitingAnswerViewController: UIViewController {
     @objc private func accept() {
         timeoutWorkItem?.cancel()
         ringTimer?.invalidate()
+        RingtonePlayer.shared.stop()
         dismiss(animated: true) {
             self.onAccept?()
         }
@@ -177,6 +179,7 @@ class WaitingAnswerViewController: UIViewController {
     @objc private func reject() {
         timeoutWorkItem?.cancel()
         ringTimer?.invalidate()
+        RingtonePlayer.shared.stop()
         dismiss(animated: true) {
             self.onReject?()
         }

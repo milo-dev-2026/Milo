@@ -743,19 +743,23 @@ class ConversationListViewController: UIViewController {
     }
 
     /// 本地库/服务端返回的旧预览用待覆盖值补齐（仅当新消息时间更晚时）
+    /// 顺序：内存覆盖（本进程刚收发）→ 持久缓存（上次进程最后一条，解决冷启动预览滞后）
     private func applyPreviewOverrides(_ list: [Conversation]) -> [Conversation] {
-        guard !previewOverrides.isEmpty else { return list }
         return list.map { conv in
+            var c = conv
             let key = previewKey(channelID: conv.channelID, channelType: conv.channelType)
-            guard let ov = previewOverrides[key] else { return conv }
-            if (conv.lastMessageTimestamp ?? 0) < ov.timestamp {
-                var c = conv
+            if let ov = previewOverrides[key], (c.lastMessageTimestamp ?? 0) < ov.timestamp {
                 c.lastMessage = ov.content
                 c.lastMessageType = ov.type
                 c.lastMessageTimestamp = ov.timestamp
-                return c
             }
-            return conv
+            if let cached = IMManager.shared.cachedLastPreview(channelId: conv.channelID, channelType: conv.channelType),
+               (c.lastMessageTimestamp ?? 0) < cached.timestamp {
+                c.lastMessage = cached.content
+                c.lastMessageType = cached.type
+                c.lastMessageTimestamp = cached.timestamp
+            }
+            return c
         }
     }
 

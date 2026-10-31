@@ -393,7 +393,8 @@ navigationController?.pushViewController(vc, animated: true)
                         return (lhs.joinTime ?? 0) < (rhs.joinTime ?? 0)
                     }
                     loaded.members = active
-                    if loaded.memberCount == nil { loaded.memberCount = active.count }
+                    // 人数以"实际有效成员"为准（频道信息里的 member_count 可能把已退群成员也算进去）
+                    if !active.isEmpty { loaded.memberCount = active.count }
                     // 兜底：频道信息未给出角色时，用成员列表里的 role/群主判定
                     let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
                     if loaded.myRole == nil, let me = active.first(where: { $0.uid == myUid }) {

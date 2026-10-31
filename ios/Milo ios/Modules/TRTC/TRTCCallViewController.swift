@@ -409,20 +409,16 @@ extension TRTCCallViewController: TRTCCloudDelegate {
         }
     }
 
-    /// 主叫回铃音（对齐安卓：等待接听时播放"嘟...嘟..."提示音）
+    /// 主叫回铃音（对齐微信：等待接听时循环播放"嘟—嘟—"回铃音）
     private func startRingbackTone() {
         stopRingbackTone()
-        // 使用系统提示音模拟回铃音（每2秒一次）
-        ringbackTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            AudioServicesPlaySystemSound(1057) // 系统提示音（类似电话回铃）
-        }
-        // 立即播放一次
-        AudioServicesPlaySystemSound(1057)
+        RingtonePlayer.shared.startRingback()
     }
 
     private func stopRingbackTone() {
         ringbackTimer?.invalidate()
         ringbackTimer = nil
+        RingtonePlayer.shared.stop()
     }
 
     private func markConnected() {

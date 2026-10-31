@@ -619,6 +619,7 @@ class IMManager: NSObject {
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: localMsg)
             }
+            recordLastPreview(localMsg)
         }
         return sent
     }
@@ -646,6 +647,7 @@ class IMManager: NSObject {
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: msg)
         }
+        recordLastPreview(msg)
     }
 }
 
@@ -713,6 +715,7 @@ extension IMManager: WKChatManagerDelegate {
         }
 
         let msg = convertWKMessageToMessage(wkMsg)
+        recordLastPreview(msg)
 
         DispatchQueue.main.async {
             self.onMessageReceived?(msg)
@@ -790,6 +793,7 @@ extension IMManager: WKChatManagerDelegate {
     func onMessageUpdate(_ message: WKMessage!) {
         guard let wkMsg = message else { return }
         let msg = convertWKMessageToMessage(wkMsg)
+        recordLastPreview(msg)
         DispatchQueue.main.async {
             self.onMessageStatusUpdate?(msg)
             NotificationCenter.default.post(name: IMManager.messageStatusUpdateNotification, object: msg)
@@ -801,6 +805,7 @@ extension IMManager: WKChatManagerDelegate {
     func onMessageStatusUpdate(_ message: WKMessage!) {
         guard let wkMsg = message else { return }
         let msg = convertWKMessageToMessage(wkMsg)
+        recordLastPreview(msg)
         DispatchQueue.main.async {
             self.onMessageStatusUpdate?(msg)
             NotificationCenter.default.post(name: IMManager.messageStatusUpdateNotification, object: msg)
@@ -1241,6 +1246,30 @@ extension IMManager {
                 lastMessageType: lastType
             )
         }
+    }
+
+    // MARK: - 会话最后一条消息持久缓存
+    /// 服务端会话列表的 last_message 更新滞后，冷启动/切回列表时会话预览会停留在旧消息。
+    /// 收/发消息时把"最新一条"落盘，会话列表按时间取更新者（对齐安卓直接读本地库的行为）。
+    private static let lastPreviewCacheKey = "last_msg_preview_cache_v1"
+
+    func recordLastPreview(_ msg: Message) {
+        guard !msg.channelID.isEmpty, !msg.content.isEmpty else { return }
+        let key = "\(msg.channelType)_\(msg.channelID)"
+        var store = (UserDefaults.standard.dictionary(forKey: Self.lastPreviewCacheKey) ?? [:])
+        if let old = store[key] as? [String: Any],
+           let oldTs = (old["ts"] as? NSNumber)?.int64Value, msg.timestamp < oldTs { return }
+        store[key] = ["c": msg.content, "t": msg.type.rawValue, "ts": msg.timestamp]
+        UserDefaults.standard.set(store, forKey: Self.lastPreviewCacheKey)
+    }
+
+    func cachedLastPreview(channelId: String, channelType: Int) -> (content: String, type: Int, timestamp: Int64)? {
+        guard let store = UserDefaults.standard.dictionary(forKey: Self.lastPreviewCacheKey),
+              let item = store["\(channelType)_\(channelId)"] as? [String: Any],
+              let content = item["c"] as? String, !content.isEmpty,
+              let ts = (item["ts"] as? NSNumber)?.int64Value, ts > 0 else { return nil }
+        let type = (item["t"] as? NSNumber)?.intValue ?? MessageType.text.rawValue
+        return (content, type, ts)
     }
 
     // MARK: 获取指定频道的会话

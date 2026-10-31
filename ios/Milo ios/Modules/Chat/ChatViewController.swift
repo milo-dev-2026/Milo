@@ -225,6 +225,21 @@ class ChatViewController: UIViewController {
             }
             return
         }
+        // 位置消息回显：SDK 回显未带 clientMsgNo 时，按"同方向同类型同内容（忽略 [位置] 前缀）15 秒内"合并，
+        // 避免一次发送出现多条位置气泡（对齐安卓只显示一条）
+        if msg.isFromMe, msg.type == .location,
+           let idx = messages.lastIndex(where: {
+               $0.isFromMe && $0.type == .location &&
+               self.normalizeForCompare($0.content) == self.normalizeForCompare(msg.content) &&
+               abs($0.timestamp - msg.timestamp) < 15_000
+           }) {
+            messages[idx].messageID = msg.messageID
+            messages[idx].messageSeq = msg.messageSeq
+            messages[idx].timestamp = msg.timestamp
+            if messages[idx].status != 2 { messages[idx].status = 1 }
+            DispatchQueue.main.async { self.tableView.reloadData() }
+            return
+        }
         // 自己发送成功的消息回显：替换本地占位气泡，避免重复
         if msg.isFromMe,
            let idx = messages.firstIndex(where: {
@@ -1024,6 +1039,12 @@ class ChatViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
+    /// 内容比对归一化：本地位置占位消息带 "[位置] " 前缀，服务端线缆解析结果没有
+    private func normalizeForCompare(_ content: String) -> String {
+        guard content.hasPrefix("[位置] "), content.count > 5 else { return content }
+        return String(content.dropFirst(5))
+    }
+
     /// 合并服务端消息与本地消息（保留发送中/失败占位），按 seq + 时间排序
     /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
@@ -1052,12 +1073,15 @@ class ChatViewController: UIViewController {
         let base = merge ? messages : []
         for local in base {
             // 本地消息 ID 与服务端 ID 相同时视为同一条；发送中的占位消息 ID 为 UUID，
-            // 用"同方向同类型同内容 5 秒内"兜底去重（窗口过大会把用户真实重复发送的消息吞掉）
+            // 用 clientMsgNo 或"同方向同类型同内容（位置去掉前缀）时间相近"兜底去重
             let duplicated = result.contains { r in
-                r.messageID == local.messageID ||
-                (r.messageID.isEmpty && local.messageID.isEmpty) ||
-                (r.isFromMe == local.isFromMe && r.type == local.type &&
-                 r.content == local.content && abs(r.timestamp - local.timestamp) < 5_000)
+                if r.messageID == local.messageID { return true }
+                if !r.clientMsgNo.isEmpty && !local.clientMsgNo.isEmpty && r.clientMsgNo == local.clientMsgNo { return true }
+                if r.messageID.isEmpty && local.messageID.isEmpty { return true }
+                guard r.isFromMe == local.isFromMe, r.type == local.type else { return false }
+                let window: Int64 = local.type == .location ? 15_000 : 5_000
+                return normalizeForCompare(r.content) == normalizeForCompare(local.content)
+                    && abs(r.timestamp - local.timestamp) < window
             }
             if !duplicated { result.append(local) }
         }
