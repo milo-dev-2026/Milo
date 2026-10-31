@@ -719,20 +719,9 @@ class APIClient {
     }
 
     func upload(data: Data, fileName: String) async throws -> String {
-        let url = try APIConfig.apiBaseURL.asURL().appendingPathComponent("/v1/files/upload")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        let token = UserDefaults.standard.string(forKey: "token") ?? ""
-        if !token.isEmpty {
-            request.setValue(token, forHTTPHeaderField: "token")
-        }
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        let body = createMultipartBody(data: data, fileName: fileName, boundary: boundary)
-        request.httpBody = body
-        let responseData = try await session.request(request).serializingData().value
-        let result = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any]
-        return result?["path"] as? String ?? ""
+        // 后端不存在 /v1/files/upload，统一走服务端中转的聊天文件上传端点（返回 static/chat/xxx）
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? "note"
+        return try await uploadChatFile(data: data, fileName: fileName, channelId: myUid, channelType: 1)
     }
 
     private func createMultipartBody(data: Data, fileName: String, boundary: String) -> Data {

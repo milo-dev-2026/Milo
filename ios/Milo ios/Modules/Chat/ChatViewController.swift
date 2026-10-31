@@ -55,6 +55,8 @@ class ChatViewController: UIViewController {
     private var pendingAppearIDs = Set<String>()
     /// 回到底部悬浮按钮（远离底部时浮现）
     private let scrollDownButton = UIButton(type: .system)
+    /// 最近一次头像点击时间：表格层命中头像后，抑制紧随其后的 didSelectRow 默认跳转
+    private var avatarTapAt: Date?
     /// 最近一次在线状态文案，供「正在输入」切换后还原
     private var lastOnlineStatusText: String?
     /// 当前用户在群内的角色（1 群主 2 管理员 0 普通成员），控制群管理入口可见性（对齐安卓 hideOrShowRightView）
@@ -185,6 +187,22 @@ class ChatViewController: UIViewController {
 
     private func handleIncomingMessage(_ msg: Message) {
         guard msg.channelID == channelId else { return }
+        // 通话结果气泡：本端可能已根据信令本地插入过一条（对方服务端生成的结果消息随后到达），
+        // 按"同方向 + 10 秒内"合并，避免出现两个通话气泡
+        if msg.type == .call {
+            if let idx = messages.lastIndex(where: {
+                $0.type == .call && !$0.isFromMe == !msg.isFromMe &&
+                abs($0.timestamp - msg.timestamp) < 10_000
+            }) {
+                messages[idx].messageID = msg.messageID
+                messages[idx].messageSeq = msg.messageSeq
+                messages[idx].content = msg.content
+                messages[idx].timestamp = msg.timestamp
+                messages[idx].status = msg.status
+                DispatchQueue.main.async { self.tableView.reloadData() }
+                return
+            }
+        }
         // 特殊群聊：系统/群事件消息与后台已删消息不显示
         if isSpecialGroup {
             if msg.type == .system { return }
@@ -269,6 +287,12 @@ class ChatViewController: UIViewController {
 
         // 长按菜单使用 iOS 原生 ContextMenu（气泡弹出 + 菜单），见 UITableViewDelegate 扩展
 
+        // 头像点击兜底：通话/合并转发等自定义 cell 的头像没有走 ChatBubbleLayout 的点击中继，
+        // 统一在表格层命中头像区域，保证任何消息点击头像都能进入个人资料页（对齐微信）
+        let avatarTap = UITapGestureRecognizer(target: self, action: #selector(handleTableAvatarTap(_:)))
+        avatarTap.cancelsTouchesInView = false
+        tableView.addGestureRecognizer(avatarTap)
+
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
         // 点击消息气泡头像：进入对方个人主页 / 群资料
@@ -326,6 +350,23 @@ class ChatViewController: UIViewController {
         NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
         markMessagesAsRead()
         startExtraSync()
+        // 通话结束返回等场景：服务端生成的消息可能未实时推送，从本地库补齐一次
+        refreshMessagesFromLocalStore()
+    }
+
+    /// 从 SDK 本地消息库补齐（只追加缺失消息，有新消息时才滚动到底部）
+    private func refreshMessagesFromLocalStore() {
+        IMManager.shared.pullLastMessages(channelId: channelId, channelType: channelType, limit: 100) { [weak self] wkMessages, _ in
+            guard let self = self, let wkMessages = wkMessages, !wkMessages.isEmpty else { return }
+            let cached = wkMessages.map { $0.toBusinessMessage() }
+            DispatchQueue.main.async {
+                let oldLastID = self.messages.last?.messageID
+                self.applyLoadedMessages(cached, scroll: false, finish: false, merge: true)
+                if self.messages.last?.messageID != oldLastID {
+                    self.scrollToBottom()
+                }
+            }
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -751,17 +792,47 @@ class ChatViewController: UIViewController {
         }
     }
 
-    /// 点击群聊标题：管理员进群详情（可管理），普通成员进群资料页（只读）
+    /// 点击群聊标题：所有成员统一进群详情页（含群成员、群二维码、群管理面板；修改权限由角色控制）
     @objc private func didTapTitleView() {
         guard channelType == 2 else { return }
-        if isGroupAdmin {
-            openGroupDetail()
-        } else {
-            navigationController?.pushViewController(GroupInfoViewController(groupId: channelId), animated: true)
-        }
+        openGroupDetail()
     }
 
     // MARK: - 点击气泡头像
+    /// 表格层头像命中：返回命中后的消息（用于任何 cell 形态的头像点击）
+    @objc private func handleTableAvatarTap(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: tableView)
+        guard let indexPath = tableView.indexPathForRow(at: point),
+              indexPath.row < messages.count,
+              let cell = tableView.cellForRow(at: indexPath) else { return }
+        let message = messages[indexPath.row]
+        guard message.type != .system, !message.fromUID.isEmpty else { return }
+        let cellPoint = gesture.location(in: cell)
+
+        var hit = false
+        // 标准气泡布局的头像带固定 tag（987_002），命中该视图的 frame 即为点击头像
+        if let avatarView = cell.contentView.viewWithTag(987_002), !avatarView.isHidden {
+            let rect = avatarView.convert(avatarView.bounds, to: cell)
+            hit = rect.insetBy(dx: -4, dy: -4).contains(cellPoint)
+        } else {
+            // 自定义 cell（通话结果/合并转发等）按左右头像区域近似命中
+            let size = ChatBubbleLayout.avatarSize
+            let inset = ChatBubbleLayout.sideInset
+            let rect = message.isFromMe
+                ? CGRect(x: cell.bounds.width - inset - size, y: 0, width: size + 8, height: ScreenAdapter.scaleH(110))
+                : CGRect(x: 0, y: 0, width: inset + size + 8, height: ScreenAdapter.scaleH(110))
+            hit = rect.contains(cellPoint)
+        }
+        guard hit else { return }
+        // 标记时间戳，抑制紧随其后的 didSelectRowAt 默认跳转（如点开图片预览）
+        avatarTapAt = Date()
+        NotificationCenter.default.post(
+            name: ChatAvatarTapRelay.notification,
+            object: nil,
+            userInfo: ["channelId": message.fromUID, "channelType": 1, "name": message.fromUID]
+        )
+    }
+
     @objc private func handleAvatarTapped(_ note: Notification) {
         guard let info = note.userInfo,
               let tappedId = info["channelId"] as? String else { return }
@@ -769,12 +840,8 @@ class ChatViewController: UIViewController {
         let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
 
         if tappedType == 2 {
-            // 群头像 → 管理员进群详情（可管理），普通成员进群资料页（只读）
-            if isGroupAdmin {
-                openGroupDetail()
-            } else {
-                navigationController?.pushViewController(GroupInfoViewController(groupId: channelId), animated: true)
-            }
+            // 群头像 → 所有成员统一进群详情页
+            openGroupDetail()
             return
         }
         // 自己的头像 → 我的主页
@@ -1029,8 +1096,13 @@ class ChatViewController: UIViewController {
                 DispatchQueue.main.async {
                     if let msgs = response.messages {
                         print("[Chat] 加载到 \(msgs.count) 条服务端消息")
+                        let page = msgs.map { Message(from: $0) }
                         // merge: 服务端只返回部分消息时保留本地已有内容，避免"加载不完整"
-                        self.applyLoadedMessages(msgs.map { Message(from: $0) }, scroll: self.messages.isEmpty, finish: true, merge: true)
+                        self.applyLoadedMessages(page, scroll: self.messages.isEmpty, finish: true, merge: true)
+                        // 用首屏服务端响应的最老一条初始化翻页游标（不依赖本地缓存是否完整）
+                        self.bootstrapHistoryCursor(from: page, more: (response.more ?? 0) != 0)
+                        // 首屏不足一屏时自动继续向上翻，保证进入会话就能看到尽量完整的历史
+                        self.fillScreenIfNeeded()
                     } else {
                         print("[Chat] 消息列表为空")
                         self.applyLoadedMessages([], scroll: false, finish: true, merge: true)
@@ -1203,7 +1275,32 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateScrollDownButtonVisibility()
         // 滑到顶部附近自动拉取更早的历史消息（修复"部分聊天记录加载不出来"）
-        if scrollView.contentOffset.y < 50, !isLoadingOlder, hasMoreHistory, messages.count >= 15 {
+        if scrollView.contentOffset.y < 50, !isLoadingOlder, hasMoreHistory {
+            loadOlderMessages()
+        }
+    }
+
+    // MARK: - 首屏历史游标初始化
+    /// 用首屏服务端响应的最老一条初始化翻页游标，不依赖本地缓存是否完整
+    private func bootstrapHistoryCursor(from page: [Message], more: Bool) {
+        guard !page.isEmpty else { return }
+        guard let oldest = page.filter({ $0.messageSeq > 0 }).min(by: { lhs, rhs in
+            let lt = lhs.timestamp > 0 ? lhs.timestamp : Int64.max
+            let rt = rhs.timestamp > 0 ? rhs.timestamp : Int64.max
+            if lt != rt { return lt < rt }
+            return lhs.messageSeq < rhs.messageSeq
+        }) else { return }
+        if historyCursorSeq == 0 || oldest.messageSeq < historyCursorSeq {
+            historyCursorSeq = oldest.messageSeq
+            historyCursorTs = Int(max(0, oldest.timestamp / 1000))
+        }
+        if more { hasMoreHistory = true }
+    }
+
+    /// 首屏内容不足一屏且仍有更早历史时，自动继续向上翻页
+    private func fillScreenIfNeeded() {
+        guard hasMoreHistory, !isLoadingOlder, tableView.bounds.height > 0 else { return }
+        if tableView.contentSize.height < tableView.bounds.height + ScreenAdapter.scaleH(100) {
             loadOlderMessages()
         }
     }
@@ -1284,9 +1381,13 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     let newHeight = self.tableView.contentSize.height
                     self.tableView.contentOffset.y = max(0, oldOffset + (newHeight - oldHeight))
                     self.saveMessagesCacheDebounced()
-                    // 本页去重后很少但服务端标记还有更多：继续翻，避免"看起来没有历史"
-                    if older.count < 10, self.hasMoreHistory {
-                        self.loadOlderMessages()
+                    // 本页去重后很少或内容不足一屏且服务端标记还有更多：继续翻，避免"看起来没有历史"
+                    if self.hasMoreHistory {
+                        if older.count < 10 {
+                            self.loadOlderMessages()
+                        } else {
+                            self.fillScreenIfNeeded()
+                        }
                     }
                 }
             } catch {
@@ -1297,6 +1398,11 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        // 头像点击已由表格层手势处理，避免同时触发图片预览/笔记打开等默认动作
+        if let t = avatarTapAt, Date().timeIntervalSince(t) < 0.6 {
+            avatarTapAt = nil
+            return
+        }
         let message = messages[indexPath.row]
         // 上传中的占位消息不做跳转
         if pendingMedia[message.messageID] != nil { return }

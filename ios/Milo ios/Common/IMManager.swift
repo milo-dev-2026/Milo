@@ -622,10 +622,47 @@ class IMManager: NSObject {
         }
         return sent
     }
+
+    /// 本地插入通话结果气泡（不发送消息）：
+    /// 收到对方"拒绝/取消/忙线"信令但对方结果消息未下发时，用本地气泡补齐（对齐安卓/微信展示）
+    func insertLocalCallResult(channelId: String,
+                               channelType: Int = 1,
+                               fromUID: String,
+                               callType: Int = 0,
+                               resultType: Int,
+                               second: Int = 0) {
+        guard !channelId.isEmpty else { return }
+        let dict: [String: Any] = ["call_type": callType, "result_type": resultType, "second": second]
+        guard let data = try? JSONSerialization.data(withJSONObject: dict),
+              let str = String(data: data, encoding: .utf8) else { return }
+        let msg = Message(messageID: "local_call_\(UUID().uuidString)",
+                          channelID: channelId,
+                          channelType: channelType,
+                          fromUID: fromUID,
+                          content: str,
+                          type: .call,
+                          timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                          status: 1)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: IMManager.messageReceivedNotification, object: msg)
+        }
+    }
 }
 
 // MARK: - WKChatManagerDelegate
 extension IMManager: WKChatManagerDelegate {
+
+    /// 安卓 WKRTCType → 本端 Signal：0邀请 1接听 2取消 3挂断 4拒绝
+    static func rtcSignalType(for contentType: Int) -> Int? {
+        switch contentType {
+        case 9996: return 0
+        case 9998: return 1
+        case 9992: return 2
+        case 9999, 9995: return 3
+        case 9997: return 4
+        default: return nil
+        }
+    }
 
     func onRecvMessages(_ message: WKMessage!, left: Int) {
         guard let wkMsg = message else { return }
@@ -640,10 +677,28 @@ extension IMManager: WKChatManagerDelegate {
             }
         }
 
-        // RTC 通话信令（type=9996）：不进聊天列表，交由通话管理器处理
-        if Int(wkMsg.content.realContentType) == 9996 {
+        // RTC 通话信令：iOS 用 9996 + signal_type；安卓按动作分不同 contentType（9992取消/9997拒绝/9998接听/9999挂断）
+        let rtcContentType = Int(wkMsg.content.realContentType)
+        if [9992, 9995, 9996, 9997, 9998, 9999].contains(rtcContentType) {
             let fromUID = wkMsg.fromUid ?? ""
-            let dict = (wkMsg.content.contentDict as? [String: Any]) ?? [:]
+            var dict = (wkMsg.content.contentDict as? [String: Any]) ?? [:]
+            if dict.isEmpty, !wkMsg.contentData.isEmpty,
+               let raw = String(data: wkMsg.contentData, encoding: .utf8),
+               let data = raw.data(using: .utf8),
+               let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                dict = parsed
+            }
+            // 安卓信令没有 signal_type，按 contentType 推导；已有 signal_type 的（本端信令）保持不变
+            if dict["signal_type"] == nil, let mapped = IMManager.rtcSignalType(for: rtcContentType) {
+                dict["signal_type"] = mapped
+            }
+            // 兼容安卓 from_uid / from_name 字段
+            if dict["caller_name"] == nil, let n = dict["from_name"] as? String {
+                dict["caller_name"] = n
+            }
+            if dict["caller_id"] == nil, let u = dict["from_uid"] as? String {
+                dict["caller_id"] = u
+            }
             DispatchQueue.main.async {
                 RTCCallManager.shared.handleSignal(fromUID: fromUID, payload: dict)
             }
@@ -848,6 +903,12 @@ extension IMManager: WKChatManagerDelegate {
                    let str = String(data: data, encoding: .utf8) {
                     content = str
                 }
+            }
+            // SDK 未按自定义类型解码（或服务端消息走的是原始 payload）时，直接取原始 JSON 兜底，
+            // 否则 content 为空会导致气泡文案异常/不显示（对齐安卓 RTCMsgContent）
+            if content.isEmpty, !wkMsg.contentData.isEmpty,
+               let raw = String(data: wkMsg.contentData, encoding: .utf8) {
+                content = raw
             }
             msgType = .call
 

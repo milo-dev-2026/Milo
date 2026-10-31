@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import SnapKit
 
 // MARK: - 笔记消息Cell

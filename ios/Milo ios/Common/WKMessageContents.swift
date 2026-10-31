@@ -356,6 +356,9 @@ import WuKongIMSDK
         dict["room_id"] = roomId
         dict["caller_id"] = callerId
         dict["caller_name"] = callerName
+        // 安卓 RTCStrategy 解析的是 from_uid / from_name，双写保证安卓端能识别主叫昵称
+        dict["from_uid"] = callerId
+        dict["from_name"] = callerName
         dict["type"] = 9996
         return dict
     }

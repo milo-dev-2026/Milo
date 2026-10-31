@@ -18,6 +18,8 @@ class NoteEditViewController: UIViewController {
 
     /// 本地未上传完成的图片（block.id → 本地图），选中后立即展示，不等上传
     private var localImages: [String: UIImage] = [:]
+    /// 正在上传中的图片/视频数量：>0 时禁止完成/自动保存，避免把空 imagePath 写进笔记
+    private var pendingUploads = 0
     
     private var blocks: [NoteBlock] = []
     
@@ -397,6 +399,8 @@ navigationController?.pushViewController(locVC, animated: true)
     }
     
     private func autoSave() {
+        // 上传未完成时跳过，避免把空 imagePath/videoPath 持久化
+        guard pendingUploads == 0 else { return }
         guard !blocks.isEmpty || !(note?.title.isEmpty ?? true) else { return }
         saveNote(silent: true)
     }
@@ -440,6 +444,11 @@ navigationController?.pushViewController(locVC, animated: true)
     }
     
     @objc private func saveAndDismiss() {
+        // 图片/视频仍在后台上传：阻止关闭，否则发送出去的笔记 imagePath 为空，查看时图片无法加载
+        guard pendingUploads == 0 else {
+            AppUtility.showToast("图片上传中，请稍候")
+            return
+        }
         saveNote()
         AppUtility.showToast("已保存")
         dismiss(animated: true)
@@ -499,17 +508,24 @@ extension NoteEditViewController: PHPickerViewControllerDelegate {
                     self.scrollToBottom()
                 }
                 guard let data = image.jpegData(compressionQuality: 0.6) else { return }
+                DispatchQueue.main.async { self.pendingUploads += 1 }
                 Task {
                     do {
                         let fileName = "note_img_\(Int(Date().timeIntervalSince1970)).jpg"
                         let path = try await APIClient.shared.upload(data: data, fileName: fileName)
+                        // 存绝对地址（/v1/static/chat/ 前缀），保证消息里的 blockListJson 在双端都能直接加载
+                        let absolute = APIConfig.chatMediaURL(path)?.absoluteString ?? path
                         DispatchQueue.main.async {
                             if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
-                                self.blocks[idx].imageURL = path
+                                self.blocks[idx].imageURL = absolute
                             }
+                            self.pendingUploads = max(0, self.pendingUploads - 1)
+                            // 上传成功后立即持久化，避免完成/自动保存时 imagePath 仍为空
+                            self.saveNote(silent: true)
                         }
                     } catch {
                         DispatchQueue.main.async {
+                            self.pendingUploads = max(0, self.pendingUploads - 1)
                             AppUtility.showToast("图片上传失败")
                         }
                     }
@@ -532,6 +548,7 @@ extension NoteEditViewController: PHPickerViewControllerDelegate {
                 let block = NoteBlock(type: .video)
                 let blockId = block.id
                 DispatchQueue.main.async {
+                    self.pendingUploads += 1
                     self.blocks.append(block)
                     self.renderBlocks()
                     self.scrollToBottom()
@@ -539,18 +556,27 @@ extension NoteEditViewController: PHPickerViewControllerDelegate {
                 Task {
                     do {
                         guard let data = try? Data(contentsOf: tmpURL) else {
-                            DispatchQueue.main.async { AppUtility.showToast("视频读取失败") }
+                            DispatchQueue.main.async {
+                                self.pendingUploads = max(0, self.pendingUploads - 1)
+                                AppUtility.showToast("视频读取失败")
+                            }
                             return
                         }
                         let path = try await APIClient.shared.upload(data: data, fileName: tmpURL.lastPathComponent)
                         try? FileManager.default.removeItem(at: tmpURL)
+                        // 存绝对地址（/v1/static/chat/ 前缀），保证消息里的 blockListJson 在双端都能直接加载
+                        let absolute = APIConfig.chatMediaURL(path)?.absoluteString ?? path
                         DispatchQueue.main.async {
                             if let idx = self.blocks.firstIndex(where: { $0.id == blockId }) {
-                                self.blocks[idx].videoURL = path
+                                self.blocks[idx].videoURL = absolute
                             }
+                            self.pendingUploads = max(0, self.pendingUploads - 1)
+                            // 上传成功后立即持久化，避免完成/自动保存时 videoPath 仍为空
+                            self.saveNote(silent: true)
                         }
                     } catch {
                         DispatchQueue.main.async {
+                            self.pendingUploads = max(0, self.pendingUploads - 1)
                             AppUtility.showToast("视频上传失败")
                         }
                     }

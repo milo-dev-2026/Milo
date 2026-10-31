@@ -1,5 +1,6 @@
 import UIKit
 import SnapKit
+import Kingfisher
 import TXLiteAVSDK_TRTC
 
 class WaitingAnswerViewController: UIViewController {
@@ -43,6 +44,16 @@ class WaitingAnswerViewController: UIViewController {
     deinit {
         ringTimer?.invalidate()
         timeoutWorkItem?.cancel()
+    }
+
+    /// 邀请信令里可能只有 uid：昵称/头像异步解析完成后刷新页面
+    func updateCallerName(_ name: String, avatar: String? = nil) {
+        let display = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !display.isEmpty else { return }
+        nameLabel.text = display
+        if let avatar = avatar, !avatar.isEmpty, let url = URL(string: avatar) {
+            avatarView.kf.setImage(with: url, placeholder: avatarView.image)
+        }
     }
 
     private func setupUI() {

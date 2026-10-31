@@ -79,9 +79,17 @@ final class RTCCallManager {
               let signal = Signal(rawValue: signalType) else { return }
         let signalRoomId = intValue(payload["room_id"]) ?? 0
         let signalCallType = intValue(payload["call_type"]) ?? 0
-        var callerName = (payload["caller_name"] as? String) ?? ""
+        // 安卓 RTC 信令字段是 from_name / from_uid（不是 caller_name），兼容两套命名，
+        // 都取不到时不再用 uid 兜底显示（否则页面显示一长串乱码）
+        var callerName = (payload["from_name"] as? String)
+            ?? (payload["caller_name"] as? String)
+            ?? ""
+        callerName = callerName.trimmingCharacters(in: .whitespacesAndNewlines)
         if callerName.isEmpty {
-            callerName = IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.displayName ?? fromUID
+            callerName = IMManager.shared.getChannelInfo(channelId: fromUID, channelType: 1)?.displayName ?? ""
+        }
+        if callerName.isEmpty || callerName == fromUID {
+            callerName = "用户"
         }
 
         switch Signal(rawValue: signalType) {
@@ -114,6 +122,23 @@ final class RTCCallManager {
             callType = signalCallType
             isInCall = true
             presentWaitingAnswer(callerId: fromUID, callerName: callerName)
+            // 信令里没有昵称（只有 uid）时异步拉取频道信息，拿到后刷新等待接听页
+            if callerName == "用户" {
+                let pendingCallerId = fromUID
+                Task {
+                    do {
+                        let info: ChannelInfo = try await APIClient.shared.requestFlexible(
+                            .getChannelInfo(channelId: pendingCallerId, channelType: 1)
+                        )
+                        DispatchQueue.main.async {
+                            let name = info.displayName
+                            guard !name.isEmpty, name != pendingCallerId else { return }
+                            self.peerName = name
+                            self.waitingVC?.updateCallerName(name, avatar: info.logo)
+                        }
+                    } catch { }
+                }
+            }
 
         case .accept:
             callVC?.handleRemoteSignal(signalType)
@@ -123,12 +148,25 @@ final class RTCCallManager {
                 waiting.dismiss(animated: true)
                 waitingVC = nil
             }
-            reset()
+            // 被叫侧：主叫取消 → 本地补一条"对方已取消"通话结果气泡（服务端同结果消息到达时会被合并）
+            IMManager.shared.insertLocalCallResult(channelId: fromUID, fromUID: fromUID,
+                                                   callType: signalCallType, resultType: 0)
+            callVC?.handleRemoteSignal(signalType)
+            if callVC == nil { reset() }
 
         case .refuse, .hangup, .busy:
             if let waiting = waitingVC {
                 waiting.dismiss(animated: true)
                 waitingVC = nil
+            }
+            // 未接通时的结束信号（拒绝/忙线）本地补结果气泡；
+            // 已接通的挂断由服务端结果消息携带真实时长，不本地插入避免出现 00:00 气泡
+            if signal == .refuse {
+                IMManager.shared.insertLocalCallResult(channelId: fromUID, fromUID: fromUID,
+                                                       callType: signalCallType, resultType: 3)
+            } else if signal == .busy {
+                IMManager.shared.insertLocalCallResult(channelId: fromUID, fromUID: fromUID,
+                                                       callType: signalCallType, resultType: 4)
             }
             callVC?.handleRemoteSignal(signalType)
             if callVC == nil { reset() }

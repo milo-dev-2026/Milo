@@ -1,7 +1,6 @@
 ﻿import UIKit
 import SnapKit
-import MAMapKit
-import AMapSearchKit
+import MapKit
 import CoreLocation
 
 class LocationMessageCell: UITableViewCell {
@@ -13,7 +12,7 @@ class LocationMessageCell: UITableViewCell {
     private let addressLabel = UILabel()
     private let tailView = ChatBubbleTailView()
     private var locationCoord: CLLocationCoordinate2D?
-    private var mapView: MAMapView?
+    private var mapView: MKMapView?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -86,13 +85,26 @@ class LocationMessageCell: UITableViewCell {
     }
 
     func configure(with message: Message, timeHeader: String? = nil, groupedAbove: Bool = false, groupedBelow: Bool = false) {
-        // 兼容三种位置内容格式：安卓 "name|lat,lng"、旧版 "name,lat,lng"、本地占位 "[位置] name"
+        // 兼容四种位置内容格式：安卓 JSON（title/address/lat/longitude）、
+        // 安卓 "name|lat,lng"、旧版 "name,lat,lng"、本地占位 "[位置] name"
         let content = message.content
         let raw = content.replacingOccurrences(of: "[位置] ", with: "")
         var name = raw
         var address = ""
         var coord: CLLocationCoordinate2D?
-        if raw.contains("|") {
+
+        if raw.hasPrefix("{"),
+           let d = raw.data(using: .utf8),
+           let j = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+            name = (j["title"] as? String) ?? (j["name"] as? String) ?? ""
+            address = j["address"] as? String ?? ""
+            let latVal = j["lat"] ?? j["latitude"]
+            let lngVal = j["longitude"] ?? j["lng"]
+            if let lat = (latVal as? NSNumber)?.doubleValue,
+               let lon = (lngVal as? NSNumber)?.doubleValue {
+                coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            }
+        } else if raw.contains("|") {
             let parts = raw.components(separatedBy: "|")
             name = parts.first ?? raw
             if parts.count >= 2 {
@@ -112,17 +124,17 @@ class LocationMessageCell: UITableViewCell {
         if name.contains("\n") {
             let lines = name.components(separatedBy: "\n")
             name = lines.first ?? name
-            if lines.count > 1 { address = lines[1] }
+            if lines.count > 1, address.isEmpty { address = lines[1] }
         } else if name.contains("|") {
             // 部分安卓格式：name|address
             let parts = name.components(separatedBy: "|")
             name = parts.first ?? name
-            if parts.count > 1 { address = parts[1] }
+            if parts.count > 1, address.isEmpty { address = parts[1] }
         }
         nameLabel.text = name.isEmpty ? "位置" : name
         addressLabel.text = address
         addressLabel.isHidden = address.isEmpty
-        if let c = coord {
+        if let c = coord, abs(c.latitude) > 0.01 || abs(c.longitude) > 0.01 {
             locationCoord = c
             updateMapView(lat: c.latitude, lon: c.longitude)
         }
@@ -148,27 +160,29 @@ class LocationMessageCell: UITableViewCell {
         let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         // 复用同一个地图实例（首次创建较慢，避免每次 configure 重建导致气泡长时间空白）
         if let map = mapView {
-            map.setCenter(coord, animated: false)
-            map.zoomLevel = 16
+            map.setRegion(MKCoordinateRegion(center: coord, latitudinalMeters: 400, longitudinalMeters: 400), animated: false)
+            // 复用时把大头针移到新坐标，避免停留在上一条位置
+            map.removeAnnotations(map.annotations)
+            let reusedPin = MKPointAnnotation()
+            reusedPin.coordinate = coord
+            map.addAnnotation(reusedPin)
             return
         }
-        let map = MAMapView()
+        // 用系统 MapKit 渲染静态缩略图：不依赖高德 key/配额，定位消息在任何环境都能显示地图
+        let map = MKMapView()
         map.isUserInteractionEnabled = false
         map.showsUserLocation = false
-        map.showsScale = false
-        map.showsCompass = false
-        map.logoCenter = CGPoint(x: -100, y: -100)
-        map.setCenter(coord, animated: false)
-        map.zoomLevel = 16
+        map.pointOfInterestFilter = .excludingAll
+        map.setRegion(MKCoordinateRegion(center: coord, latitudinalMeters: 400, longitudinalMeters: 400), animated: false)
         mapContainer.addSubview(map)
         map.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
         mapView = map
 
-        let pin = MAPointAnnotation()
+        let pin = MKPointAnnotation()
         pin.coordinate = coord
-        map.add(pin)
+        map.addAnnotation(pin)
     }
 
     func openLocationMap(from vc: UIViewController) {

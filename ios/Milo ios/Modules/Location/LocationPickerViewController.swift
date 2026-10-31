@@ -4,6 +4,7 @@ import MAMapKit
 import AMapLocationKit
 import AMapSearchKit
 import CoreLocation
+import MapKit
 
 // MARK: - 地图选点页（对齐安卓 utalk MapLocationActivity + 微信"发送位置"）
 // 布局：导航栏「所在位置」+ 右侧「发送」；顶部搜索框（点击进入独立搜索页）；
@@ -15,9 +16,21 @@ struct PickedLocation {
     let longitude: Double
 }
 
+/// 搜索页统一结果模型：高德 POI 与系统 MapKit 兜底结果共用，避免高德搜索失败时整页无结果
+struct SearchPlace {
+    let name: String
+    let address: String
+    let latitude: Double
+    let longitude: Double
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 class LocationPickerViewController: UIViewController {
 
-    private var mapView: MAMapView!
+    private var mapView: MKMapView!
     private var poiTableView = UITableView()
     private var locateButton = UIButton(type: .system)
 
@@ -29,13 +42,17 @@ class LocationPickerViewController: UIViewController {
     private var currentCoord: CLLocationCoordinate2D?
     private var searchAPI: AMapSearchAPI?
     private var locationManager: AMapLocationManager?
+    /// 系统定位兜底（高德 key 异常时使用）
+    private var locationFallback: LocationFallback?
     /// 当前定位是否已取得过真实位置
     private var hasLocated = false
     /// 拖动结束后防抖刷新 POI
     private var dragRefreshWorkItem: DispatchWorkItem?
+    /// 周边检索失败提示只弹一次
+    private var didToastSearchFailure = false
 
     /// 从搜索页选中的地点：置顶为列表第 0 行并选中（拖动地图后恢复普通模式）
-    private var searchedPOI: AMapPOI?
+    private var searchedPlace: SearchPlace?
     /// 当前城市（用于限定关键词搜索范围，取自逆地理结果）
     private var currentCity = ""
 
@@ -88,13 +105,11 @@ class LocationPickerViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
 
-    // MARK: - 地图
+    // MARK: - 地图（系统 MapKit：不依赖高德 key/配额，保证任何环境都能显示与拖动）
     private func setupMap() {
-        mapView = MAMapView(frame: view.bounds)
-        mapView.delegate = self
-        mapView.showsUserLocation = true
-        mapView.userTrackingMode = .none
-        mapView.zoomLevel = 16
+        mapView = MKMapView(frame: view.bounds)
+        mapView.showsUserLocation = false
+        mapView.pointOfInterestFilter = .excludingAll
         view.addSubview(mapView)
         mapView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -111,8 +126,7 @@ class LocationPickerViewController: UIViewController {
             make.width.height.equalTo(ScreenAdapter.scaleW(34))
         }
 
-        // 用手势识别用户拖地图（平移/缩放），替代计时器猜测程序性移动，行为与微信一致：
-        // 拖动结束后以防抖方式按新中心点刷新 POI 列表并选中首行
+        // 用手势识别用户拖地图（平移/缩放），拖动结束后以防抖方式按新中心点刷新 POI 列表并选中首行
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handleMapGesture(_:)))
         pan.delegate = self
         pan.cancelsTouchesInView = false
@@ -121,6 +135,12 @@ class LocationPickerViewController: UIViewController {
         pinch.delegate = self
         pinch.cancelsTouchesInView = false
         mapView.addGestureRecognizer(pinch)
+    }
+
+    /// 把地图移到指定坐标（统一用米制跨度控制缩放级别）
+    private func setMapRegion(_ coord: CLLocationCoordinate2D, meters: Double, animated: Bool) {
+        mapView.setRegion(MKCoordinateRegion(center: coord, latitudinalMeters: meters, longitudinalMeters: meters),
+                          animated: animated)
     }
 
     @objc private func handleMapGesture(_ gesture: UIGestureRecognizer) {
@@ -143,7 +163,7 @@ class LocationPickerViewController: UIViewController {
         let center = mapView.centerCoordinate
         guard abs(center.latitude) > 0.01 || abs(center.longitude) > 0.01 else { return }
         currentCoord = center
-        searchedPOI = nil
+        searchedPlace = nil
         selectedIndex = 0
         myLocationTitle = "我的位置"
         reverseGeocode(coord: center)
@@ -235,20 +255,19 @@ class LocationPickerViewController: UIViewController {
         if let coord = currentCoord {
             searchVC.nearCoordinate = coord
         }
-        searchVC.onPick = { [weak self] poi in
-            self?.applySearchedPOI(poi)
+        searchVC.onPick = { [weak self] place in
+            self?.applySearchedPlace(place)
         }
         navigationController?.pushViewController(searchVC, animated: true)
     }
 
-    /// 搜索页选点：地图移到该地点，该 POI 置顶为列表第 0 行并选中
-    private func applySearchedPOI(_ poi: AMapPOI) {
-        let coord = CLLocationCoordinate2D(latitude: poi.location.latitude, longitude: poi.location.longitude)
-        searchedPOI = poi
+    /// 搜索页选点：地图移到该地点，该地点置顶为列表第 0 行并选中
+    private func applySearchedPlace(_ place: SearchPlace) {
+        let coord = place.coordinate
+        searchedPlace = place
         selectedIndex = 0
         currentCoord = coord
-        mapView.setCenter(coord, animated: false)
-        mapView.setZoomLevel(17, animated: false)
+        setMapRegion(coord, meters: 400, animated: false)
         reverseGeocode(coord: coord)
         searchNearbyPOI(coord: coord)
         poiTableView.reloadData()
@@ -275,13 +294,23 @@ class LocationPickerViewController: UIViewController {
         // 带逆地理的单次定位，直接拿到地址
         locationManager?.requestLocation(withReGeocode: true) { [weak self] location, regeocode, error in
             guard let self = self else { return }
-            if let location = location {
+            if let location = location, error == nil {
                 self.handleLocated(location: location, regeocode: regeocode)
             } else {
-                // 兜底：持续定位回调
-                self.locationManager?.startUpdatingLocation()
+                // 高德定位失败（key/配额异常）时用系统定位兜底，保证定位功能可用
+                self.startCoreLocationFallback()
             }
         }
+    }
+
+    /// 系统定位兜底：高德 key 异常时仍能拿到当前位置
+    private func startCoreLocationFallback() {
+        locationFallback = LocationFallback { [weak self] location in
+            guard let self = self else { return }
+            self.handleLocated(location: location, regeocode: nil)
+            self.locationFallback = nil
+        }
+        locationFallback?.start()
     }
 
     @objc private func relocate() {
@@ -298,11 +327,12 @@ class LocationPickerViewController: UIViewController {
             myLocationTitle = poiName.isEmpty ? "我的位置" : poiName
         } else {
             myLocationTitle = "我的位置"
+            // 高德定位无逆地理结果时用系统地理编码兜底
+            fallbackReverseGeocode(coord: coord)
         }
-        searchedPOI = nil
+        searchedPlace = nil
         selectedIndex = 0
-        mapView.setCenter(coord, animated: false)
-        mapView.setZoomLevel(17, animated: false)
+        setMapRegion(coord, meters: 400, animated: false)
         searchNearbyPOI(coord: coord)
     }
 
@@ -333,10 +363,10 @@ class LocationPickerViewController: UIViewController {
         var address = myLocationAddress
         var coord = currentCoord
 
-        if let searched = searchedPOI, selectedIndex == 0 {
-            name = (searched.name?.isEmpty == false ? searched.name! : "所选位置")
-            address = searched.address ?? ""
-            coord = CLLocationCoordinate2D(latitude: searched.location.latitude, longitude: searched.location.longitude)
+        if let searched = searchedPlace, selectedIndex == 0 {
+            name = searched.name.isEmpty ? "所选位置" : searched.name
+            address = searched.address
+            coord = searched.coordinate
         } else {
             let poiIndex = selectedIndex - 1
             if selectedIndex > 0, pois.count > poiIndex, poiIndex >= 0 {
@@ -372,11 +402,6 @@ extension LocationPickerViewController: UIGestureRecognizerDelegate {
     }
 }
 
-// MARK: - MAMapViewDelegate
-extension LocationPickerViewController: MAMapViewDelegate {
-    // 不再用 regionDidChangeAnimated 判定拖动（无法区分程序性移动），统一走手势识别
-}
-
 // MARK: - AMapLocationManagerDelegate
 extension LocationPickerViewController: AMapLocationManagerDelegate {
 
@@ -387,7 +412,10 @@ extension LocationPickerViewController: AMapLocationManagerDelegate {
     }
 
     func amapLocationManager(_ manager: AMapLocationManager!, didFailWithError error: Error!) {
-        print("[LocationPicker] 定位失败: \(error.localizedDescription)")
+        print("[LocationPicker] 高德定位失败: \(error.localizedDescription)")
+        if !hasLocated {
+            startCoreLocationFallback()
+        }
     }
 
     func amapLocationManager(_ manager: AMapLocationManager!, doRequireLocationAuth locationManager: CLLocationManager!) {
@@ -418,11 +446,43 @@ extension LocationPickerViewController: AMapSearchDelegate {
                 myLocationTitle = poiName.isEmpty ? "我的位置" : poiName
             }
             poiTableView.reloadData()
+        } else if let coord = currentCoord {
+            // 高德逆地理无结果时用系统地理编码兜底，保证首行有地址
+            fallbackReverseGeocode(coord: coord)
         }
     }
 
     func aMapSearchRequest(_ request: Any!, didFailWithError error: Error!) {
-        print("[LocationPicker] 搜索失败: \(error?.localizedDescription ?? "unknown")")
+        print("[LocationPicker] 高德搜索失败: \(error?.localizedDescription ?? "unknown")")
+        if pois.isEmpty {
+            if let coord = currentCoord {
+                fallbackReverseGeocode(coord: coord)
+            }
+            if !didToastSearchFailure {
+                didToastSearchFailure = true
+                AppUtility.showToast("周边地点加载失败，可拖动地图选择位置")
+            }
+        }
+    }
+
+    /// 系统逆地理兜底（CLGeocoder），高德 key/配额异常时仍能显示地址
+    private func fallbackReverseGeocode(coord: CLLocationCoordinate2D) {
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, _ in
+            DispatchQueue.main.async {
+                guard let self = self, let pm = placemarks?.first else { return }
+                let addr = [pm.name, pm.locality, pm.subLocality, pm.thoroughfare]
+                    .compactMap { $0 }
+                    .joined(separator: " ")
+                if !addr.isEmpty {
+                    self.myLocationAddress = addr
+                    self.poiTableView.reloadData()
+                }
+                if self.myLocationTitle == "我的位置" || self.myLocationTitle.isEmpty {
+                    if let name = pm.name, !name.isEmpty { self.myLocationTitle = name }
+                }
+            }
+        }
     }
 
     /// 列表行数：第 0 行为"我的位置"或搜索置顶地点
@@ -439,9 +499,9 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "POICell", for: indexPath) as! LocationPOICell
         if indexPath.row == 0 {
-            if let searched = searchedPOI {
-                cell.configure(name: searched.name ?? "所选位置",
-                               address: searched.address ?? "",
+            if let searched = searchedPlace {
+                cell.configure(name: searched.name.isEmpty ? "所选位置" : searched.name,
+                               address: searched.address,
                                selected: selectedIndex == 0)
             } else {
                 cell.configure(name: myLocationTitle, address: myLocationAddress, selected: selectedIndex == 0)
@@ -463,8 +523,8 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
         // 点选行：地图移到对应地点（程序性移动，不触发列表刷新）
         var target: CLLocationCoordinate2D?
         if indexPath.row == 0 {
-            if let searched = searchedPOI {
-                target = CLLocationCoordinate2D(latitude: searched.location.latitude, longitude: searched.location.longitude)
+            if let searched = searchedPlace {
+                target = searched.coordinate
             } else {
                 target = currentCoord
             }
@@ -474,7 +534,7 @@ extension LocationPickerViewController: UITableViewDataSource, UITableViewDelega
         }
         if let coord = target {
             currentCoord = coord
-            mapView.setCenter(coord, animated: true)
+            setMapRegion(coord, meters: 400, animated: true)
         }
     }
 }
@@ -486,14 +546,16 @@ class LocationSearchViewController: UIViewController {
     var currentCity = ""
     /// 附近坐标（排序参考）
     var nearCoordinate: CLLocationCoordinate2D?
-    var onPick: ((AMapPOI) -> Void)?
+    var onPick: ((SearchPlace) -> Void)?
 
     private let searchBar = UISearchBar()
     private let tableView = UITableView()
     private let emptyLabel = UILabel()
     private var searchAPI: AMapSearchAPI?
-    private var results: [AMapPOI] = []
+    private var results: [SearchPlace] = []
     private var searchWorkItem: DispatchWorkItem?
+    /// 最近一次关键词，高德无结果/失败时用系统 MapKit 兜底
+    private var lastKeyword = ""
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -560,6 +622,7 @@ class LocationSearchViewController: UIViewController {
             tableView.reloadData()
             return
         }
+        lastKeyword = kw
         let request = AMapPOIKeywordsSearchRequest()
         request.keywords = kw
         if !currentCity.isEmpty {
@@ -569,6 +632,34 @@ class LocationSearchViewController: UIViewController {
         request.offset = 30
         request.page = 1
         searchAPI?.aMapPOIKeywordsSearch(request)
+    }
+
+    /// 高德搜索失败或无结果时，用系统 MapKit 检索兜底，保证搜索功能可用
+    private func systemSearch(_ keyword: String) {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = keyword
+        if let center = nearCoordinate {
+            request.region = MKCoordinateRegion(center: center, latitudinalMeters: 30000, longitudinalMeters: 30000)
+        } else if !currentCity.isEmpty {
+            request.region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 34.3416, longitude: 108.9398),
+                                                latitudinalMeters: 60000, longitudinalMeters: 60000)
+        }
+        MKLocalSearch(request: request).start { [weak self] response, _ in
+            DispatchQueue.main.async {
+                guard let self = self, !keyword.isEmpty else { return }
+                let items = response?.mapItems ?? []
+                self.results = items.prefix(30).map { item in
+                    SearchPlace(
+                        name: item.name ?? "未知位置",
+                        address: item.placemark.title ?? item.placemark.thoroughfare ?? "",
+                        latitude: item.placemark.coordinate.latitude,
+                        longitude: item.placemark.coordinate.longitude
+                    )
+                }
+                self.emptyLabel.isHidden = !self.results.isEmpty
+                self.tableView.reloadData()
+            }
+        }
     }
 }
 
@@ -592,13 +683,27 @@ extension LocationSearchViewController: UISearchBarDelegate {
 
 extension LocationSearchViewController: AMapSearchDelegate {
     func onPOISearchDone(_ request: AMapPOISearchBaseRequest!, response: AMapPOISearchResponse!) {
-        results = response.pois ?? []
+        let pois = response.pois ?? []
+        if pois.isEmpty {
+            // 高德无结果（key/配额/包名异常等）时用系统检索兜底，避免"搜索地址失效"
+            systemSearch(lastKeyword)
+            return
+        }
+        results = pois.map { poi in
+            SearchPlace(
+                name: poi.name ?? "未知位置",
+                address: poi.address ?? "",
+                latitude: poi.location.latitude,
+                longitude: poi.location.longitude
+            )
+        }
         emptyLabel.isHidden = !results.isEmpty || (searchBar.text ?? "").isEmpty
         tableView.reloadData()
     }
 
     func aMapSearchRequest(_ request: Any!, didFailWithError error: Error!) {
-        print("[LocationSearch] 搜索失败: \(error?.localizedDescription ?? "unknown")")
+        print("[LocationSearch] 高德搜索失败，改用系统检索: \(error?.localizedDescription ?? "unknown")")
+        systemSearch(lastKeyword)
     }
 }
 
@@ -610,18 +715,18 @@ extension LocationSearchViewController: UITableViewDataSource, UITableViewDelega
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "POICell", for: indexPath) as! LocationPOICell
         guard indexPath.row < results.count else { return cell }
-        let poi = results[indexPath.row]
-        cell.configure(name: poi.name ?? "未知位置", address: poi.address ?? "", selected: false)
+        let place = results[indexPath.row]
+        cell.configure(name: place.name, address: place.address, selected: false)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard indexPath.row < results.count else { return }
-        let poi = results[indexPath.row]
+        let place = results[indexPath.row]
         searchBar.resignFirstResponder()
         navigationController?.popViewController(animated: true)
-        onPick?(poi)
+        onPick?(place)
     }
 }
 
@@ -675,5 +780,46 @@ class LocationPOICell: UITableViewCell {
         addressLabel.text = address
         addressLabel.isHidden = address.isEmpty
         checkIcon.isHidden = !selected
+    }
+}
+
+// MARK: - 系统定位兜底（CLLocationManager 单次定位）
+/// 高德 SDK 的 key/配额异常时，用它获取当前位置，保证选点页仍可用
+final class LocationFallback: NSObject, CLLocationManagerDelegate {
+
+    private let manager = CLLocationManager()
+    private let onLocation: (CLLocation) -> Void
+    private var finished = false
+
+    init(onLocation: @escaping (CLLocation) -> Void) {
+        self.onLocation = onLocation
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+    }
+
+    func start() {
+        manager.requestWhenInUseAuthorization()
+        manager.requestLocation()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard !finished, let location = locations.last else { return }
+        finished = true
+        manager.stopUpdatingLocation()
+        onLocation(location)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("[LocationFallback] 系统定位失败: \(error.localizedDescription)")
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            manager.requestLocation()
+        default:
+            break
+        }
     }
 }

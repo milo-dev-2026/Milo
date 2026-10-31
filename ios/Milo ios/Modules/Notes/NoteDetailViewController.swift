@@ -34,11 +34,34 @@ class NoteDetailViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 重新加载最新数据
+        // 重新加载最新数据（本地记录媒体地址为空时保留消息里传入的地址，避免图片被覆盖丢失）
         if let latest = NoteStorageManager.shared.getNote(by: note.id) {
-            note = latest
+            note = NoteDetailViewController.merge(local: latest, incoming: note)
             renderContent()
         }
+    }
+
+    /// 合并本地记录与打开时传入的笔记：本地缺失的图片/视频地址用传入值补齐
+    private static func merge(local: NoteEntity, incoming: NoteEntity) -> NoteEntity {
+        var merged = local
+        if merged.title.isEmpty { merged.title = incoming.title }
+        for i in merged.blocks.indices {
+            guard i < incoming.blocks.count else { continue }
+            if merged.blocks[i].type == .image,
+               (merged.blocks[i].imageURL ?? "").isEmpty,
+               let url = incoming.blocks[i].imageURL, !url.isEmpty {
+                merged.blocks[i].imageURL = url
+            }
+            if merged.blocks[i].type == .video,
+               (merged.blocks[i].videoURL ?? "").isEmpty,
+               let url = incoming.blocks[i].videoURL, !url.isEmpty {
+                merged.blocks[i].videoURL = url
+            }
+            if merged.blocks[i].type == .location, merged.blocks[i].location == nil {
+                merged.blocks[i].location = incoming.blocks[i].location
+            }
+        }
+        return merged
     }
     
     private func setupUI() {

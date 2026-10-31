@@ -380,7 +380,18 @@ navigationController?.pushViewController(vc, animated: true)
                     .getGroupMembers(groupId: groupId, page: 1, size: 200, keyword: nil)
                 )
                 if let decoded = memberList {
-                    let active = decoded.filter { ($0.isDeleted ?? 0) == 0 }
+                    // 过滤已退群成员 + 空 uid，并按 uid 去重（同一人可能有多条历史记录）
+                    var seen = Set<String>()
+                    var active = decoded.filter {
+                        ($0.isDeleted ?? 0) == 0 && !$0.uid.isEmpty && seen.insert($0.uid).inserted
+                    }
+                    // 群主优先展示（对齐安卓 resortData），其余保持服务端加入顺序
+                    active.sort { lhs, rhs in
+                        let lp = (lhs.role ?? 0) == 1 ? 0 : 1
+                        let rp = (rhs.role ?? 0) == 1 ? 0 : 1
+                        if lp != rp { return lp < rp }
+                        return (lhs.joinTime ?? 0) < (rhs.joinTime ?? 0)
+                    }
                     loaded.members = active
                     if loaded.memberCount == nil { loaded.memberCount = active.count }
                     // 兜底：频道信息未给出角色时，用成员列表里的 role/群主判定
@@ -390,6 +401,10 @@ navigationController?.pushViewController(vc, animated: true)
                     }
                     if loaded.ownerUid == nil, let owner = active.first(where: { $0.role == 1 }) {
                         loaded.ownerUid = owner.uid
+                    }
+                    // 群主兜底：频道 creator 为本人时视为群主（避免角色字段缺失导致群管理不可见）
+                    if loaded.myRole == nil, loaded.ownerUid == myUid {
+                        loaded.myRole = 1
                     }
                 }
 
@@ -603,8 +618,8 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             // 管理员不显示个人开关（免打扰/置顶/保存通讯录/显示群昵称），统一进群管理
             return admin ? 0 : 4
         case .manage:
-            // 群主/管理员显示"群管理"入口
-            return admin ? 1 : 0
+            // 群管理入口：所有人可见（对齐安卓/微信，进页面后再按角色限制可改项）
+            return 1
         case .actions:
             // 管理员不显示查找/清空（群管理内提供）
             return admin ? 0 : 2
@@ -646,6 +661,10 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
             cell.detailTextLabel?.textColor = .secondaryLabel
             let admin = group?.isAdmin ?? false
 
+            // 特殊群才展示客服入口（对齐安卓：仅特殊群多一行客服）
+            cell.textLabel?.text = nil
+            cell.imageView?.image = nil
+            cell.detailTextLabel?.text = nil
             if admin {
                 // 管理员版：row0 群二维码，特殊群 row1 客服
                 switch indexPath.row {
@@ -759,8 +778,11 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
                     let vc = GroupQRCodeViewController(groupId: groupId, groupName: group?.name ?? "群聊")
                     navigationController?.pushViewController(vc, animated: true)
                 case 1:
-                    // 特殊群：客服 → 特殊好友 888 个人信息页
-                    navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
+                    // 特殊群：客服 → 特殊好友 888 个人信息页（标题显示"本群客服"）
+                    navigationController?.pushViewController(
+                        ContactDetailViewController(uid: SpecialUserUtils.specialUid, titleOverride: "本群客服"),
+                        animated: true
+                    )
                 default: break
                 }
             } else {
@@ -782,8 +804,11 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
                     let vc = SetGroupRemarkViewController(groupId: groupId)
                     navigationController?.pushViewController(vc, animated: true)
                 case 3:
-                    // 特殊群：客服 → 特殊好友 888 个人信息页
-                    navigationController?.pushViewController(ContactDetailViewController(uid: SpecialUserUtils.specialUid), animated: true)
+                    // 特殊群：客服 → 特殊好友 888 个人信息页（标题显示"本群客服"）
+                    navigationController?.pushViewController(
+                        ContactDetailViewController(uid: SpecialUserUtils.specialUid, titleOverride: "本群客服"),
+                        animated: true
+                    )
                 default: break
                 }
             }
@@ -793,7 +818,7 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
 
         case .manage:
             // 群管理（角色/权限/禁言/黑名单/转让）
-            let vc = GroupManageViewController(groupId: groupId)
+            let vc = GroupManageViewController(groupId: groupId, myRole: group?.myRole)
             navigationController?.pushViewController(vc, animated: true)
 
         case .actions:

@@ -1,6 +1,6 @@
 import UIKit
 import SnapKit
-import MAMapKit
+import MapKit
 import CoreLocation
 
 // MARK: - 位置详情页（对齐安卓 LocationDetailActivity）
@@ -11,7 +11,7 @@ class LocationDetailViewController: UIViewController {
     private let latitude: Double
     private let longitude: Double
 
-    private var mapView: MAMapView!
+    private var mapView: MKMapView!
 
     init(name: String, address: String, latitude: Double, longitude: Double) {
         self.locationName = name
@@ -45,13 +45,12 @@ class LocationDetailViewController: UIViewController {
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
-    // MARK: - 地图
+    // MARK: - 地图（系统 MapKit，不依赖高德 key/配额）
     private func setupMap() {
-        mapView = MAMapView(frame: view.bounds)
-        mapView.zoomLevel = 17
+        mapView = MKMapView(frame: view.bounds)
+        mapView.delegate = self
         mapView.showsUserLocation = false
-        mapView.showsScale = false
-        mapView.showsCompass = false
+        mapView.pointOfInterestFilter = .excludingAll
         view.addSubview(mapView)
         mapView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -59,11 +58,11 @@ class LocationDetailViewController: UIViewController {
 
         if latitude != 0 && longitude != 0 {
             let coord = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            mapView.setCenter(coord, animated: false)
-            let pin = MAPointAnnotation()
+            mapView.setRegion(MKCoordinateRegion(center: coord, latitudinalMeters: 300, longitudinalMeters: 300), animated: false)
+            let pin = MKPointAnnotation()
             pin.coordinate = coord
             pin.title = locationName
-            mapView.add(pin)
+            mapView.addAnnotation(pin)
         }
     }
 
@@ -203,5 +202,18 @@ class LocationDetailViewController: UIViewController {
         if let appleURL = URL(string: "http://maps.apple.com/?daddr=\(latitude),\(longitude)") {
             UIApplication.shared.open(appleURL)
         }
+    }
+}
+
+// MARK: - MKMapViewDelegate（自定义红色大头针）
+extension LocationDetailViewController: MKMapViewDelegate {
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        guard annotation is MKPointAnnotation else { return nil }
+        let reuseId = "locationPin"
+        let view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseId) as? MKMarkerAnnotationView
+            ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseId)
+        view.markerTintColor = .systemRed
+        view.animatesWhenAdded = false
+        return view
     }
 }

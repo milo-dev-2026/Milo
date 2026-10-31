@@ -514,15 +514,41 @@ class ConversationListViewController: UIViewController {
         guard !isLoadingLocal else { return }
         isLoadingLocal = true
         let existingSnapshot = conversations
+        let serverLoadedSnapshot = serverLoaded
         DispatchQueue.global(qos: .userInitiated).async {
             let local = IMManager.shared.getLocalConversationModels()
             CrashLogger.shared.log("[ConvCache] SDK local conversations = \(local.count)")
             DispatchQueue.main.async {
                 self.isLoadingLocal = false
                 guard !local.isEmpty else { return }
-                let merged = self.filterDeleted(self.mergeNames(local, with: existingSnapshot))
-                // 服务端列表已展示时，不用本地较少的会话覆盖，防止回退闪空
-                if self.serverLoaded && merged.count < self.conversations.count { return }
+                var merged = self.filterDeleted(self.mergeNames(local, with: existingSnapshot))
+                if serverLoadedSnapshot {
+                    // 服务端列表更全时不要用本地较少的会话覆盖，但必须把本地最新的最后一条消息/名称回填，
+                    // 否则昵称下方的预览会一直停留在旧消息（对齐安卓实时更新）
+                    merged = self.conversations.map { conv in
+                        guard let l = local.first(where: {
+                            $0.channelID == conv.channelID && $0.channelType == conv.channelType
+                        }) else { return conv }
+                        var c = conv
+                        if (l.lastMessageTimestamp ?? 0) > (conv.lastMessageTimestamp ?? 0) {
+                            c.lastMessage = l.lastMessage
+                            c.lastMessageType = l.lastMessageType
+                            c.lastMessageTimestamp = l.lastMessageTimestamp
+                        }
+                        if c.name.isEmpty || c.name == c.channelID {
+                            if !l.name.isEmpty { c.name = l.name }
+                            if c.avatar == nil { c.avatar = l.avatar }
+                        }
+                        return c
+                    }
+                    // 本地存在但服务端未返回的会话（如刚产生的笔记/邀请会话）补齐进来
+                    for l in local where !merged.contains(where: {
+                        $0.channelID == l.channelID && $0.channelType == l.channelType
+                    }) {
+                        merged.append(l)
+                    }
+                }
+                merged = self.applyPreviewOverrides(self.filterDeleted(merged))
                 self.conversations = self.sortedConversations(merged)
                 self.tableView.reloadData()
                 self.saveCache(self.conversations)
@@ -540,15 +566,23 @@ class ConversationListViewController: UIViewController {
                 let syncResp: WKSyncChat = try await APIClient.shared.requestFlexible(.syncConversations)
                 let wkConversations = syncResp.conversations ?? []
                 // 置顶优先，其余按 lastMsgSeq 降序（其次按时间戳），与Android会话顺序一致
-                let serverList = self.sortedConversations(
-                    self.filterDeleted(self.mergeNames(wkConversations.map { Conversation(from: $0) }, with: existingSnapshot))
+                var serverList = self.sortedConversations(
+                    self.applyPreviewOverrides(self.filterDeleted(self.mergeNames(wkConversations.map { Conversation(from: $0) }, with: existingSnapshot)))
                 )
+                // 服务端列表未返回、但本地已存在且未被删除的会话补齐（避免会话丢失）
+                for conv in existingSnapshot where !serverList.contains(where: {
+                    $0.channelID == conv.channelID && $0.channelType == conv.channelType
+                }) {
+                    if !self.deletedIDs.contains(conv.channelID) { serverList.append(conv) }
+                }
+                serverList = self.sortedConversations(serverList)
+                let finalList = serverList
                 DispatchQueue.main.async {
                     self.isFetchingServer = false
                     self.serverLoaded = true
-                    self.conversations = serverList
+                    self.conversations = finalList
                     self.tableView.reloadData()
-                    self.saveCache(serverList)
+                    self.saveCache(finalList)
                 }
                 self.fetchChannelInfoForConversations()
             } catch {
@@ -636,6 +670,13 @@ class ConversationListViewController: UIViewController {
             name: IMManager.messageReceivedNotification,
             object: nil
         )
+        // 自己发送的消息：SDK 发送结果回写时同步更新预览（会话库 lastMessage 有延迟）
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMessageStatusUpdate(_:)),
+            name: IMManager.messageStatusUpdateNotification,
+            object: nil
+        )
     }
 
     @objc private func handleIMMessageReceived(_ notification: Notification) {
@@ -645,7 +686,76 @@ class ConversationListViewController: UIViewController {
             unmarkDeleted(channelId: message.channelID)
         }
         DispatchQueue.main.async {
+            self.applyLastMessage(message)
             self.refreshFromLocal()
+        }
+    }
+
+    @objc private func handleMessageStatusUpdate(_ notification: Notification) {
+        guard let message = notification.object as? Message, message.isFromMe else { return }
+        DispatchQueue.main.async {
+            self.applyLastMessage(message)
+        }
+    }
+
+    /// SDK 会话库 lastMessage 更新有延迟：用刚收到/刚发出的消息直接补丁会话预览，
+    /// 保证列表昵称下方显示的是最新一条消息（与安卓一致）
+    private struct PreviewOverride {
+        let content: String
+        let type: Int
+        let timestamp: Int64
+    }
+
+    private var previewOverrides: [String: PreviewOverride] = [:]
+
+    private func previewKey(channelID: String, channelType: Int) -> String {
+        return "\(channelType)_\(channelID)"
+    }
+
+    private func applyLastMessage(_ message: Message) {
+        guard !message.content.isEmpty else { return }
+        guard !deletedIDs.contains(message.channelID) else { return }
+        // 历史消息迟到时不覆盖更新的预览
+        if let idx = conversations.firstIndex(where: {
+            $0.channelID == message.channelID && $0.channelType == message.channelType
+        }), let ts = conversations[idx].lastMessageTimestamp, message.timestamp < ts {
+            return
+        }
+        let key = previewKey(channelID: message.channelID, channelType: message.channelType)
+        if let old = previewOverrides[key], message.timestamp < old.timestamp { return }
+        previewOverrides[key] = PreviewOverride(content: message.content,
+                                                type: message.type.rawValue,
+                                                timestamp: message.timestamp)
+
+        guard let idx = conversations.firstIndex(where: {
+            $0.channelID == message.channelID && $0.channelType == message.channelType
+        }) else {
+            // 会话尚未出现在列表（新会话）：交给本地库刷新补入
+            refreshFromLocal()
+            return
+        }
+        conversations[idx].lastMessage = message.content
+        conversations[idx].lastMessageType = message.type.rawValue
+        conversations[idx].lastMessageTimestamp = message.timestamp
+        conversations = sortedConversations(conversations)
+        tableView.reloadData()
+        saveCacheDebounced()
+    }
+
+    /// 本地库/服务端返回的旧预览用待覆盖值补齐（仅当新消息时间更晚时）
+    private func applyPreviewOverrides(_ list: [Conversation]) -> [Conversation] {
+        guard !previewOverrides.isEmpty else { return list }
+        return list.map { conv in
+            let key = previewKey(channelID: conv.channelID, channelType: conv.channelType)
+            guard let ov = previewOverrides[key] else { return conv }
+            if (conv.lastMessageTimestamp ?? 0) < ov.timestamp {
+                var c = conv
+                c.lastMessage = ov.content
+                c.lastMessageType = ov.type
+                c.lastMessageTimestamp = ov.timestamp
+                return c
+            }
+            return conv
         }
     }
 

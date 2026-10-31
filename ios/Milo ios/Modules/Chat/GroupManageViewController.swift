@@ -6,6 +6,8 @@ import Kingfisher
 class GroupManageViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
 
     private let groupId: String
+    /// 由群详情页传入的本人角色（1=群主 2=管理员 0=普通成员），用于兜底判定权限
+    private let myRole: Int?
     private var group: Group?
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
@@ -17,8 +19,9 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
         case ownerTransfer = 4  // 群主转让
     }
 
-    init(groupId: String) {
+    init(groupId: String, myRole: Int? = nil) {
         self.groupId = groupId
+        self.myRole = myRole
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -55,7 +58,9 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                     payload["group_id"] = groupId
                 }
                 if let jsonData = try? JSONSerialization.data(withJSONObject: payload),
-                   let loaded = try? JSONDecoder().decode(Group.self, from: jsonData) {
+                   var loaded = try? JSONDecoder().decode(Group.self, from: jsonData) {
+                    // 角色兜底：/v1/groups/{id} 不返回本人角色时，用群详情页传入的角色
+                    if loaded.myRole == nil { loaded.myRole = self.myRole }
                     group = loaded
                     DispatchQueue.main.async {
                         self.tableView.reloadData()
@@ -139,6 +144,11 @@ class GroupManageViewController: UIViewController, UITableViewDataSource, UITabl
                 cell.switchControl.tag = 104
                 cell.switchControl.addTarget(self, action: #selector(toggleGroupSetting(_:)), for: .valueChanged)
             default: break
+            }
+            // 普通成员只可查看，不可修改群设置（对齐微信/安卓权限）
+            if !(group?.isAdmin ?? false) {
+                cell.switchControl.isEnabled = false
+                cell.switchControl.alpha = 0.5
             }
             return cell
 

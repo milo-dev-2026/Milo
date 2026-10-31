@@ -44,9 +44,13 @@ class ContactDetailViewController: UIViewController {
     private let sendMsgButton = UIButton(type: .system)
     private let audioCallButton = UIButton(type: .system)
 
-    init(uid: String, source: String? = nil) {
+    /// 页面标题覆盖（如群聊客服入口需要显示"本群客服"而非"个人信息"）
+    private let titleOverride: String?
+
+    init(uid: String, source: String? = nil, titleOverride: String? = nil) {
         self.uid = uid
         self.source = source
+        self.titleOverride = titleOverride
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -84,7 +88,7 @@ class ContactDetailViewController: UIViewController {
 
     private func setupUI() {
         view.backgroundColor = UIColor(white: 0.97, alpha: 1.0)
-        title = "个人信息"
+        title = titleOverride ?? "个人信息"
 
         // 导航栏返回按钮
         let backBtn = UIBarButtonItem(
