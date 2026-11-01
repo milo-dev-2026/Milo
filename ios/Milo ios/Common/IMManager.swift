@@ -1495,7 +1495,7 @@ extension IMManager: WKCMDManagerDelegate {
             DataSyncManager.shared.syncFriends()
         } else if cmd.contains("frienddeleted") {
             DataSyncManager.shared.syncFriends()
-        } else if cmd == "revoke" {
+        } else if cmd.contains("revoke") {
             // 对方撤回消息（后端 /v1/message/revoke 推送的实时 CMD）：
             // 直接发通知，聊天页即时替换为"对方撤回了一条消息"，不用等 10s 扩展同步轮询
             if let messageId = param["message_id"] as? String, !messageId.isEmpty {

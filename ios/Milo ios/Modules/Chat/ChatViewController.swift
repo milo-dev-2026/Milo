@@ -336,6 +336,11 @@ class ChatViewController: UIViewController {
         avatarTap.cancelsTouchesInView = false
         tableView.addGestureRecognizer(avatarTap)
 
+        // 点击消息区任意位置收回键盘（cancelsTouchesInView=false 不影响气泡/头像原有点击）
+        let dismissKeyboardTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboardTap(_:)))
+        dismissKeyboardTap.cancelsTouchesInView = false
+        tableView.addGestureRecognizer(dismissKeyboardTap)
+
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
         // 点击消息气泡头像：进入对方个人主页 / 群资料
@@ -858,6 +863,11 @@ class ChatViewController: UIViewController {
     @objc private func didTapTitleView() {
         guard channelType == 2 else { return }
         openGroupDetail()
+    }
+
+    // MARK: - 点击空白收回键盘
+    @objc private func dismissKeyboardTap(_ gesture: UITapGestureRecognizer) {
+        view.endEditing(true)
     }
 
     // MARK: - 点击气泡头像
