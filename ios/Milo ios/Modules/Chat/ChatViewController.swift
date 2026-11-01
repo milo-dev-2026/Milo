@@ -1611,6 +1611,13 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             actions.append(UIAction(title: "收藏", image: UIImage(systemName: "star")) { [weak self] _ in
                 self?.favoriteMessage(message)
             })
+            // 保存笔记：把收到的笔记存进「我的笔记」（他人笔记默认只读，不落本地库）
+            if message.type == .note, let note = self.parseNoteMessage(message.content) {
+                actions.append(UIAction(title: "保存笔记", image: UIImage(systemName: "square.and.arrow.down")) { _ in
+                    NoteStorageManager.shared.saveReceivedNote(note)
+                    AppUtility.showToast("已保存到我的笔记")
+                })
+            }
             // 表情回应
             actions.append(UIAction(title: "回复表情", image: UIImage(systemName: "face.smiling")) { [weak self] _ in
                 guard let self = self else { return }

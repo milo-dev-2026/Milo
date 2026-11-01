@@ -746,9 +746,11 @@ extension IMManager: WKChatManagerDelegate {
         }
 
         if UIApplication.shared.applicationState == .active {
-            // 前台：播放系统提示音 + 震动
+            // 前台：播放提示音 + 震动
             if LocalStore.shared.isSoundEnabled {
-                AudioServicesPlaySystemSound(1007) // 系统短信提示音
+                // 不用 AudioServicesPlaySystemSound：会被硬件静音开关吞掉，
+                // 且录音后音频会话停在 .playAndRecord 时会走听筒几乎无声
+                RingtonePlayer.shared.playMessageTone()
             }
             if LocalStore.shared.isVibrationEnabled {
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
