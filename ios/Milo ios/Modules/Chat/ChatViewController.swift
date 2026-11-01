@@ -1685,6 +1685,11 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     private func openQRPayload(_ payload: String) {
+        // 群二维码：识别后直接在 App 内申请进群（不再跳到浏览器）
+        if let groupNo = GroupQRCodeHelper.groupNo(from: payload) {
+            GroupQRCodeHelper.join(groupNo: groupNo, from: self)
+            return
+        }
         if let url = URL(string: payload), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) {
             UIApplication.shared.open(url)
         } else {
