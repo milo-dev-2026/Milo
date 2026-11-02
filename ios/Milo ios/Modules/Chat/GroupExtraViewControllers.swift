@@ -765,7 +765,7 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         }
 
         let avatar = UIImageView()
-        avatar.layer.cornerRadius = 8
+        avatar.layer.cornerRadius = 10
         avatar.clipsToBounds = true
         avatar.contentMode = .scaleAspectFill
         avatar.backgroundColor = .systemGray6
@@ -773,12 +773,12 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         avatar.tintColor = .systemGray5
 
         let name = UILabel()
-        name.font = ScreenAdapter.boldFont(18)
+        name.font = ScreenAdapter.boldFont(20)
         name.textColor = .label
         name.numberOfLines = 2
 
         let count = UILabel()
-        count.font = ScreenAdapter.font(13)
+        count.font = ScreenAdapter.font(14)
         count.textColor = .secondaryLabel
 
         let notice = UILabel()
@@ -791,7 +791,7 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         avatar.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
             make.top.equalToSuperview().offset(ScreenAdapter.scaleH(14))
-            make.width.height.equalTo(ScreenAdapter.scaleW(56))
+            make.width.height.equalTo(ScreenAdapter.scaleW(64))
         }
         name.snp.makeConstraints { make in
             make.leading.equalTo(avatar.snp.trailing).offset(ScreenAdapter.scaleW(12))
@@ -800,7 +800,7 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
         }
         count.snp.makeConstraints { make in
             make.leading.equalTo(name)
-            make.top.equalTo(name.snp.bottom).offset(ScreenAdapter.scaleH(4))
+            make.top.equalTo(name.snp.bottom).offset(ScreenAdapter.scaleH(6))
         }
         notice.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(ScreenAdapter.scaleW(16))
@@ -888,7 +888,8 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "InfoCell", for: indexPath)
-        cell.textLabel?.font = ScreenAdapter.font(16)
+        cell.textLabel?.font = ScreenAdapter.font(17)
+        cell.textLabel?.textColor = .label
         cell.imageView?.tintColor = .themePrimary
         cell.accessoryType = .disclosureIndicator
         if indexPath.row == 0 {
@@ -896,9 +897,13 @@ class GroupInfoViewController: UIViewController, UITableViewDataSource, UITableV
             cell.imageView?.image = UIImage(systemName: "gearshape")
         } else {
             cell.textLabel?.text = "客服"
-            cell.imageView?.image = UIImage(systemName: "headset")
+            cell.imageView?.image = UIImage(systemName: "headphone")
         }
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        ScreenAdapter.scaleH(54)
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

@@ -41,6 +41,9 @@ class ChatViewController: UIViewController {
 
     /// 上传中的本地缩略图（messageID → 图片），用于立刻展示占位气泡
     private var pendingMedia: [String: UIImage] = [:]
+    /// 已撤回消息 ID（持久化）：后续从 SDK/磁盘/服务端重新加载时不还原原始内容（修复"撤回的消息还在"）
+    private var revokedMessageIDs: Set<String> = []
+    private var revokedKey: String { "revoked_ids_\(channelId)_\(channelType)" }
     /// 上传任务缓存（失败后点击气泡可重发）
     private var pendingUploads: [String: PendingUpload] = [:]
     /// 已上传成功、等待 SDK 回显替换的本地占位消息
@@ -107,6 +110,7 @@ class ChatViewController: UIViewController {
         setupLoadingView()
         setupNavBar()
         // 先读磁盘消息缓存秒显，再读 SDK 本地库，最后异步拉服务端补齐
+        revokedMessageIDs = Set(UserDefaults.standard.stringArray(forKey: revokedKey) ?? [])
         loadDiskCachedMessages()
         loadCachedMessages()
         loadMessages()
@@ -144,8 +148,9 @@ class ChatViewController: UIViewController {
 
     /// 对方撤回消息的实时 CMD：立即把对应气泡替换为"对方撤回了一条消息"
     @objc private func handleMessageRevokedNotification(_ notification: Notification) {
-        guard let messageId = notification.userInfo?["messageId"] as? String,
-              let idx = messages.firstIndex(where: { $0.messageID == messageId }),
+        guard let messageId = notification.userInfo?["messageId"] as? String else { return }
+        markRevoked(messageID: messageId)
+        guard let idx = messages.firstIndex(where: { $0.messageID == messageId }),
               messages[idx].type != .system else { return }
         if isSpecialGroup {
             // 特殊群聊：不展示撤回通知，直接移除消息
@@ -335,6 +340,11 @@ class ChatViewController: UIViewController {
         let avatarTap = UITapGestureRecognizer(target: self, action: #selector(handleTableAvatarTap(_:)))
         avatarTap.cancelsTouchesInView = false
         tableView.addGestureRecognizer(avatarTap)
+
+        // 点击消息区任意位置收回键盘（cancelsTouchesInView=false 不影响气泡/头像原有点击）
+        let dismissKeyboardTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboardTap(_:)))
+        dismissKeyboardTap.cancelsTouchesInView = false
+        tableView.addGestureRecognizer(dismissKeyboardTap)
 
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
@@ -824,7 +834,7 @@ class ChatViewController: UIViewController {
                 )
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
-                    if let me = members.first(where: { $0.uid == myUid && ($0.isDeleted ?? 0) == 0 }) {
+                    if let me = members.first(where: { $0.uid == myUid }) {
                         let role = me.role ?? 0
                         print("[Chat] 群成员兜底查到我的角色: \(role)")
                         if role > 0, role != self.myGroupRole {
@@ -854,10 +864,46 @@ class ChatViewController: UIViewController {
         inputBar.setMuted(shouldMute)
     }
 
+    /// 特殊群聊：系统/群事件消息、已撤回与被后台删除的消息一律不展示（只保留正常聊天与时间分隔）
+    private func isHiddenInSpecialGroup(_ msg: Message) -> Bool {
+        guard isSpecialGroup else { return false }
+        if msg.type == .system { return true }
+        if let data = msg.content.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           (dict["is_deleted"] as? Int) == 1 { return true }
+        return false
+    }
+
+    /// 记录撤回消息 ID 并持久化，防止从 SDK/磁盘/服务端重新加载时把原始内容还原回来
+    private func markRevoked(messageID: String) {
+        guard !messageID.isEmpty else { return }
+        revokedMessageIDs.insert(messageID)
+        let recent = Array(revokedMessageIDs.suffix(500))
+        UserDefaults.standard.set(recent, forKey: revokedKey)
+        revokedMessageIDs = Set(recent)
+    }
+
+    /// 把服务端/缓存里已撤回的消息替换为撤回提示条
+    private func normalizeRevoked(_ list: [Message]) -> [Message] {
+        guard !revokedMessageIDs.isEmpty else { return list }
+        return list.map { msg in
+            guard revokedMessageIDs.contains(msg.messageID) else { return msg }
+            var m = msg
+            m.type = .system
+            m.content = m.isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+            return m
+        }
+    }
+
     /// 点击群聊标题：所有成员统一进群详情页（含群成员、群二维码、群管理面板；修改权限由角色控制）
     @objc private func didTapTitleView() {
         guard channelType == 2 else { return }
         openGroupDetail()
+    }
+
+    // MARK: - 点击空白收回键盘
+    @objc private func dismissKeyboardTap(_ gesture: UITapGestureRecognizer) {
+        view.endEditing(true)
     }
 
     // MARK: - 点击气泡头像
@@ -1173,6 +1219,8 @@ class ChatViewController: UIViewController {
             }
         }
         // 特殊群聊：过滤掉管理后台已删除的消息（is_deleted=1）以及全部系统/群事件消息
+        // 已撤回消息统一替换为撤回提示条，避免重新加载时把原始内容还原（修复"撤回的消息还在"）
+        result = normalizeRevoked(result)
         if isSpecialGroup {
             result = result.filter { msg in
                 // 系统消息（谁邀请谁、改群名、退群等）不显示
@@ -1217,6 +1265,10 @@ class ChatViewController: UIViewController {
             return lSeq < rSeq
         }
         messages = dedupeForDisplay(result)
+        // 特殊群聊只保留正常聊天消息（撤回条、入群/改群名等灰色通知全部不展示）
+        if isSpecialGroup {
+            messages.removeAll { isHiddenInSpecialGroup($0) }
+        }
         tableView.reloadData()
         if finish || !messages.isEmpty {
             finishLoading()
@@ -1611,6 +1663,13 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
             actions.append(UIAction(title: "收藏", image: UIImage(systemName: "star")) { [weak self] _ in
                 self?.favoriteMessage(message)
             })
+            // 保存笔记：把收到的笔记存进「我的笔记」（他人笔记默认只读，不落本地库）
+            if message.type == .note, let note = self.parseNoteMessage(message.content) {
+                actions.append(UIAction(title: "保存笔记", image: UIImage(systemName: "square.and.arrow.down")) { _ in
+                    NoteStorageManager.shared.saveReceivedNote(note)
+                    AppUtility.showToast("已保存到我的笔记")
+                })
+            }
             // 表情回应
             actions.append(UIAction(title: "回复表情", image: UIImage(systemName: "face.smiling")) { [weak self] _ in
                 guard let self = self else { return }
@@ -1685,6 +1744,11 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     private func openQRPayload(_ payload: String) {
+        // 群二维码：识别后直接在 App 内申请进群（不再跳到浏览器）
+        if let groupNo = GroupQRCodeHelper.groupNo(from: payload) {
+            GroupQRCodeHelper.join(groupNo: groupNo, from: self)
+            return
+        }
         if let url = URL(string: payload), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) {
             UIApplication.shared.open(url)
         } else {
@@ -1757,11 +1821,13 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                        ver > self.extraVersion { self.extraVersion = ver }
                     if let ver = (item["extra_version"] as? NSNumber)?.int64Value,
                        ver > self.extraVersion { self.extraVersion = ver }
-                    guard let mid = item["message_id"] as? String,
-                          let idx = self.messages.firstIndex(where: { $0.messageID == mid }) else { continue }
+                    guard let mid = item["message_id"] as? String else { continue }
                     let readed = (item["readed"] as? NSNumber)?.intValue ?? 0
                     let readedCount = (item["readed_count"] as? NSNumber)?.intValue ?? 0
                     let revoked = (item["revoke"] as? NSNumber)?.intValue ?? 0
+                    // 先记录撤回 ID，保证后续重新加载不会把原文还原
+                    if revoked == 1 { self.markRevoked(messageID: mid) }
+                    guard let idx = self.messages.firstIndex(where: { $0.messageID == mid }) else { continue }
                     if revoked == 1 {
                         if self.messages[idx].type != .system {
                             if self.isSpecialGroup {
@@ -1816,6 +1882,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
         // 直接从本地移除即可（发送中/失败的消息都还没真正到达服务端，无需走撤回接口）
         let isServerID = Int64(message.messageID) != nil
         if !isServerID {
+            markRevoked(messageID: message.messageID)
             if let idx = messages.firstIndex(where: { $0.messageID == message.messageID }) {
                 messages.remove(at: idx)
                 tableView.deleteRows(at: [IndexPath(row: idx, section: 0)], with: .fade)
@@ -1837,6 +1904,7 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                     || (response["status"] as? Int == 200)
                     || response.isEmpty
                 if revoked {
+                    markRevoked(messageID: message.messageID)
                     DispatchQueue.main.async {
                         if let idx = self.messages.firstIndex(where: { $0.messageID == message.messageID }) {
                             if self.isSpecialGroup {
