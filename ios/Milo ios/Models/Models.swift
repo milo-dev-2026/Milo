@@ -160,10 +160,12 @@ struct WKMessageData: Codable {
     var payload: String?
     /// 当 payload 是字典而非 base64 字符串时，存储原始字典
     var payloadDict: [String: Any]?
+    /// 撤回标记（服务端历史同步已合并 message_extra.revoke，1 = 已撤回）
+    var revoke: Int?
 
     enum CodingKeys: String, CodingKey {
         case message_id, message_idstr, client_msg_no, message_seq
-        case from_uid, channel_id, channel_type, timestamp, payload
+        case from_uid, channel_id, channel_type, timestamp, payload, revoke
         case seq // 兼容 seq 字段（部分 API 返回 seq 而非 message_seq）
     }
 
@@ -174,6 +176,7 @@ struct WKMessageData: Codable {
         from_uid = try c.decodeIfPresent(String.self, forKey: .from_uid)
         channel_id = try c.decodeIfPresent(String.self, forKey: .channel_id)
         channel_type = try c.decodeIfPresent(Int.self, forKey: .channel_type)
+        revoke = try c.decodeIfPresent(Int.self, forKey: .revoke)
 
         // message_seq: 兼容 message_seq 和 seq 两种字段名
         if let seq = try c.decodeIfPresent(Int.self, forKey: .message_seq) {
@@ -237,6 +240,7 @@ struct WKMessageData: Codable {
         try c.encodeIfPresent(channel_id, forKey: .channel_id)
         try c.encodeIfPresent(channel_type, forKey: .channel_type)
         try c.encodeIfPresent(timestamp, forKey: .timestamp)
+        try c.encodeIfPresent(revoke, forKey: .revoke)
         // payload: 如果有字典格式，序列化为 JSON 字符串后编码
         if let dict = payloadDict {
             if let jsonData = try? JSONSerialization.data(withJSONObject: dict),
@@ -555,6 +559,12 @@ struct Message: Codable {
         self.timestamp = rawTs > 100_000_000_000 ? rawTs : rawTs * 1000
         self.status = 1
         self.messageSeq = wk.message_seq ?? 0
+        // 服务端历史同步已合并撤回标记：撤回后重新拉历史也显示为撤回提示条，不再还原原文
+        // （修复"撤回的消息还在"：消息本体仍存在分表，仅 message_extra.revoke 置 1）
+        if (wk.revoke ?? 0) == 1 {
+            self.type = .system
+            self.content = self.isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
+        }
     }
 
     var timeString: String {
@@ -1025,8 +1035,14 @@ extension WKMessage {
             }
             type = .note
         default:
-            if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
-            type = .text
+            // 群系统/事件消息（contentType 1000~2000）：统一按系统消息处理，特殊群过滤可正确拦截
+            if (1000...2000).contains(Int(content.realContentType)) {
+                if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+                type = .system
+            } else {
+                if let textContent = content as? WKTextContent { body = textContent.content ?? "" }
+                type = .text
+            }
         }
 
         let sendStatus: Int
