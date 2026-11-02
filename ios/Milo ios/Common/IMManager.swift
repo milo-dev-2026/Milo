@@ -31,6 +31,12 @@ class IMManager: NSObject {
     private(set) var connectStatusRaw: Int = 0
     /// 是否正在处理被踢下线（防止重复弹窗）
     private var isHandlingKick = false
+    /// 连续 IM 连接失败次数（识别 token 失效导致的永久"未连接"）
+    private var connectFailCount = 0
+    /// 上次通过 API 校验登录态的时间（校验节流，避免频繁请求）
+    private var lastSessionVerifyAt: Date = .distantPast
+    /// 是否正在校验登录态
+    private var isVerifyingSession = false
     /// 当前连接状态文案（"" 表示已连接，无需展示）
     var connectStatusText: String {
         switch connectStatusRaw {
@@ -985,6 +991,7 @@ extension IMManager: WKConnectionManagerDelegate {
             case 3: // WKConnected
                 print("[IM] 连接成功")
                 isConnected = true
+                self.connectFailCount = 0
                 // 连接成功后拉取离线 CMD（好友申请等系统消息）
                 WKSDK.shared().cmdManager.pullCMDMessages()
             case 4: // WKDisconnected
@@ -993,6 +1000,8 @@ extension IMManager: WKConnectionManagerDelegate {
             case 0: // WKNoConnect
                 print("[IM] 未连接")
                 isConnected = false
+                self.connectFailCount += 1
+                self.verifySessionIfNeeded()
             case 1: // WKConnecting
                 print("[IM] 连接中...")
                 isConnected = false
@@ -1030,6 +1039,33 @@ extension IMManager: WKConnectionManagerDelegate {
         }
     }
 
+    /// 连续多次连接失败时校验登录态：token 已失效（其他设备登录顶号后本端重连只会被
+    /// "token verify fail" 静默拒绝，不会触发 onKick）时主动弹下线通知；网络抖动则静默重试。
+    /// 修复"账号在他端登录后，本端一直显示未连接且无任何提示"
+    private func verifySessionIfNeeded() {
+        guard connectFailCount >= 4 else { return }
+        guard !isVerifyingSession, !isHandlingKick else { return }
+        guard Date().timeIntervalSince(lastSessionVerifyAt) > 60 else { return }
+        guard let uid = UserDefaults.standard.string(forKey: "uid"), !uid.isEmpty else { return }
+        isVerifyingSession = true
+        lastSessionVerifyAt = Date()
+        Task {
+            defer { isVerifyingSession = false }
+            do {
+                // 轻量鉴权接口：token 失效时服务端返回 401
+                let _: IMServerResponse = try await APIClient.shared.requestFlexible(.getIMServer(uid: uid))
+                // 登录态正常：网络/服务器临时问题，继续静默重连
+            } catch let APIError.serverError(_, code) where code == 401 || code == 403 {
+                DispatchQueue.main.async {
+                    print("[IM] token 已失效(HTTP \(code))，强制下线")
+                    self.handleKickedOffline()
+                }
+            } catch {
+                // 网络错误等，忽略，继续重连
+            }
+        }
+    }
+
     /// 被踢下线：提示"账号已在其他设备登录"，确认后清空登录态回登录页
     private func handleKickedOffline() {
         guard !isHandlingKick else { return }
@@ -1062,9 +1098,10 @@ extension IMManager: WKConnectionManagerDelegate {
     /// 清空本地登录态并跳转登录页
     private func forceLogoutToLogin(window: UIWindow) {
         disconnect()
+        connectFailCount = 0
         LocalStore.shared.clearAll()
         let defaults = UserDefaults.standard
-        ["token", "uid", "short_no", "sex", "sign", "bind_phone", "bind_email", "email"].forEach {
+        ["token", "im_token", "uid", "short_no", "sex", "sign", "bind_phone", "bind_email", "email"].forEach {
             defaults.removeObject(forKey: $0)
         }
         let loginVC = LoginViewController(account: "", isEmail: false)
