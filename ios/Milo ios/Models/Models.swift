@@ -509,6 +509,8 @@ struct Message: Codable {
     /// SDK 发送时的 clientMsgNo（本地占位消息 messageID 为 UUID，靠它与 sendack 回执关联，撤回/已读都依赖该映射）
     /// 不入 CodingKeys：旧缓存无此字段可正常解码，且只有本会话发送的消息需要它
     var clientMsgNo: String = ""
+    /// 服务端历史同步标记该消息已撤回（revoke=1）。用于合并本地缓存时丢弃已撤回的原文
+    var isRevokedFromServer: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case messageID = "message_id"
@@ -562,6 +564,7 @@ struct Message: Codable {
         // 服务端历史同步已合并撤回标记：撤回后重新拉历史也显示为撤回提示条，不再还原原文
         // （修复"撤回的消息还在"：消息本体仍存在分表，仅 message_extra.revoke 置 1）
         if (wk.revoke ?? 0) == 1 {
+            self.isRevokedFromServer = true
             self.type = .system
             self.content = self.isFromMe ? "你撤回了一条消息" : "对方撤回了一条消息"
         }
