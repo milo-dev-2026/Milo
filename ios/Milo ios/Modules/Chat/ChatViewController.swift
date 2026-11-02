@@ -1211,6 +1211,9 @@ class ChatViewController: UIViewController {
     /// - Parameter merge: 为 true 时保留已有本地消息（服务端只返回部分消息也不丢内容）
     private func applyLoadedMessages(_ loaded: [Message], scroll: Bool, finish: Bool, merge: Bool = false) {
         var result = loaded.filter { !($0.type == .text && $0.content.isEmpty) }
+        // 服务端已标记撤回的消息 ID：合并本地缓存时必须丢弃同名原文，
+        // 否则特殊群聊过滤掉撤回条后，本地缓存的原文又会被重新追加回来（表现为"撤回的消息还在"）
+        let serverRevokedIDs = Set(loaded.filter { $0.isRevokedFromServer }.map { $0.messageID })
         // 黑名单过滤（微信逻辑：拉黑后对方消息不展示）
         if channelType == 1 {
             let blackUids = UserDefaults.standard.stringArray(forKey: "blacklist_uids") ?? []
@@ -1236,6 +1239,8 @@ class ChatViewController: UIViewController {
         }
         let base = merge ? messages : []
         for local in base {
+            // 服务端已撤回：本地缓存的原文不再保留（普通群由撤回条代替，特殊群直接不展示）
+            if serverRevokedIDs.contains(local.messageID) { continue }
             // 本地消息 ID 与服务端 ID 相同时视为同一条；发送中的占位消息 ID 为 UUID，
             // 用 clientMsgNo 或"同方向同类型同内容（位置去掉前缀）时间相近"兜底去重
             let duplicated = result.contains { r in
@@ -1821,7 +1826,16 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
                        ver > self.extraVersion { self.extraVersion = ver }
                     if let ver = (item["extra_version"] as? NSNumber)?.int64Value,
                        ver > self.extraVersion { self.extraVersion = ver }
-                    guard let mid = item["message_id"] as? String else { continue }
+                    // message_id 兼容字符串/数字两种返回（服务端部分接口返回 BIGINT 数字，
+                    // 直接 as? String 会让整条撤回/已读变更被跳过，表现为"撤回不生效"）
+                    let mid: String
+                    if let s = item["message_id"] as? String {
+                        mid = s
+                    } else if let n = item["message_id"] as? NSNumber {
+                        mid = n.stringValue
+                    } else {
+                        continue
+                    }
                     let readed = (item["readed"] as? NSNumber)?.intValue ?? 0
                     let readedCount = (item["readed_count"] as? NSNumber)?.intValue ?? 0
                     let revoked = (item["revoke"] as? NSNumber)?.intValue ?? 0
