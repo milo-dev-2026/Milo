@@ -997,6 +997,10 @@ extension IMManager: WKConnectionManagerDelegate {
             case 4: // WKDisconnected
                 print("[IM] 断开连接, reason: \(reasonCode.rawValue)")
                 isConnected = false
+                // 兜底：服务器踢人(reason 12)时即使 onKick 未触发也强制下线
+                if Int(reasonCode.rawValue) == 12 {
+                    self.handleKickedOffline()
+                }
             case 0: // WKNoConnect
                 print("[IM] 未连接")
                 isConnected = false
@@ -1023,9 +1027,12 @@ extension IMManager: WKConnectionManagerDelegate {
         }
     }
 
-    func onKick(_ reasonCode: WKReason) {
+    /// SDK 协议方法是 onKick:reason:（两个参数：uint8_t + NSString）。
+    /// 旧实现 func onKick(_ reasonCode: WKReason) 签名不匹配，respondsToSelector 校验失败
+    /// 永远不会被调用——这就是"账号在他端登录后前台无任何提示"的根因
+    func onKick(_ reasonCode: UInt8, reason: String?) {
         DispatchQueue.main.async {
-            print("[IM] 被踢下线, reason: \(reasonCode.rawValue)")
+            print("[IM] 被踢下线, reasonCode: \(reasonCode), reason: \(reason ?? "")")
             self.isConnected = false
             self.connectStatusRaw = 4
             self.onConnectionChanged?(false)
@@ -1034,8 +1041,11 @@ extension IMManager: WKConnectionManagerDelegate {
                 object: NSNumber(value: false),
                 userInfo: ["status": 4]
             )
-            // 对齐微信/安卓：其他设备登录后强制下线，提示并回到登录页
-            self.handleKickedOffline()
+            // 12=被其他设备踢下线；2=token 认证失败（登录态已失效）
+            let message = (reasonCode == 2)
+                ? "登录状态已失效，请重新登录"
+                : "你的账号已在其他设备上登录，当前设备已下线"
+            self.handleKickedOffline(message: message)
         }
     }
 
@@ -1066,8 +1076,8 @@ extension IMManager: WKConnectionManagerDelegate {
         }
     }
 
-    /// 被踢下线：提示"账号已在其他设备登录"，确认后清空登录态回登录页
-    private func handleKickedOffline() {
+    /// 被踢下线：提示后确认清空登录态回登录页（对齐微信：一台手机只登录一个账号）
+    private func handleKickedOffline(message: String = "你的账号已在其他设备上登录，当前设备已下线") {
         guard !isHandlingKick else { return }
         isHandlingKick = true
         let presentKickAlert = {
@@ -1079,10 +1089,9 @@ extension IMManager: WKConnectionManagerDelegate {
                 self.isHandlingKick = false
                 return
             }
-            // 闪退避免重复弹窗：已有弹窗则直接返回登录页
             let alert = UIAlertController(
                 title: "下线通知",
-                message: "你的账号已在其他设备上登录，当前设备已下线",
+                message: message,
                 preferredStyle: .alert
             )
             alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
