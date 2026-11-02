@@ -746,9 +746,11 @@ extension IMManager: WKChatManagerDelegate {
         }
 
         if UIApplication.shared.applicationState == .active {
-            // 前台：播放系统提示音 + 震动
+            // 前台：播放提示音 + 震动
             if LocalStore.shared.isSoundEnabled {
-                AudioServicesPlaySystemSound(1007) // 系统短信提示音
+                // 不用 AudioServicesPlaySystemSound：会被硬件静音开关吞掉，
+                // 且录音后音频会话停在 .playAndRecord 时会走听筒几乎无声
+                RingtonePlayer.shared.playMessageTone()
             }
             if LocalStore.shared.isVibrationEnabled {
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
@@ -925,6 +927,10 @@ extension IMManager: WKChatManagerDelegate {
                    let d = text.data(using: .utf8),
                    let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
                    j["_sys"] as? Bool == true {
+                    content = text
+                    msgType = .system
+                } else if (1000...2000).contains(contentType) {
+                    // 群系统/事件消息（contentType 1000~2000，如改群名/禁言等）：统一按系统消息处理
                     content = text
                     msgType = .system
                 } else {
@@ -1489,7 +1495,7 @@ extension IMManager: WKCMDManagerDelegate {
             DataSyncManager.shared.syncFriends()
         } else if cmd.contains("frienddeleted") {
             DataSyncManager.shared.syncFriends()
-        } else if cmd == "revoke" {
+        } else if cmd.contains("revoke") {
             // 对方撤回消息（后端 /v1/message/revoke 推送的实时 CMD）：
             // 直接发通知，聊天页即时替换为"对方撤回了一条消息"，不用等 10s 扩展同步轮询
             if let messageId = param["message_id"] as? String, !messageId.isEmpty {

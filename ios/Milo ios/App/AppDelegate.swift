@@ -180,26 +180,55 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         print("APNs注册失败: \(error.localizedDescription)")
     }
 
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        // APNs token 回调可能发生在登录之前（无 auth token 会被后端 401 拒绝），
+        // 这里在每次回到前台时补传一次（按 uid+token 去重，不会重复上报）
+        if let token = UserDefaults.standard.string(forKey: "apns_device_token"), !token.isEmpty {
+            uploadPushTokenToServer(token: token)
+        }
+    }
+
+    /// 上传 APNs device token 到后端 /v1/devices/apns（落 device_push_token 表 + Redis userDeviceToken:{uid}）
     private func uploadPushTokenToServer(token: String) {
+        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        let authToken = UserDefaults.standard.string(forKey: "token") ?? ""
+        guard !uid.isEmpty, !authToken.isEmpty else { return }
+        let dedupKey = "\(uid):\(token)"
+        if UserDefaults.standard.string(forKey: "apns_uploaded_dedup") == dedupKey { return }
+
         let url = APIConfig.apiBaseURL + "/v1/devices/apns"
         guard let urlObj = URL(string: url) else { return }
         var request = URLRequest(url: urlObj)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let uid = UserDefaults.standard.string(forKey: "uid") ?? ""
-        let authToken = UserDefaults.standard.string(forKey: "token") ?? ""
-        if !authToken.isEmpty {
-            request.setValue(authToken, forHTTPHeaderField: "token")
-        }
+        request.setValue(authToken, forHTTPHeaderField: "token")
         let body: [String: Any] = [
             "uid": uid,
             "device_token": token,
+            "device_type": "IOS",
             "bundle_id": APIConfig.apnsBundleID
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                UserDefaults.standard.set(dedupKey, forKey: "apns_uploaded_dedup")
+            }
+        }.resume()
+    }
+
+    /// 退出登录时解绑 APNs device token（DELETE /v1/user/device_token），避免退出后仍收到推送
+    static func unregisterAPNsToken() {
+        let authToken = UserDefaults.standard.string(forKey: "token") ?? ""
+        guard !authToken.isEmpty else { return }
+        guard let urlObj = URL(string: APIConfig.apiBaseURL + "/v1/user/device_token") else { return }
+        var request = URLRequest(url: urlObj)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(authToken, forHTTPHeaderField: "token")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["device_type": "IOS"])
         URLSession.shared.dataTask(with: request).resume()
+        UserDefaults.standard.removeObject(forKey: "apns_uploaded_dedup")
     }
 }
 

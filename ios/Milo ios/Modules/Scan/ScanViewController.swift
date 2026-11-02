@@ -358,6 +358,59 @@ class MyQRCodeViewController: UIViewController {
     }
 }
 
+// MARK: - 群二维码识别与入群（长按识图 / 扫一扫共用）
+enum GroupQRCodeHelper {
+
+    /// 解析群二维码内容并返回群号
+    /// 支持后端永久群二维码格式 http(s)://host/v1/qrcode/g{group_no}，以及裸 g{group_no}
+    static func groupNo(from payload: String) -> String? {
+        let text = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        let marker = "/v1/qrcode/g"
+        if let range = text.range(of: marker) {
+            let gid = String(text[range.upperBound...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return gid.isEmpty ? nil : gid
+        }
+        if text.count == 33, text.hasPrefix("g") { return String(text.dropFirst()) }
+        return nil
+    }
+
+    /// 弹确认框，确认后以自己 uid 申请加入群聊
+    static func join(groupNo: String, from presenter: UIViewController) {
+        let alert = UIAlertController(title: "加入群聊", message: "是否加入该群聊？", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "加入", style: .default) { _ in
+            let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            guard !myUid.isEmpty else {
+                AppUtility.showToast("请先登录")
+                return
+            }
+            AppUtility.showToast("正在申请加入…")
+            Task {
+                do {
+                    let resp = try await APIClient.shared.requestRaw(
+                        .applyJoinGroup(groupId: groupNo, remark: "申请加入群聊")
+                    )
+                    let status = resp["status"] as? Int ?? 0
+                    // invite: 0=直接加入，1=已提交申请等待群主/管理员审核
+                    let invite = (resp["data"] as? [String: Any])?["invite"] as? Int ?? 1
+                    DispatchQueue.main.async {
+                        if status == 200 {
+                            AppUtility.showToast(invite == 0 ? "已加入群聊" : "已发送进群申请，等待管理员审核")
+                            NotificationCenter.default.post(name: NSNotification.Name("ConversationsSynced"), object: nil)
+                        } else {
+                            AppUtility.showToast(resp["msg"] as? String ?? "加入群聊失败")
+                        }
+                    }
+                } catch {
+                    DispatchQueue.main.async { AppUtility.showToast("加入群聊失败") }
+                }
+            }
+        })
+        presenter.present(alert, animated: true)
+    }
+}
+
 // MARK: - 扫描动画视图
 class ScanOverlayView: UIView {
 

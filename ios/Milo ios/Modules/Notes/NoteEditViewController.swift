@@ -430,7 +430,8 @@ navigationController?.pushViewController(locVC, animated: true)
             group: note?.group ?? "普通笔记"
         )
         
-        if note == nil {
+        // 收到的笔记不在本地笔记库中时，updateNote 会静默丢弃，这里统一按「不存在则新增」处理
+        if note == nil || !NoteStorageManager.shared.contains(noteId: savedNote.id) {
             NoteStorageManager.shared.addNote(savedNote)
             note = savedNote
         } else {

@@ -45,6 +45,8 @@ enum APIRouter: URLRequestConvertible {
     case getGroupMembers(groupId: String, page: Int, size: Int, keyword: String?)
     case createGroup(name: String, members: [String], memberNames: [String])
     case addGroupMembers(groupId: String, uids: [String])
+    /// 扫码/识图进群：以自己 uid 申请加入群聊（走后端 /v1/groups/{group_no}/member/invite）
+    case applyJoinGroup(groupId: String, remark: String)
     case removeGroupMembers(groupId: String, uids: [String])
     case updateGroupInfo(groupId: String, name: String?, avatar: String?)
     case getGroupAdmins(groupId: String)
@@ -317,6 +319,10 @@ enum APIRouter: URLRequestConvertible {
             ])
         case let .addGroupMembers(groupId, uids):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uids": uids])
+        case let .applyJoinGroup(_, remark):
+            // 自己作为申请对象：非群成员时后端生成入群申请，群主/管理员在新朋友页审批
+            let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["uids": [myUid], "remark": remark])
         case let .removeGroupMembers(groupId, uids):
             request.httpBody = try JSONSerialization.data(withJSONObject: ["group_id": groupId, "uids": uids])
         case let .updateGroupInfo(groupId, name, avatar):
@@ -482,6 +488,7 @@ enum APIRouter: URLRequestConvertible {
             return "/v1/groups/\(groupId)/membersync"
         case .createGroup: return "/v1/group/create"
         case .addGroupMembers: return "/v1/groups/members/add"
+        case let .applyJoinGroup(groupId, _): return "/v1/groups/\(groupId)/member/invite"
         case .removeGroupMembers: return "/v1/groups/members/remove"
         case .updateGroupInfo: return "/v1/groups/info/update"
         case .getGroupAdmins: return "/v1/groups/admins"

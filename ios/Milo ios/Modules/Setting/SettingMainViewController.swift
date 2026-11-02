@@ -90,6 +90,8 @@ class SettingMainViewController: UIViewController {
     }
 
     private func logout() {
+        // 先解绑 APNs 推送 token（需要在清除登录态之前调用，接口要 auth token）
+        AppDelegate.unregisterAPNsToken()
         // 断开 IM 连接并清除本地登录状态（token、uid 等）
         IMManager.shared.disconnect()
         LocalStore.shared.clearAll()

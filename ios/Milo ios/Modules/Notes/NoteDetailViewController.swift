@@ -68,12 +68,20 @@ class NoteDetailViewController: UIViewController {
         title = "笔记详情"
         view.backgroundColor = .themeBackground
         
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "square.and.pencil"),
-            style: .plain,
-            target: self,
-            action: #selector(editNote)
-        )
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(
+                image: UIImage(systemName: "square.and.pencil"),
+                style: .plain,
+                target: self,
+                action: #selector(editNote)
+            ),
+            UIBarButtonItem(
+                image: UIImage(systemName: "square.and.arrow.down"),
+                style: .plain,
+                target: self,
+                action: #selector(saveAsMyNote)
+            )
+        ]
         
         scrollView.keyboardDismissMode = .interactive
         view.addSubview(scrollView)
@@ -322,6 +330,16 @@ class NoteDetailViewController: UIViewController {
         present(nav, animated: true)
     }
     
+    /// 保存笔记：把当前笔记（他人发来的笔记）存入「我的笔记」
+    @objc private func saveAsMyNote() {
+        if NoteStorageManager.shared.contains(noteId: note.id) {
+            AppUtility.showToast("已在我的笔记中")
+            return
+        }
+        _ = NoteStorageManager.shared.saveReceivedNote(note)
+        AppUtility.showToast("已保存到我的笔记")
+    }
+
     @objc private func imageTapped(_ gesture: UITapGestureRecognizer) {
         guard let imgView = gesture.view as? UIImageView,
               let image = imgView.image else { return }

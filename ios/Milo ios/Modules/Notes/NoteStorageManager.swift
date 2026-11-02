@@ -74,6 +74,24 @@ class NoteStorageManager {
         notes.append(note)
         saveNotesToStorage(notes)
     }
+
+    /// 保存他人发来的笔记到「我的笔记」：分配新的本地 ID，避免与发送方 noteId 冲突或覆盖已有笔记
+    @discardableResult
+    func saveReceivedNote(_ note: NoteEntity) -> NoteEntity {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        var copy = note
+        copy.id = UUID().uuidString
+        copy.createTime = now
+        copy.updateTime = now
+        copy.isSticky = false
+        addNote(copy)
+        return copy
+    }
+
+    /// 笔记是否已存在于本地笔记库（用于「保存笔记」状态判断）
+    func contains(noteId: String) -> Bool {
+        loadNotesFromStorage().contains { $0.id == noteId }
+    }
     
     /// 更新笔记
     func updateNote(_ note: NoteEntity) {

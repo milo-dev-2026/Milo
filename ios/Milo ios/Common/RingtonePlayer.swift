@@ -9,10 +9,12 @@ final class RingtonePlayer {
     private enum Style: Equatable {
         case ringback   // 主叫等待接听：450Hz 1s 响 + 2s 静音
         case incoming   // 被叫来电：800Hz 双短音 + 长间隔
+        case message    // 应用内新消息提示音：短促双音
     }
 
     private var player: AVAudioPlayer?
     private var currentStyle: Style?
+    private var messagePlayer: AVAudioPlayer?
 
     private init() {}
 
@@ -26,10 +28,28 @@ final class RingtonePlayer {
         start(style: .incoming)
     }
 
+    /// 应用内新消息提示音（前台）
+    /// 系统 AudioServices 提示音会被硬件静音开关吞掉；且录过语音后音频会话停留在 .playAndRecord，
+    /// 系统声音会改走听筒几乎听不见。这里统一切回 .playback 用 AVAudioPlayer 播放，保证前台能听到。
+    func playMessageTone() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? session.setActive(true)
+        guard let url = wavURL(for: .message),
+              let p = try? AVAudioPlayer(contentsOf: url) else { return }
+        messagePlayer = p
+        p.numberOfLoops = 0
+        p.volume = 1.0
+        p.prepareToPlay()
+        p.play()
+    }
+
     func stop() {
         player?.stop()
         player = nil
         currentStyle = nil
+        messagePlayer?.stop()
+        messagePlayer = nil
     }
 
     private func start(style: Style) {
@@ -64,7 +84,13 @@ final class RingtonePlayer {
 
     private func wavURL(for style: Style) -> URL? {
         guard let dir = cacheDirectory else { return nil }
-        let url = dir.appendingPathComponent(style == .ringback ? "ringback.wav" : "incoming.wav")
+        let fileName: String
+        switch style {
+        case .ringback: fileName = "ringback.wav"
+        case .incoming: fileName = "incoming.wav"
+        case .message: fileName = "message.wav"
+        }
+        let url = dir.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: url.path) { return url }
 
         var samples: [Int16] = []
@@ -91,6 +117,10 @@ final class RingtonePlayer {
             silence(seconds: 0.15)
             tone(freq: 880, seconds: 0.25)
             silence(seconds: 1.6)
+        case .message:
+            tone(freq: 1318, seconds: 0.14, amplitude: 0.55)
+            silence(seconds: 0.06)
+            tone(freq: 1760, seconds: 0.16, amplitude: 0.45)
         }
 
         guard let data = wavData(from: samples, sampleRate: Int(rate)) else { return nil }
