@@ -1529,16 +1529,20 @@ extension IMManager: WKCMDManagerDelegate {
         let cmd = (model.cmd ?? "").lowercased()
         let param = (model.param as? [String: Any]) ?? [:]
 
-        if cmd.contains("friendrequest") {
-            // 收到好友申请：写入本地申请列表
-            FriendApplyStore.shared.saveFromCMD(param)
-        } else if cmd.contains("friendaccept") {
-            // 对方同意了我的申请
-            let uid = (param["from_uid"] as? String) ?? (param["to_uid"] as? String) ?? ""
+        // 注意分支顺序：autoaccept 系列（friendrequestautoaccept / friendverificationautoaccept）
+        // 也包含 "friendrequest" 子串，必须先匹配 accept 类，否则会误判为待处理申请
+        if cmd.contains("friendaccept") || (cmd.contains("autoaccept") && (cmd.contains("friendrequest") || cmd.contains("friendverification"))) {
+            // 对方同意了我的申请（Android friendAccept CMD param 为 {"uid": 接受者uid}）
+            let uid = (param["uid"] as? String) ?? (param["from_uid"] as? String) ?? (param["to_uid"] as? String) ?? ""
             if !uid.isEmpty {
                 FriendApplyStore.shared.markStatus(uid: uid, status: 1)
             }
             DataSyncManager.shared.syncFriends()
+        } else if cmd.contains("friendapplyexpires") {
+            // 申请过期：忽略
+        } else if cmd.contains("friendapply") || cmd.contains("friendrequest") {
+            // 收到好友申请（friendApply CMD）：写入本地申请列表
+            FriendApplyStore.shared.saveFromCMD(param)
         } else if cmd.contains("frienddeleted") {
             DataSyncManager.shared.syncFriends()
         } else if cmd.contains("revoke") {

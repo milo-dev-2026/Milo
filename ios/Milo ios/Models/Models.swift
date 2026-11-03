@@ -958,6 +958,35 @@ struct FriendApply: Codable {
     /// 入群申请时的群号/群名称
     var groupNo: String?
     var groupName: String?
+    /// 是否我发出的申请（来自 GET /v1/friend/apply 的服务端记录，对齐 Android NewFriendsActivity 合并展示）
+    var isOutgoing: Bool = false
+
+    init(uid: String, name: String, avatar: String?, remark: String?, status: Int, token: String?, type: Int?, groupNo: String?, groupName: String?, isOutgoing: Bool = false) {
+        self.uid = uid
+        self.name = name
+        self.avatar = avatar
+        self.remark = remark
+        self.status = status
+        self.token = token
+        self.type = type
+        self.groupNo = groupNo
+        self.groupName = groupName
+        self.isOutgoing = isOutgoing
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        uid = try c.decode(String.self, forKey: .uid)
+        name = try c.decode(String.self, forKey: .name)
+        avatar = try c.decodeIfPresent(String.self, forKey: .avatar)
+        remark = try c.decodeIfPresent(String.self, forKey: .remark)
+        status = try c.decode(Int.self, forKey: .status)
+        token = try c.decodeIfPresent(String.self, forKey: .token)
+        type = try c.decodeIfPresent(Int.self, forKey: .type)
+        groupNo = try c.decodeIfPresent(String.self, forKey: .groupNo)
+        groupName = try c.decodeIfPresent(String.self, forKey: .groupName)
+        isOutgoing = try c.decodeIfPresent(Bool.self, forKey: .isOutgoing) ?? false
+    }
 }
 
 // MARK: - API响应包装

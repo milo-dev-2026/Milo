@@ -438,6 +438,9 @@ enum APIRouter: URLRequestConvertible {
             request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
         case .updateGroupSettingString(let groupId, let key, let value):
             request.httpBody = try JSONSerialization.data(withJSONObject: [key: value])
+        case .getFriendsApply:
+            // TSDD 分页 1 起始（Offset((page-1)*size)），不带 page_index 返回空列表
+            request = try URLEncoding.default.encode(request, with: ["page_index": 1, "page_size": 100])
         default:
             break
         }
@@ -723,6 +726,12 @@ class APIClient {
     func requestRaw(_ router: APIRouter) async throws -> [String: Any] {
         let response = try await session.request(router).serializingData().value
         return (try? JSONSerialization.jsonObject(with: response) as? [String: Any]) ?? [:]
+    }
+
+    /// 顶层为 JSON 数组的原始请求（TSDD 列表接口多为裸数组，如 GET /v1/friend/apply）
+    func requestRawArray(_ router: APIRouter) async throws -> [[String: Any]] {
+        let response = try await session.request(router).serializingData().value
+        return (try? JSONSerialization.jsonObject(with: response) as? [[String: Any]]) ?? []
     }
 
     func upload(data: Data, fileName: String) async throws -> String {

@@ -8,6 +8,8 @@ class NewFriendsViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let emptyLabel = UILabel()
     private var applies: [FriendApply] = []
+    /// 服务端申请记录（我发出的，含888客服自动通过记录）
+    private var serverOutgoing: [FriendApply] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -75,10 +77,56 @@ class NewFriendsViewController: UIViewController {
 
     private func loadData() {
         // 与Android一致：申请记录来自 IM 的 system CMD，持久化在本地
-        let list = FriendApplyStore.shared.all()
-        applies = list
-        emptyLabel.isHidden = !list.isEmpty
+        mergeAndShow()
+        // 同时拉取服务端记录（我发出的申请，含888客服自动通过记录）
+        fetchServerOutgoing()
+    }
+
+    /// 本地 incoming 记录优先，服务端我发出的记录按 uid+方向 去重后合并展示
+    private func mergeAndShow() {
+        let local = FriendApplyStore.shared.all()
+        let localKeys = Set(local.map { "\($0.uid)|\($0.isOutgoing)" })
+        var merged = local
+        for item in serverOutgoing where !localKeys.contains("\(item.uid)|\(item.isOutgoing)") {
+            merged.append(item)
+        }
+        applies = merged
+        emptyLabel.isHidden = !merged.isEmpty
         tableView.reloadData()
+    }
+
+    /// GET /v1/friend/apply（TSDD 返回裸数组）
+    private func fetchServerOutgoing() {
+        Task {
+            do {
+                let list = try await APIClient.shared.requestRawArray(.getFriendsApply)
+                var outgoing: [FriendApply] = []
+                for row in list {
+                    // uid=被加者, to_uid=另一方, to_name=对方昵称；status: 0=待处理 1=已通过 2=已拒绝
+                    let toUid = row["to_uid"] as? String ?? ""
+                    if toUid.isEmpty { continue }
+                    let toName = row["to_name"] as? String ?? ""
+                    outgoing.append(FriendApply(
+                        uid: toUid,
+                        name: toName.isEmpty ? "用户" : toName,
+                        avatar: nil,
+                        remark: row["remark"] as? String,
+                        status: row["status"] as? Int ?? 0,
+                        token: row["token"] as? String,
+                        type: 0,
+                        groupNo: nil,
+                        groupName: nil,
+                        isOutgoing: true
+                    ))
+                }
+                await MainActor.run {
+                    self.serverOutgoing = outgoing
+                    self.mergeAndShow()
+                }
+            } catch {
+                // 静默失败：本地记录仍可展示
+            }
+        }
     }
 
     private func acceptApply(_ apply: FriendApply) {
@@ -304,7 +352,16 @@ class FriendApplyCell: UITableViewCell {
 
         AppUtility.loadChannelAvatar(channelId: apply.uid, channelType: 1, name: apply.name, into: avatarView)
 
-        if apply.status == 0 {
+        if apply.isOutgoing {
+            // 我发出的申请：无操作按钮，只显示状态（对齐 Android 新朋友列表的我发出记录）
+            statusLabel.isHidden = false
+            buttonStack.isHidden = true
+            switch apply.status {
+            case 1: statusLabel.text = "已同意"
+            case 2: statusLabel.text = "已拒绝"
+            default: statusLabel.text = "等待验证"
+            }
+        } else if apply.status == 0 {
             // 等待验证：好友申请只显示"同意"，入群申请显示"拒绝/同意"（对齐 Android）
             statusLabel.isHidden = true
             buttonStack.isHidden = false
