@@ -203,6 +203,12 @@ class IMManager: NSObject {
                                 syncModel.version = convDict["version"] as? Int64 ?? 0
                                 syncModel.mute = (convDict["mute"] as? Int ?? 0) == 1
                                 syncModel.stick = (convDict["stick"] as? Int ?? 0) == 1
+                                // 解析 recents：服务端把最近若干条消息直接放在会话里返回，
+                                // SDK 的 handleSyncConversation 只保存 recents 中的消息，
+                                // 这里漏解析会导致杀进程后离线消息永远收不到。
+                                if let recentsArr = convDict["recents"] as? [[String: Any]], let ch = syncModel.channel {
+                                    syncModel.recents = recentsArr.compactMap { self.parseSyncMessage(from: $0, channel: ch) }
+                                }
                                 syncModels.append(syncModel)
                             }
                             wrapModel.conversations = syncModels
@@ -224,6 +230,66 @@ class IMManager: NSObject {
             print("[IM] 会话同步ACK, version: \(cmdVersion)")
             complete?(nil)
         })
+    }
+
+    // MARK: - 消息解析（会话同步 recents / 频道消息同步共用）
+    /// 把服务端返回的消息字典解析为 WKMessage。channel 由调用方传入：
+    /// - 频道消息同步时传入 SDK 回调的 channel
+    /// - 会话同步 recents 时传入会话的 channel（单聊为对端 uid）
+    private func parseSyncMessage(from msgDict: [String: Any], channel: WKChannel) -> WKMessage {
+        let msg = WKMessage()
+        if let mid = msgDict["message_id"] as? Int {
+            msg.messageId = UInt64(mid)
+        } else if let midStr = msgDict["message_id"] as? String, let mid = UInt64(midStr) {
+            msg.messageId = mid
+        }
+        msg.timestamp = msgDict["timestamp"] as? Int ?? 0
+        msg.fromUid = msgDict["from_uid"] as? String ?? ""
+        msg.clientMsgNo = msgDict["client_msg_no"] as? String ?? ""
+        if let seq = msgDict["message_seq"] as? Int {
+            msg.messageSeq = UInt32(seq)
+        } else if let seq = msgDict["seq"] as? Int {
+            msg.messageSeq = UInt32(seq)
+        }
+        msg.channel = channel
+        msg.status = WKMessageStatus(rawValue: 1) ?? msg.status
+
+        var payloadDict: [String: Any]?
+        if let payloadStr = msgDict["payload"] as? String {
+            if let data = Data(base64Encoded: payloadStr),
+               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                payloadDict = j
+            } else if let data = payloadStr.data(using: .utf8),
+                      let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                payloadDict = j
+            }
+        } else if let pDict = msgDict["payload"] as? [String: Any] {
+            payloadDict = pDict
+        }
+        if let payloadDict = payloadDict {
+            let contentType: Int
+            if let t = payloadDict["type"] as? Int { contentType = t }
+            else if let t = payloadDict["type"] as? NSNumber { contentType = t.intValue }
+            else { contentType = 1 }
+            if let cls = WKSDK.shared().getMessageContent(contentType) as? WKMessageContent.Type {
+                let content = cls.init()
+                content.decode(withJSON: payloadDict)
+                msg.content = content
+            } else {
+                let sysJson: [String: Any] = [
+                    "_sys": true,
+                    "content": payloadDict["content"] as? String ?? "",
+                    "extra": payloadDict["extra"] ?? []
+                ]
+                if let d = try? JSONSerialization.data(withJSONObject: sysJson),
+                   let s = String(data: d, encoding: .utf8) {
+                    msg.content = WKTextContent(content: s)
+                } else {
+                    msg.content = WKTextContent(content: payloadDict["content"] as? String ?? "")
+                }
+            }
+        }
+        return msg
     }
 
     // MARK: - 设置消息同步提供者
@@ -270,66 +336,7 @@ class IMManager: NSObject {
                         syncModel.endMessageSeq = UInt32(json["end_message_seq"] as? Int ?? 0)
 
                         if let messages = json["messages"] as? [[String: Any]] {
-                            var wkMessages = [WKMessage]()
-                            for msgDict in messages {
-                                let msg = WKMessage()
-                                if let mid = msgDict["message_id"] as? Int {
-                                    msg.messageId = UInt64(mid)
-                                } else if let midStr = msgDict["message_id"] as? String, let mid = UInt64(midStr) {
-                                    msg.messageId = mid
-                                }
-                                msg.timestamp = msgDict["timestamp"] as? Int ?? 0
-                                msg.fromUid = msgDict["from_uid"] as? String ?? ""
-                                msg.clientMsgNo = msgDict["client_msg_no"] as? String ?? ""
-                                if let seq = msgDict["message_seq"] as? Int {
-                                    msg.messageSeq = UInt32(seq)
-                                } else if let seq = msgDict["seq"] as? Int {
-                                    msg.messageSeq = UInt32(seq)
-                                }
-                                msg.channel = channel
-                                msg.status = WKMessageStatus(rawValue: 1) ?? msg.status
-
-                                // 解析payload为消息正文（与SDK网络收包路径一致）
-                                var payloadDict: [String: Any]?
-                                if let payloadStr = msgDict["payload"] as? String {
-                                    if let data = Data(base64Encoded: payloadStr),
-                                       let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                                        payloadDict = j
-                                    } else if let data = payloadStr.data(using: .utf8),
-                                              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                                        payloadDict = j
-                                    }
-                                } else if let pDict = msgDict["payload"] as? [String: Any] {
-                                    payloadDict = pDict
-                                }
-                                if let payloadDict = payloadDict {
-                                    let contentType: Int
-                                    if let t = payloadDict["type"] as? Int { contentType = t }
-                                    else if let t = payloadDict["type"] as? NSNumber { contentType = t.intValue }
-                                    else { contentType = 1 }
-                                    if let cls = WKSDK.shared().getMessageContent(contentType) as? WKMessageContent.Type {
-                                        let content = cls.init()
-                                        content.decode(withJSON: payloadDict)
-                                        msg.content = content
-                                    } else {
-                                        // 未注册类型（群事件 1001/1002/1003 等）：包装成带 _sys 标记的系统消息 JSON，
-                                        // 保留 extra 数组供 {0}/{1} 占位符替换成昵称
-                                        let sysJson: [String: Any] = [
-                                            "_sys": true,
-                                            "content": payloadDict["content"] as? String ?? "",
-                                            "extra": payloadDict["extra"] ?? []
-                                        ]
-                                        if let d = try? JSONSerialization.data(withJSONObject: sysJson),
-                                           let s = String(data: d, encoding: .utf8) {
-                                            msg.content = WKTextContent(content: s)
-                                        } else {
-                                            msg.content = WKTextContent(content: payloadDict["content"] as? String ?? "")
-                                        }
-                                    }
-                                }
-                                wkMessages.append(msg)
-                            }
-                            syncModel.messages = wkMessages
+                            syncModel.messages = messages.map { self.parseSyncMessage(from: $0, channel: channel) }
                         }
                     }
 
