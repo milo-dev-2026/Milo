@@ -206,8 +206,8 @@ class IMManager: NSObject {
                                 // 解析 recents：服务端把最近若干条消息直接放在会话里返回，
                                 // SDK 的 handleSyncConversation 只保存 recents 中的消息，
                                 // 这里漏解析会导致杀进程后离线消息永远收不到。
-                                if let recentsArr = convDict["recents"] as? [[String: Any]], let ch = syncModel.channel {
-                                    syncModel.recents = recentsArr.compactMap { self.parseSyncMessage(from: $0, channel: ch) }
+                                if let recentsArr = convDict["recents"] as? [[String: Any]] {
+                                    syncModel.recents = recentsArr.compactMap { self.parseSyncMessage(from: $0, channel: syncModel.channel) }
                                 }
                                 syncModels.append(syncModel)
                             }
