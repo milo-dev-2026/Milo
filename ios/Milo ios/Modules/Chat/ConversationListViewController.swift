@@ -283,9 +283,8 @@ class ConversationListViewController: UIViewController {
     }
 
     private func handleScanResult(_ result: String) {
-        // 群二维码：直接在 App 内申请进群
-        if let groupNo = GroupQRCodeHelper.groupNo(from: result) {
-            GroupQRCodeHelper.join(groupNo: groupNo, from: self)
+        // 群二维码 / 个人二维码：统一交给 GroupQRCodeHelper（内部走服务端 /v1/qrcode 解析，与安卓一致）
+        if GroupQRCodeHelper.handle(payload: result, from: self) {
             return
         }
         let uid: String

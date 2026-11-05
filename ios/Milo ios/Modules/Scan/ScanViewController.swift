@@ -313,10 +313,12 @@ class MyQRCodeViewController: UIViewController {
             make.trailing.lessThanOrEqualToSuperview().offset(-ScreenAdapter.scaleW(20))
         }
 
-        // 二维码（与扫码端解析格式一致：uid:xxx）
+        // 二维码（与安卓/服务端格式一致：/v1/qrcode/<Milo号>，无 Milo 号时兼容旧格式 uid:xxx）
+        let shortNo = UserDefaults.standard.string(forKey: "short_no") ?? ""
+        let qrContent = shortNo.isEmpty ? "uid:\(uid)" : "\(APIConfig.apiBaseURL)/v1/qrcode/\(shortNo)"
         let qrImageView = UIImageView()
         qrImageView.contentMode = .scaleAspectFit
-        qrImageView.image = Self.makeQRCode(from: "uid:\(uid)", size: 512)
+        qrImageView.image = Self.makeQRCode(from: qrContent, size: 512)
         card.addSubview(qrImageView)
         qrImageView.snp.makeConstraints { make in
             make.top.equalTo(avatarView.snp.bottom).offset(ScreenAdapter.scaleH(20))
@@ -358,21 +360,123 @@ class MyQRCodeViewController: UIViewController {
     }
 }
 
-// MARK: - 群二维码识别与入群（长按识图 / 扫一扫共用）
+// MARK: - 二维码识别与入群（扫一扫 / 相册识别 / 长按识图共用）
 enum GroupQRCodeHelper {
 
-    /// 解析群二维码内容并返回群号
-    /// 支持后端永久群二维码格式 http(s)://host/v1/qrcode/g{group_no}，以及裸 g{group_no}
-    static func groupNo(from payload: String) -> String? {
+    /// 十六进制校验
+    private static func isHex(_ text: String) -> Bool {
+        return text.rangeOfCharacter(from: CharacterSet(charactersIn: "0123456789abcdefABCDEF").inverted) == nil
+    }
+
+    /// 提取服务端二维码短码
+    /// 安卓端群二维码来自后端 /v1/groups/<群号>/qrcode，内容为 http(s)://host/v1/qrcode/g<群号>；
+    /// 个人二维码为 http(s)://host/v1/qrcode/<Milo号>。两端统一交给后端解析，避免格式猜不一致。
+    private static func serverCode(from payload: String) -> String? {
         let text = payload.trimmingCharacters(in: .whitespacesAndNewlines)
-        let marker = "/v1/qrcode/g"
-        if let range = text.range(of: marker) {
-            let gid = String(text[range.upperBound...])
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            return gid.isEmpty ? nil : gid
+        guard !text.isEmpty else { return nil }
+        if let url = URL(string: text), url.path.contains("/v1/qrcode/") {
+            let code = (url.path as NSString).lastPathComponent
+            return code.isEmpty ? nil : code
         }
-        if text.count == 33, text.hasPrefix("g") { return String(text.dropFirst()) }
+        // 裸短码：g + 32位群号，或 10 位 Milo 号
+        if text.count == 33, text.hasPrefix("g"), isHex(String(text.dropFirst())) {
+            return text
+        }
+        if text.count == 10, text.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) == nil {
+            return text
+        }
         return nil
+    }
+
+    /// 本地解析群号（g + 32 位十六进制，兼容直接编码群号的二维码）
+    static func groupNo(from payload: String) -> String? {
+        guard let code = serverCode(from: payload) else { return nil }
+        if code.count == 33, code.hasPrefix("g") { return String(code.dropFirst()) }
+        if code.count == 32, isHex(code) { return code }
+        return nil
+    }
+
+    /// 统一入口：识别二维码内容并执行对应操作（返回 true 表示已接管）
+    @discardableResult
+    static func handle(payload: String, from presenter: UIViewController) -> Bool {
+        let text = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return false }
+
+        // 1. 群二维码：本地能解析的直接处理，响应最快
+        if let groupNo = groupNo(from: text), groupNo.count == 32 {
+            join(groupNo: groupNo, from: presenter)
+            return true
+        }
+        // 2. 其它 /v1/qrcode/ 短码（个人二维码、旧版邀请码）交给后端解析，与安卓走同一条链路
+        if let code = serverCode(from: text) {
+            resolve(code: code, from: presenter)
+            return true
+        }
+        // 3. 兼容 iOS 旧版个人二维码 uid:xxx
+        if text.hasPrefix("uid:") {
+            let uid = String(text.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !uid.isEmpty { applyFriend(uid: uid, from: presenter) }
+            return true
+        }
+        return false
+    }
+
+    /// 调用后端 /v1/qrcode/<code> 解析（对齐安卓 ScanUtils）
+    private static func resolve(code: String, from presenter: UIViewController) {
+        guard let url = URL(string: "\(APIConfig.apiBaseURL)/v1/qrcode/\(code)") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                DispatchQueue.main.async { AppUtility.showToast("二维码无效或已过期") }
+                return
+            }
+            let type = json["type"] as? String ?? ""
+            let dataDict = json["data"] as? [String: Any]
+            DispatchQueue.main.async {
+                switch type {
+                case "group":
+                    if let gid = dataDict?["group_no"] as? String, !gid.isEmpty {
+                        join(groupNo: gid, from: presenter)
+                    } else {
+                        AppUtility.showToast("群二维码无效")
+                    }
+                case "userInfo":
+                    if let uid = dataDict?["uid"] as? String, !uid.isEmpty {
+                        applyFriend(uid: uid, from: presenter)
+                    } else {
+                        AppUtility.showToast("二维码无效")
+                    }
+                default:
+                    AppUtility.showToast(json["msg"] as? String ?? "二维码无效或已过期")
+                }
+            }
+        }.resume()
+    }
+
+    /// 发送好友申请（对齐扫码加好友流程）
+    private static func applyFriend(uid: String, from presenter: UIViewController) {
+        let myUid = UserDefaults.standard.string(forKey: "uid") ?? ""
+        guard !myUid.isEmpty else {
+            AppUtility.showToast("请先登录")
+            return
+        }
+        guard uid != myUid else {
+            AppUtility.showToast("不能添加自己为好友")
+            return
+        }
+        Task {
+            do {
+                let response = try await APIClient.shared.requestRaw(.applyFriend(uid: uid, remark: "", vercode: ""))
+                let ok = (response["status"] as? Int) == 200
+                DispatchQueue.main.async {
+                    AppUtility.showToast(ok ? "好友申请已发送" : (response["msg"] as? String ?? "发送申请失败"))
+                }
+            } catch {
+                DispatchQueue.main.async { AppUtility.showToast("发送申请失败") }
+            }
+        }
     }
 
     /// 弹确认框，确认后以自己 uid 申请加入群聊

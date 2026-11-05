@@ -97,7 +97,9 @@ class UserQRCodeViewController: UIViewController {
     }
 
     private func generateQRCode() {
-        let qrString = "uid:\(uid)"
+        // 与安卓/服务端格式保持一致：/v1/qrcode/<Milo号>，无 Milo 号时兼容旧格式 uid:xxx
+        let shortNo = UserDefaults.standard.string(forKey: "short_no") ?? ""
+        let qrString = shortNo.isEmpty ? "uid:\(uid)" : "\(APIConfig.apiBaseURL)/v1/qrcode/\(shortNo)"
         guard let data = qrString.data(using: .utf8) else { return }
 
         let context = CIContext()

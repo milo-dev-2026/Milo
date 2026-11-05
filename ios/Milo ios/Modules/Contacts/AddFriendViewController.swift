@@ -301,6 +301,13 @@ class AddFriendViewController: UIViewController {
         let scanVC = ScanViewController()
         // 扫码页全屏：隐藏底部 TabBar（对齐安卓）
         scanVC.hidesBottomBarWhenPushed = true
+        // 与首页扫一扫共用同一套解析（群二维码走服务端 /v1/qrcode 入群）
+        scanVC.onScanResult = { [weak self] result in
+            guard let self = self else { return }
+            if !GroupQRCodeHelper.handle(payload: result, from: self) {
+                AppUtility.showToast("未识别的二维码")
+            }
+        }
         navigationController?.pushViewController(scanVC, animated: true)
     }
 
